@@ -81,14 +81,35 @@
 	mw.flow.ve.Target.static.importRules = ve.copy( mw.flow.ve.Target.static.importRules );
 	mw.flow.ve.Target.static.importRules.external.blacklist[ 'link/mwExternal' ] = false;
 
+	if(!OO.ui.isMobile()) {	// Full	toolbar	if not in mobile mode.
+
+		var toolBar = ve.init.mw.Target.static.toolbarGroups;
+		toolBar.shift(); // Remove the undo/redo buttons to save space.
+
+	        mw.flow.ve.Target.static.toolbarGroups = [{name: 'flowMention', include: ['flowMention']}].concat(toolBar).concat([{
+                        "name": "editMode",
+                        "align": "after",
+                        "type": "list",
+                        "icon": "edit",
+                        "title": "Changer d’éditeur",
+                        "include": [
+                            "editModeVisual",
+                            "editModeSource"
+                        ],
+                        "classes": [
+                            "ve-ui-toolbar-group-editMode"
+                        ]
+                    }]);
+	}
+
 	// Methods
 
 	mw.flow.ve.Target.prototype.addSurface = function ( dmDoc, config ) {
 		config = ve.extendObject( {
 			// eslint-disable-next-line no-jquery/no-global-selector
-			$overlayContainer: $( '#content' ),
+			$overlayContainer: $( '#content' )
 			// Disable to allow Tab/Shift+Tab to move focus out of the widget (T172694)
-			excludeCommands: [ 'indent', 'outdent' ]
+			//excludeCommands: [ 'indent', 'outdent' ]
 		}, config );
 		// Parent method
 		return mw.flow.ve.Target.super.prototype.addSurface.call( this, dmDoc, config );

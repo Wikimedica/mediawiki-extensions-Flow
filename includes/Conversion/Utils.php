@@ -18,7 +18,9 @@ use Language;
 use MediaWiki\MediaWikiServices;
 use OutputPage;
 use ParserOptions;
+use ParsoidVirtualRESTService;
 use RequestContext;
+use RestbaseVirtualRESTService;
 use Sanitizer;
 use Title;
 use VirtualRESTServiceClient;
@@ -59,14 +61,17 @@ abstract class Utils {
 		if ( $from === 'wt' ) {
 			$from = 'wikitext';
 		}
-
+		
 		if ( $from === 'wikitext' || $from === 'html' ) {
 			if ( $to === 'wikitext' || $to === 'html' ) {
 				if ( self::isParsoidConfigured() ) {
-					return self::parsoid( $from, $to, $content, $title );
-				} else {
-					return self::parser( $from, $to, $content, $title );
+					try {
+						return self::parsoid( $from, $to, $content, $title );
+					} catch ( NoParserException $e ) {
+						/* fall through, try legacy parser */
+					}
 				}
+				return self::parser( $from, $to, $content, $title );
 			} else {
 				throw new WikitextException( "Conversion from '$from' to '$to' was requested, " .
 					"but this is not supported." );
@@ -131,6 +136,7 @@ abstract class Utils {
 		}
 		$url = '/restbase/local/v1/transform/' . $from . '/to/' . $to . '/' .
 			urlencode( $prefixedDbTitle );
+		
 		$request = [
 			'method' => 'POST',
 			'url' => $url,
@@ -145,6 +151,7 @@ abstract class Utils {
 			],
 		];
 		$response = $serviceClient->run( $request );
+		
 		if ( $response['code'] !== 200 ) {
 			if ( $response['error'] !== '' ) {
 				$statusMsg = $response['error'];
@@ -294,37 +301,37 @@ abstract class Utils {
 	 * For backwards compatibility, $wgFlowParsoid* variables are used
 	 * to specify a Parsoid configuration as a fall back.
 	 *
+	 * See ApiParsoidTrait::getVRSObject() in VisualEditor (which should
+	 * eventually be upstreamed to core, T261310).
+	 *
 	 * @return \VirtualRESTService the VirtualRESTService object to use
 	 * @throws NoParserException When Parsoid/RESTBase is not configured
 	 */
 	private static function makeVRSObject() {
-		global $wgVirtualRestConfig, $wgFlowParsoidURL, $wgFlowParsoidPrefix,
+		global $wgFlowParsoidURL, $wgFlowParsoidPrefix,
 			$wgFlowParsoidTimeout, $wgFlowParsoidForwardCookies,
-			$wgFlowParsoidHTTPProxy;
+			$wgFlowParsoidHTTPProxy, $wgVisualEditorParsoidAutoConfig;
+		$context = RequestContext::getMain();
 
 		// the params array to create the service object with
 		$params = [];
-		// the VRS class to use; defaults to Parsoid
-		$class = 'ParsoidVirtualRESTService';
-		// the global virtual rest service config object, if any
-		$vrs = $wgVirtualRestConfig;
+		// the VRS class to use, defaults to Parsoid
+		$class = ParsoidVirtualRESTService::class;
+		// The global virtual rest service config object, if any
+		$vrs = $context->getConfig()->get( 'VirtualRestConfig' );
 		// HACK: don't use RESTbase because it'll drop data-parsoid, see T115236
-		/*if ( isset( $vrs['modules'] ) && isset( $vrs['modules']['restbase'] ) ) {
+		// @phan-suppress-next-line PhanImpossibleCondition
+		if ( false && isset( $vrs['modules'] ) && isset( $vrs['modules']['restbase'] ) ) {
 			// if restbase is available, use it
 			$params = $vrs['modules']['restbase'];
-			$params['parsoidCompat'] = false; // backward compatibility
-			$class = 'RestbaseVirtualRESTService';
-		} else
-		*/
-		if ( isset( $vrs['modules'] ) && isset( $vrs['modules']['parsoid'] ) ) {
+			// backward compatibility
+			$params['parsoidCompat'] = false;
+			$class = RestbaseVirtualRESTService::class;
+		} elseif ( isset( $vrs['modules'] ) && isset( $vrs['modules']['parsoid'] ) ) {
 			// there's a global parsoid config, use it next
 			$params = $vrs['modules']['parsoid'];
 			$params['restbaseCompat'] = true;
-		} else {
-			// no global modules defined, fall back to old defaults
-			if ( !$wgFlowParsoidURL ) {
-				throw new NoParserException( 'Flow Parsoid configuration is unavailable', 'process-wikitext' );
-			}
+		} elseif ( $wgFlowParsoidURL ) {
 			$params = [
 				'URL' => $wgFlowParsoidURL,
 				'prefix' => $wgFlowParsoidPrefix,
@@ -332,6 +339,14 @@ abstract class Utils {
 				'HTTPProxy' => $wgFlowParsoidHTTPProxy,
 				'forwardCookies' => $wgFlowParsoidForwardCookies
 			];
+		} elseif ( isset( $wgVisualEditorParsoidAutoConfig ) ) {
+			$params = $vrs['modules']['parsoid'] ?? [];
+			$params['restbaseCompat'] = true;
+			// forward cookies on private wikis
+			$params['forwardCookies'] = !MediaWikiServices::getInstance()
+				->getPermissionManager()->isEveryoneAllowed( 'read' );
+		} else {
+			throw new NoParserException( 'Flow Parsoid configuration is unavailable', 'process-wikitext' );
 		}
 		// merge the global and service-specific params
 		if ( isset( $vrs['global'] ) ) {
@@ -339,14 +354,12 @@ abstract class Utils {
 		}
 		// set up cookie forwarding
 		// @phan-suppress-next-line PhanTypePossiblyInvalidDimOffset
-		if ( $params['forwardCookies'] &&
-				!MediaWikiServices::getInstance()->getPermissionManager()->isEveryoneAllowed( 'read' )
-		) {
+		if ( $params['forwardCookies'] ) {
 			if ( PHP_SAPI === 'cli' ) {
 				// From the command line we need to generate a cookie
 				$params['forwardCookies'] = self::generateForwardedCookieForCli();
 			} else {
-				$params['forwardCookies'] = RequestContext::getMain()->getRequest()->getHeader( 'Cookie' );
+				$params['forwardCookies'] = $context->getRequest()->getHeader( 'Cookie' );
 			}
 		} else {
 			$params['forwardCookies'] = false;

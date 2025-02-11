@@ -573,6 +573,45 @@
 				"mobile"
 			]
 		},
+		"ext.flow.mobileVisualEditor": {
+			"scripts": [
+				"editor/editors/visualeditor/mw.flow.ve.Target.js",
+				"editor/editors/visualeditor/mw.flow.ve.UserCache.js",
+				"editor/editors/visualeditor/ui/inspectors/mw.flow.ve.ui.MentionInspector.js",
+				"editor/editors/visualeditor/ui/tools/mw.flow.ve.ui.MentionInspectorTool.js",
+				"editor/editors/visualeditor/ui/tools/mw.flow.ve.ui.MWEditModeTool.js",
+				"editor/editors/visualeditor/ui/contextitem/mw.flow.ve.ui.MentionContextItem.js",
+				"editor/editors/visualeditor/ui/widgets/mw.flow.ve.ui.MentionTargetInputWidget.js",
+				"editor/editors/visualeditor/mw.flow.ve.CommandRegistry.js",
+				"editor/editors/visualeditor/mw.flow.ve.SequenceRegistry.js"
+			],
+			"styles": [
+				"editor/editors/visualeditor/mw.flow.ve.Target.less"
+			],
+			"dependencies": [
+				"ext.visualEditor.core",
+				"ext.visualEditor.core.mobile",
+				"ext.visualEditor.mediawiki",
+				"ext.visualEditor.mwwikitext",
+				"ext.visualEditor.switching",
+				"mediawiki.editfont.styles",
+				"oojs-ui.styles.icons-editing-advanced",
+				"ext.flow.visualEditor.icons",
+				"mediawiki.api",
+				"mediawiki.util"
+			],
+			"messages": [
+				"flow-ve-mention-context-item-label",
+				"flow-ve-mention-inspector-title",
+				"flow-ve-mention-inspector-remove-label",
+				"flow-ve-mention-inspector-invalid-user",
+				"flow-ve-mention-placeholder",
+				"flow-ve-mention-tool-title"
+			],
+			"targets": [
+				"mobile"
+			]
+		},
 		"ext.flow.visualEditor": {
 			"scripts": [
 				"editor/editors/visualeditor/mw.flow.ve.Target.js",
@@ -639,7 +678,11 @@
 						"rtl": "styles/flow/images/topicCollapse-ltr.svg"
 					}
 				}
-			}
+			},
+			"targets": [
+				"desktop",
+				"mobile"
+			]
 		},
 		"ext.flow.jquery.conditionalScroll": {
 			"scripts": [

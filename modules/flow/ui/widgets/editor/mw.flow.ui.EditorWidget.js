@@ -155,7 +155,7 @@
 	mw.flow.ui.EditorWidget.static.isVisualEditorSupported = function () {
 		/* global VisualEditorSupportCheck:false */
 		return !!(
-			!OO.ui.isMobile() &&
+			//!OO.ui.isMobile() &&
 			mw.loader.getState( 'ext.visualEditor.core' ) &&
 			mw.user.options.get( 'flow-visualeditor' ) &&
 			window.VisualEditorSupportCheck && VisualEditorSupportCheck()
@@ -172,7 +172,7 @@
 		if ( !this.preloadPromise ) {
 			if ( this.isVisualEditorSupported() ) {
 				conf = mw.config.get( 'wgVisualEditorConfig' );
-				modules = [ 'ext.flow.visualEditor' ].concat(
+				modules = [ OO.ui.isMobile() ? 'ext.flow.mobileVisualEditor' : 'ext.flow.visualEditor' ].concat(
 					conf.pluginModules.filter( mw.loader.getState )
 				);
 				this.preloadPromise =
