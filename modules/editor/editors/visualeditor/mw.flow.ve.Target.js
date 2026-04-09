@@ -81,7 +81,7 @@
 	mw.flow.ve.Target.static.importRules = ve.copy( mw.flow.ve.Target.static.importRules );
 	mw.flow.ve.Target.static.importRules.external.blacklist[ 'link/mwExternal' ] = false;
 
-	if(!OO.ui.isMobile()) {	// Full	toolbar	if not in mobile mode.
+	{	// Full toolbar.
 
 		var toolBar = ve.init.mw.Target.static.toolbarGroups;
 		toolBar.shift(); // Remove the undo/redo buttons to save space.
@@ -102,7 +102,7 @@
                     }]);
 	}
 
-	mw.flow.ve.Target.static.allowTabFocusChange = true;
+	mw.flow.ve.Target.static.allowTabFocusChange = false;
 
 	// Methods
 

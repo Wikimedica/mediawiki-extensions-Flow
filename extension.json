@@ -561,10 +561,13 @@
 				"ext.visualEditor.core",
 				"ext.visualEditor.core.mobile",
 				"ext.visualEditor.mediawiki",
+				"ext.visualEditor.articleTarget",
+				"ext.visualEditor.mwextensions",
 				"ext.visualEditor.mwwikitext",
 				"ext.visualEditor.switching",
 				"mediawiki.editfont.styles",
 				"oojs-ui.styles.icons-editing-advanced",
+				"oojs-ui.styles.icons-user",
 				"ext.flow.visualEditor.icons",
 				"mediawiki.api",
 				"mediawiki.util"

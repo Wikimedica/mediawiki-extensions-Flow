@@ -3,6 +3,30 @@
 
 // TODO most of this should move to EditorWidget.less once the old editor system
 // has been removed
+
+// Toolbar fixes for Flow's bottom-positioned toolbar.
+// Replace OOUI's float-based layout with flexbox so buttons wrap to a second
+// row instead of overflowing or overlapping.
+.flow-component .oo-ui-toolbar-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+
+	.oo-ui-toolbar-tools {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		flex: 1 1 auto;
+		min-width: 0;
+		white-space: normal;
+	}
+
+	.oo-ui-toolbar-after {
+		float: none;
+		flex: 0 0 auto;
+	}
+}
+
 .flow-component {
 	.ve-init-target {
 		border: @border-subtle;
