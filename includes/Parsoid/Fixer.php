@@ -3,13 +3,9 @@
 namespace Flow\Parsoid;
 
 use DOMNode;
-use Title;
+use MediaWiki\Title\Title;
 
 interface Fixer {
-	/**
-	 * @param DOMNode $node
-	 * @param Title $title
-	 */
 	public function apply( DOMNode $node, Title $title );
 
 	/**

@@ -2,20 +2,20 @@
 
 namespace Flow\SpamFilter;
 
-use ExtensionRegistry;
 use Flow\Container;
 use Flow\Data\ManagerGroup;
 use Flow\Model\AbstractRevision;
 use Flow\Model\UUID;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
 use MediaWiki\Extension\AbuseFilter\AbuseFilterServices;
 use MediaWiki\Extension\AbuseFilter\VariableGenerator\RCVariableGenerator;
 use MediaWiki\Extension\AbuseFilter\Variables\VariableHolder;
 use MediaWiki\MediaWikiServices;
-use RecentChange;
-use Status;
-use Title;
-use User;
+use MediaWiki\RecentChanges\RecentChange;
+use MediaWiki\Registration\ExtensionRegistry;
+use MediaWiki\Status\Status;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 class AbuseFilter implements SpamFilter {
 	/**
@@ -85,6 +85,7 @@ class AbuseFilter implements SpamFilter {
 			->addUserVars( $context->getUser() )
 			->addTitleVars( $title, 'page' )
 			->addTitleVars( $ownerTitle, 'board' )
+			->addGenericVars()
 			->getVariableHolder();
 
 		$vars->setVar( 'action', $newRevision->getChangeType() );
@@ -141,6 +142,7 @@ class AbuseFilter implements SpamFilter {
 			->addUserVars( $recentChange->getPerformerIdentity() )
 			->addTitleVars( $title, 'page' )
 			->addTitleVars( $rev->getCollection()->getWorkflow()->getOwnerTitle(), 'board' )
+			->addGenericVars()
 			->addEditVars( MediaWikiServices::getInstance()->getWikiPageFactory()
 				->newFromTitle( $title ), $contextUser );
 	}

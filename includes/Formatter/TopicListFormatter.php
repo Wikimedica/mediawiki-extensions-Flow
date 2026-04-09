@@ -6,7 +6,7 @@ use Flow\Data\Pager\PagerPage;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\UrlGenerator;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
 
 class TopicListFormatter extends BaseTopicListFormatter {
 	/**
@@ -24,7 +24,7 @@ class TopicListFormatter extends BaseTopicListFormatter {
 		$this->serializer = $serializer;
 	}
 
-	public function setContentFormat( $contentFormat, UUID $revisionId = null ) {
+	public function setContentFormat( $contentFormat, ?UUID $revisionId = null ) {
 		$this->serializer->setContentFormat( $contentFormat, $revisionId );
 	}
 
@@ -127,18 +127,22 @@ class TopicListFormatter extends BaseTopicListFormatter {
 		return $actions;
 	}
 
-	protected function generateTopicMetadata( array $posts, array $revisions, array $workflows, $postAlphaId, IContextSource $ctx ) {
+	protected function generateTopicMetadata(
+		array $posts,
+		array $revisions,
+		array $workflows,
+		$postAlphaId,
+		IContextSource $ctx
+	) {
 		$language = $ctx->getLanguage();
 		$user = $ctx->getUser();
 
 		$replies = -1;
-		$authors = [];
 		$stack = new \SplStack;
 		$stack->push( $revisions[$posts[$postAlphaId][0]] );
 		do {
 			$data = $stack->pop();
 			$replies++;
-			$authors[] = $data['creator']['name'];
 			foreach ( $data['replies'] as $postId ) {
 				$stack->push( $revisions[$posts[$postId][0]] );
 			}

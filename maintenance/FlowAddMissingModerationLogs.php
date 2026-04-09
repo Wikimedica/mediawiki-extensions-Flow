@@ -7,8 +7,8 @@ use Flow\Container;
 use Flow\DbFactory;
 use Flow\Model\AbstractRevision;
 use Flow\Model\UUID;
-use LoggedUpdateMaintenance;
-use WikiMap;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
+use MediaWiki\WikiMap\WikiMap;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -26,10 +26,12 @@ class FlowAddMissingModerationLogs extends LoggedUpdateMaintenance {
 	public function __construct() {
 		parent::__construct();
 
+		// phpcs:disable Generic.Files.LineLength
 		$this->addDescription( 'Backfills missing moderation logs from flow_revision.  Must be run separately for each affected wiki.' );
 
 		$this->addOption( 'start', 'rev_id of last moderation revision that was logged correctly before regression.', true, true );
 		$this->addOption( 'stop', 'rev_id of first revision that was logged correctly after moderation logging fix.', true, true );
+		// phpcs:enable
 
 		$this->setBatchSize( 300 );
 
@@ -72,13 +74,13 @@ class FlowAddMissingModerationLogs extends LoggedUpdateMaintenance {
 		$start = $this->getOption( 'start' );
 		$startId = UUID::create( $start );
 		$rowIterator->addConditions( [
-			'rev_id > ' . $dbw->addQuotes( $startId->getBinary() ),
+			$dbw->expr( 'rev_id', '>', $startId->getBinary() ),
 		] );
 
 		$stop = $this->getOption( 'stop' );
 		$stopId = UUID::create( $stop );
 		$rowIterator->addConditions( [
-			'rev_id < ' . $dbw->addQuotes( $stopId->getBinary() ),
+			$dbw->expr( 'rev_id', '<', $stopId->getBinary() ),
 		] );
 
 		$rowIterator->setCaller( __METHOD__ );

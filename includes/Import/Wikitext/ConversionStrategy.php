@@ -4,17 +4,18 @@ namespace Flow\Import\Wikitext;
 
 use DateTime;
 use DateTimeZone;
-use ExtensionRegistry;
 use Flow\Import\ArchiveNameHelper;
 use Flow\Import\IConversionStrategy;
 use Flow\Import\SourceStore\SourceStoreInterface;
+use MediaWiki\Content\WikitextContent;
+use MediaWiki\Deferred\LinksUpdate\TemplateLinksTable;
 use MediaWiki\MediaWikiServices;
-use Parser;
+use MediaWiki\Parser\Parser;
+use MediaWiki\Registration\ExtensionRegistry;
+use MediaWiki\StubObject\StubObject;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 use Psr\Log\LoggerInterface;
-use StubObject;
-use Title;
-use User;
-use WikitextContent;
 
 /**
  * Does not really convert. Archives wikitext pages out of the way and puts
@@ -59,7 +60,6 @@ class ConversionStrategy implements IConversionStrategy {
 	/** @var User User doing the conversion actions (e.g. initial description, wikitext
 	 *    archive edit).  However, actions will be attributed to the original user when
 	 *    possible (e.g. the user who did the original LQT reply)
-	 *
 	 */
 	protected $user;
 
@@ -125,7 +125,7 @@ class ConversionStrategy implements IConversionStrategy {
 	/**
 	 * @inheritDoc
 	 */
-	public function isConversionFinished( Title $title, Title $movedFrom = null ) {
+	public function isConversionFinished( Title $title, ?Title $movedFrom = null ) {
 		if ( $title->getContentModel() === CONTENT_MODEL_FLOW_BOARD ) {
 			// page is a flow board already
 			return true;
@@ -209,19 +209,19 @@ class ConversionStrategy implements IConversionStrategy {
 			return false;
 		}
 
-		$dbr = wfGetDB( DB_REPLICA );
+		$dbr = MediaWikiServices::getInstance()->getConnectionProvider()->getReplicaDatabase(
+			TemplateLinksTable::VIRTUAL_DOMAIN
+		);
 		$batch = MediaWikiServices::getInstance()->getLinkBatchFactory()->newLinkBatch( $this->noConvertTemplates );
-		$result = $dbr->select(
-			'templatelinks',
-			'tl_from',
-			[
+		return (bool)$dbr->newSelectQueryBuilder()
+			->select( 'tl_from' )
+			->from( 'templatelinks' )
+			->where( [
 				'tl_from' => $sourceTitle->getArticleID(),
 				$batch->constructSet( 'tl', $dbr )
-			],
-			__METHOD__,
-			[ 'LIMIT' => 1 ]
-		);
-		return $result->numRows() > 0;
+			] )
+			->caller( __METHOD__ )
+			->fetchRow();
 	}
 
 	/**

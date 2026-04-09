@@ -9,9 +9,9 @@ use Flow\Conversion\Utils;
 use Flow\Exception\WikitextException;
 use Flow\Import\IObjectRevision;
 use Flow\Import\Wikitext\ImportSource;
-use Parser;
-use Title;
-use WikitextContent;
+use MediaWiki\Content\WikitextContent;
+use MediaWiki\Parser\Parser;
+use MediaWiki\Title\Title;
 
 /**
  * @covers \Flow\Import\Wikitext\ImportSource
@@ -21,15 +21,17 @@ use WikitextContent;
  */
 class ImportSourceTest extends \MediaWikiIntegrationTestCase {
 
-	/** @inheritDoc */
-	protected $tablesUsed = [ 'page', 'revision', 'ip_changes' ];
-
 	protected function setUp(): void {
+		// https://gerrit.wikimedia.org/r/c/mediawiki/extensions/Flow/+/927619 needs to be merged
+		// but until then, skip this test unconditionally.
+		// TODO: remove the below line once the above patch is merged.
+		$this->markTestSkipped( 'Until Ifb85f4733be3b43b71b111df0cd3d88281101153 gets merged' );
+
 		parent::setUp();
 
 		// Check for Parsoid
 		try {
-			Utils::convert( 'html', 'wikitext', 'Foo', Title::newFromText( 'UTPage' ) );
+			Utils::convert( 'html', 'wikitext', 'Foo', Title::makeTitle( NS_MAIN, 'ImportSourceTest' ) );
 		} catch ( WikitextException $excep ) {
 			$this->markTestSkipped( 'Parsoid not enabled' );
 		}
@@ -71,7 +73,7 @@ class ImportSourceTest extends \MediaWikiIntegrationTestCase {
 		$this->assertEquals( $user->getName(), $revision->getAuthor() );
 	}
 
-	public function getHeaderProvider() {
+	public static function getHeaderProvider() {
 		$now = new DateTime( "now", new DateTimeZone( "GMT" ) );
 		$date = $now->format( 'Y-m-d' );
 

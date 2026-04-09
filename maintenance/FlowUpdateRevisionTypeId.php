@@ -4,8 +4,7 @@ namespace Flow\Maintenance;
 
 use Flow\Container;
 use Flow\DbFactory;
-use LoggedUpdateMaintenance;
-use MWException;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
 use Wikimedia\Rdbms\IDatabase;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
@@ -47,33 +46,28 @@ class FlowUpdateRevisionTypeId extends LoggedUpdateMaintenance {
 
 		while ( $count == $batchSize ) {
 			$count = 0;
-			$res = $dbr->select(
-				[ 'flow_revision', 'flow_tree_revision', 'flow_header_revision' ],
-				[ 'rev_id', 'rev_type', 'tree_rev_descendant_id', 'header_workflow_id' ],
-				[ 'rev_id > ' . $dbr->addQuotes( $revId ) ],
-				__METHOD__,
-				[ 'ORDER BY' => 'rev_id ASC', 'LIMIT' => $batchSize ],
-				[
-					'flow_tree_revision' => [ 'LEFT JOIN', 'rev_id=tree_rev_id' ],
-					'flow_header_revision' => [ 'LEFT JOIN', 'rev_id=header_rev_id' ]
-				]
-			);
+			$res = $dbr->newSelectQueryBuilder()
+				->select( [ 'rev_id', 'rev_type', 'tree_rev_descendant_id', 'header_workflow_id' ] )
+				->from( 'flow_revision' )
+				->leftJoin( 'flow_tree_revision', null, 'rev_id=tree_rev_id' )
+				->leftJoin( 'flow_header_revision', null, 'rev_id=header_rev_id' )
+				->where( $dbr->expr( 'rev_id', '>', $revId ) )
+				->orderBy( 'rev_id' )
+				->limit( $batchSize )
+				->caller( __METHOD__ )
+				->fetchResultSet();
 
-			if ( $res ) {
-				foreach ( $res as $row ) {
-					$count++;
-					$revId = $row->rev_id;
-					switch ( $row->rev_type ) {
-						case 'header':
-							$this->updateRevision( $dbw, $row->rev_id, $row->header_workflow_id );
-							break;
-						case 'post':
-							$this->updateRevision( $dbw, $row->rev_id, $row->tree_rev_descendant_id );
-							break;
-					}
+			foreach ( $res as $row ) {
+				$count++;
+				$revId = $row->rev_id;
+				switch ( $row->rev_type ) {
+					case 'header':
+						$this->updateRevision( $dbw, $row->rev_id, $row->header_workflow_id );
+						break;
+					case 'post':
+						$this->updateRevision( $dbw, $row->rev_id, $row->tree_rev_descendant_id );
+						break;
 				}
-			} else {
-				throw new MWException( 'SQL error in maintenance script ' . __CLASS__ . '::' . __METHOD__ );
 			}
 			$dbFactory->waitForReplicas();
 		}
@@ -95,15 +89,12 @@ class FlowUpdateRevisionTypeId extends LoggedUpdateMaintenance {
 			return;
 		}
 
-		$res = $dbw->update(
-			'flow_revision',
-			[ 'rev_type_id' => $revTypeId ],
-			[ 'rev_id' => $revId ],
-			__METHOD__
-		);
-		if ( !$res ) {
-			throw new MWException( 'SQL error in maintenance script ' . __CLASS__ . '::' . __METHOD__ );
-		}
+		$dbw->newUpdateQueryBuilder()
+			->update( 'flow_revision' )
+			->set( [ 'rev_type_id' => $revTypeId ] )
+			->where( [ 'rev_id' => $revId ] )
+			->caller( __METHOD__ )
+			->execute();
 	}
 
 	/**

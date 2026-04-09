@@ -15,12 +15,16 @@ use Flow\Model\TopicListEntry;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\OccupationController;
+use MediaWiki\Deferred\SiteStatsUpdate;
 use MediaWiki\Extension\CentralAuth\CentralAuthServices;
 use MediaWiki\Extension\CentralAuth\User\CentralAuthUser;
 use MediaWiki\MediaWikiServices;
-use MWException;
+use MediaWiki\Title\Title;
+use MediaWiki\User\CentralId\CentralIdLookup;
+use MediaWiki\User\User;
+use MediaWiki\WikiMap\WikiMap;
+use RuntimeException;
 use WikiImporter;
-use WikiMap;
 use XMLReader;
 
 class Importer {
@@ -56,7 +60,7 @@ class Importer {
 	/**
 	 * To convert between global and local user ids
 	 *
-	 * @var \CentralIdLookup|null
+	 * @var CentralIdLookup|null
 	 */
 	protected $lookup;
 
@@ -67,9 +71,6 @@ class Importer {
 	 */
 	protected $transWikiMode = false;
 
-	/**
-	 * @param WikiImporter $importer
-	 */
 	public function __construct( WikiImporter $importer ) {
 		$this->importer = $importer;
 		try {
@@ -81,9 +82,6 @@ class Importer {
 		}
 	}
 
-	/**
-	 * @param ManagerGroup $storage
-	 */
 	public function setStorage( ManagerGroup $storage ) {
 		$this->storage = $storage;
 	}
@@ -119,7 +117,7 @@ class Importer {
 		$this->importer->debug( 'Enter board handler for ' . $id );
 
 		$uuid = UUID::create( $id );
-		$title = \Title::newFromDBkey( $this->importer->nodeAttribute( 'title' ) );
+		$title = Title::newFromDBkey( $this->importer->nodeAttribute( 'title' ) );
 
 		$this->boardWorkflow = Workflow::fromStorageRow( [
 			'workflow_id' => $uuid->getAlphadecimal(),
@@ -136,7 +134,7 @@ class Importer {
 		$occupationController = Container::get( 'occupation_controller' );
 		$creationStatus = $occupationController->safeAllowCreation( $title, $occupationController->getTalkpageManager() );
 		if ( !$creationStatus->isOK() ) {
-			throw new MWException( $creationStatus->getWikiText() );
+			throw new RuntimeException( $creationStatus->__toString() );
 		}
 
 		$ensureStatus = $occupationController->ensureFlowRevision(
@@ -144,7 +142,7 @@ class Importer {
 			$this->boardWorkflow
 		);
 		if ( !$ensureStatus->isOK() ) {
-			throw new MWException( $ensureStatus->getWikiText() );
+			throw new RuntimeException( $ensureStatus->__toString() );
 		}
 
 		$this->put( $this->boardWorkflow, [] );
@@ -199,7 +197,7 @@ class Importer {
 			$occupationController->getTalkpageManager()
 		);
 		if ( !$creationStatus->isOK() ) {
-			throw new MWException( $creationStatus->getWikiText() );
+			throw new RuntimeException( $creationStatus->__toString() );
 		}
 
 		$ensureStatus = $occupationController->ensureFlowRevision(
@@ -208,7 +206,7 @@ class Importer {
 			$this->topicWorkflow
 		);
 		if ( !$ensureStatus->isOK() ) {
-			throw new MWException( $ensureStatus->getWikiText() );
+			throw new RuntimeException( $ensureStatus->__toString() );
 		}
 
 		$this->put( $this->topicWorkflow, $metadata );
@@ -305,7 +303,7 @@ class Importer {
 				if ( isset( $attribs[ $globalUserIdField ] ) ) {
 					$localUser = $this->lookup->localUserFromCentralId(
 						(int)$attribs[ $globalUserIdField ],
-						\CentralIdLookup::AUDIENCE_RAW
+						CentralIdLookup::AUDIENCE_RAW
 					);
 					if ( !$localUser ) {
 						$localUser = $this->createLocalUser( (int)$attribs[ $globalUserIdField ] );
@@ -368,12 +366,12 @@ class Importer {
 	private function checkTransWikiMode( $boardWorkflowId, $title ) {
 		/** @var DbFactory $dbFactory */
 		$dbFactory = Container::get( 'db.factory' );
-		$workflowExist = (bool)$dbFactory->getDB( DB_PRIMARY )->selectField(
-			'flow_workflow',
-			'workflow_id',
-			[ 'workflow_id' => UUID::create( $boardWorkflowId )->getBinary() ],
-			__METHOD__
-		);
+		$workflowExist = (bool)$dbFactory->getDB( DB_PRIMARY )->newSelectQueryBuilder()
+			->select( 'workflow_id' )
+			->from( 'flow_workflow' )
+			->where( [ 'workflow_id' => UUID::create( $boardWorkflowId )->getBinary() ] )
+			->caller( __METHOD__ )
+			->fetchField();
 
 		if ( $workflowExist ) {
 			$this->importer->debug( "$title will be imported in trans-wiki mode" );
@@ -385,7 +383,7 @@ class Importer {
 	 * Create a local user corresponding to a global id
 	 *
 	 * @param int $globalUserId
-	 * @return \User Local user
+	 * @return User Local user
 	 * @throws ImportException
 	 */
 	private function createLocalUser( $globalUserId ) {
@@ -394,7 +392,7 @@ class Importer {
 		}
 
 		$globalUser = CentralAuthUser::newFromId( $globalUserId );
-		$localUser = \User::newFromName( $globalUser->getName() );
+		$localUser = User::newFromName( $globalUser->getName() );
 
 		if ( $localUser->getId() ) {
 			throw new ImportException( "User '{$localUser->getName()}' already exists" );
@@ -408,7 +406,7 @@ class Importer {
 		}
 
 		# Update user count
-		$ssUpdate = \SiteStatsUpdate::factory( [ 'users' => 1 ] );
+		$ssUpdate = SiteStatsUpdate::factory( [ 'users' => 1 ] );
 		$ssUpdate->doUpdate();
 
 		return $localUser;

@@ -2,8 +2,6 @@
 
 namespace Flow\Formatter;
 
-use ApiResult;
-use ExtensionRegistry;
 use Flow\Collection\PostCollection;
 use Flow\Conversion\Utils;
 use Flow\Exception\FlowException;
@@ -18,14 +16,20 @@ use Flow\Repository\UserNameBatch;
 use Flow\RevisionActionPermissions;
 use Flow\Templating;
 use Flow\UrlGenerator;
-use GenderCache;
-use IContextSource;
+use MediaWiki\Api\ApiResult;
+use MediaWiki\Cache\GenderCache;
+use MediaWiki\Context\IContextSource;
 use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Message\Message;
+use MediaWiki\Registration\ExtensionRegistry;
+use MediaWiki\SpecialPage\SpecialPage;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 use MediaWiki\User\UserGroupManager;
-use Message;
-use User;
-use WikiMap;
+use MediaWiki\WikiMap\WikiMap;
+use Wikimedia\Message\MessageParam;
+use Wikimedia\Message\ParamType;
 use Wikimedia\Timestamp\TimestampException;
 
 /**
@@ -188,7 +192,7 @@ class RevisionFormatter {
 	 * @throws FlowException
 	 * @throws InvalidInputException
 	 */
-	public function setContentFormat( $format, UUID $revisionId = null ) {
+	public function setContentFormat( $format, ?UUID $revisionId = null ) {
 		if ( !in_array( $format, $this->allowedContentFormats ) ) {
 			throw new InvalidInputException( "Unknown content format: $format" );
 		}
@@ -221,7 +225,7 @@ class RevisionFormatter {
 				__METHOD__ . ': Permission denied for user on action {action}',
 				[
 					'action' => $action,
-					'revision_id' => $row->revision->getRevisionId(),
+					'revision_id' => $row->revision->getRevisionId()->getAlphadecimal(),
 					'user_id' => $ctx->getUser()->getId(),
 				]
 			);
@@ -370,9 +374,16 @@ class RevisionFormatter {
 				);
 
 				// moderated posts won't have that property
-				if ( isset( $res['properties']['topic-of-post-text-from-html']['plaintext'] ) ) {
+				// FIXME: This shouldn't depend on Message implementation details.
+				// You're not really supposed to know how Message represents the
+				// parameters internally.
+				if (
+					isset( $res['properties']['topic-of-post-text-from-html'] ) &&
+					$res['properties']['topic-of-post-text-from-html'] instanceof MessageParam &&
+					$res['properties']['topic-of-post-text-from-html']->getType() === ParamType::PLAINTEXT
+				) {
 					$res['content']['plaintext'] =
-						$res['properties']['topic-of-post-text-from-html']['plaintext'];
+						$res['properties']['topic-of-post-text-from-html']->getValue();
 				}
 			}
 
@@ -400,14 +411,14 @@ class RevisionFormatter {
 		}
 
 		$talkPageTitle = null;
-		$userTitle = \Title::newFromText( $name, NS_USER );
+		$userTitle = Title::newFromText( $name, NS_USER );
 		if ( $userTitle ) {
 			$talkPageTitle = $userTitle->getTalkPage();
 		}
 
-		$blockTitle = \SpecialPage::getTitleFor( 'Block', $name );
+		$blockTitle = SpecialPage::getTitleFor( 'Block', $name );
 
-		$userContribsTitle = \SpecialPage::getTitleFor( 'Contributions', $name );
+		$userContribsTitle = SpecialPage::getTitleFor( 'Contributions', $name );
 		$userLinksBCBools = [
 			'_BC_bools' => [
 				'exists',
@@ -754,7 +765,7 @@ class RevisionFormatter {
 				case 'post':
 					if ( !$postId ) {
 						wfDebugLog( 'Flow', __METHOD__ . ': No postId available to render post link' );
-					break;
+						break;
 					}
 					$links['post'] = $this->urlGenerator->postLink( $title, $workflowId, $postId );
 					break;
@@ -767,7 +778,7 @@ class RevisionFormatter {
 				case 'topic-revision':
 					if ( !$postId ) {
 						wfDebugLog( 'Flow', __METHOD__ . ': No postId available to render revision link' );
-					break;
+						break;
 					}
 
 					$links['topic-revision'] = $this->urlGenerator
@@ -777,7 +788,7 @@ class RevisionFormatter {
 				case 'post-revision':
 					if ( !$postId ) {
 						wfDebugLog( 'Flow', __METHOD__ . ': No postId available to render revision link' );
-					break;
+						break;
 					}
 
 					$links['post-revision'] = $this->urlGenerator
@@ -792,7 +803,7 @@ class RevisionFormatter {
 				case 'post-history':
 					if ( !$postId ) {
 						wfDebugLog( 'Flow', __METHOD__ . ': No postId available to render post-history link' );
-					break;
+						break;
 					}
 					$links['post-history'] = $this->urlGenerator->postHistoryLink( $title, $workflowId, $postId );
 					break;
@@ -805,12 +816,9 @@ class RevisionFormatter {
 					$links['board-history'] = $this->urlGenerator->boardHistoryLink( $title );
 					break;
 
-				/** @noinspection PhpMissingBreakStatementInspection */
-				// phpcs:ignore PSR2.ControlStructures.SwitchDeclaration.TerminatingComment
 				case 'diff-header':
 					$diffCallback ??= [ $this->urlGenerator, 'diffHeaderLink' ];
 					// don't break, diff links are rendered below
-				/** @noinspection PhpMissingBreakStatementInspection */
 				case 'diff-post':
 					$diffCallback ??= [ $this->urlGenerator, 'diffPostLink' ];
 					// don't break, diff links are rendered below
@@ -886,7 +894,7 @@ class RevisionFormatter {
 		UUID $workflowId,
 		AbstractRevision $revision,
 		IContextSource $ctx,
-		FormatterRow $row = null
+		?FormatterRow $row = null
 	) {
 		if ( $this->includeProperties === false ) {
 			return [];
@@ -919,7 +927,7 @@ class RevisionFormatter {
 	 * @param UUID $workflowId The UUID of the workflow $revision belongs tow
 	 * @param IContextSource $ctx
 	 * @param FormatterRow|null $row
-	 * @return mixed A valid parameter for a core Message instance. These
+	 * @return string|MessageParam A valid parameter for a core Message instance. These
 	 *  parameters will be used with Message::parse
 	 * @throws FlowException
 	 */
@@ -928,8 +936,11 @@ class RevisionFormatter {
 		$revision,
 		UUID $workflowId,
 		IContextSource $ctx,
-		FormatterRow $row = null
+		?FormatterRow $row = null
 	) {
+		$isWikiText = str_ends_with( $param, 'wikitext' );
+		$format = $isWikiText ? $revision->getWikitextFormat() : $revision->getHtmlFormat();
+
 		switch ( $param ) {
 			case 'creator-text':
 				if ( $revision instanceof PostRevision ) {
@@ -961,13 +972,15 @@ class RevisionFormatter {
 				return Message::plaintextParam( $content );
 
 			case 'wikitext':
+			case 'plaintext':
 				if ( !$this->permissions->isAllowed( $revision, 'view' ) ) {
 					return '';
 				}
 
-				$format = $revision->getWikitextFormat();
-
 				$content = $this->templating->getContent( $revision, $format );
+				if ( !$isWikiText ) {
+					$content = Utils::htmlToPlaintext( $content );
+				}
 				// This must be escaped and marked raw to prevent special chars in
 				// content, like $1, from changing the i18n result
 				return Message::plaintextParam( $content );
@@ -975,37 +988,6 @@ class RevisionFormatter {
 			// This is potentially two networked round trips, much too expensive for
 			// the rendering loop
 			case 'prev-wikitext':
-				if ( $revision->isFirstRevision() ) {
-					return '';
-				}
-				if ( $row === null ) {
-					$previousRevision = $revision->getCollection()->getPrevRevision( $revision );
-				} else {
-					$previousRevision = $row->previousRevision;
-				}
-				if ( !$previousRevision ) {
-					return '';
-				}
-				if ( !$this->permissions->isAllowed( $previousRevision, 'view' ) ) {
-					return '';
-				}
-
-				$format = $revision->getWikitextFormat();
-
-				$content = $this->templating->getContent( $previousRevision, $format );
-				return Message::plaintextParam( $content );
-			case 'plaintext':
-				if ( !$this->permissions->isAllowed( $revision, 'view' ) ) {
-					return '';
-				}
-
-				$format = $revision->getHtmlFormat();
-
-				$content = Utils::htmlToPlaintext( $this->templating->getContent( $revision, $format ) );
-				return Message::plaintextParam( $content );
-
-			// This is potentially two networked round trips, much too expensive for
-			// the rendering loop
 			case 'prev-plaintext':
 				if ( $revision->isFirstRevision() ) {
 					return '';
@@ -1022,9 +1004,10 @@ class RevisionFormatter {
 					return '';
 				}
 
-				$format = $revision->getHtmlFormat();
-
-				$content = Utils::htmlToPlaintext( $this->templating->getContent( $previousRevision, $format ) );
+				$content = $this->templating->getContent( $previousRevision, $format );
+				if ( !$isWikiText ) {
+					$content = Utils::htmlToPlaintext( $content );
+				}
 				return Message::plaintextParam( $content );
 
 			case 'workflow-url':

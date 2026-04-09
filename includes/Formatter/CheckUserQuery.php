@@ -35,7 +35,7 @@ class CheckUserQuery extends AbstractQuery {
 			}
 
 			/** @noinspection PhpUnusedLocalVariableInspection */
-			list( $action, $workflowId, $revisionId ) = $ids;
+			[ $action, $workflowId, $revisionId ] = $ids;
 
 			switch ( $action ) {
 				case 'create-topic-summary':
@@ -115,31 +115,21 @@ class CheckUserQuery extends AbstractQuery {
 		$comment = MediaWikiServices::getInstance()
 			->getCommentStore()
 			->getComment( 'cuc_comment', $row )->text;
-		$data = explode( ',', $comment );
 
 		// anything not prefixed v1 is a pre-versioned check user comment
 		// if it changes again the prefix can be updated.
-		if ( strpos( $comment, self::VERSION_PREFIX ) !== 0 ) {
+		if ( !str_starts_with( $comment, self::VERSION_PREFIX ) ) {
 			return false;
 		}
 
-		// remove the version specifier
-		array_shift( $data );
-
-		$action = array_shift( $data );
-		$revisionId = null;
-		$workflowId = null;
-		switch ( count( $data ) ) {
-			case 2:
-				$revisionId = UUID::create( $data[1] );
-				$workflowId = UUID::create( $data[0] );
-				break;
-			default:
-				wfDebugLog( 'Flow', __METHOD__ . ': Invalid number of ids received from cuc_comment.' .
-					' Expected 2 but received ' . count( $data ) );
-				return false;
+		$data = explode( ',', $comment );
+		if ( count( $data ) !== 4 ) {
+			wfDebugLog( 'Flow', __METHOD__ . ': Invalid number of ids received from cuc_comment.' .
+				' Expected 4 but received ' . count( $data ) );
+			return false;
 		}
 
-		return [ $action, $workflowId, $revisionId ];
+		[ , $action, $workflowId, $revisionId ] = $data;
+		return [ $action, UUID::create( $workflowId ), UUID::create( $revisionId ) ];
 	}
 }

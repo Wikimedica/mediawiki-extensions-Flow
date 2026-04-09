@@ -3,8 +3,8 @@
 namespace Flow\Model;
 
 use Flow\Collection\PostSummaryCollection;
-use Title;
-use User;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 class PostSummary extends AbstractSummary {
 

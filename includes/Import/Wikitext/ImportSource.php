@@ -8,16 +8,16 @@ use Flow\Import\ImportException;
 use Flow\Import\Plain\ImportHeader;
 use Flow\Import\Plain\ObjectRevision;
 use Flow\Import\TemplateHelper;
-use IDBAccessObject;
+use MediaWiki\Content\WikitextContent;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Parser\Parser;
+use MediaWiki\Parser\ParserOptions;
 use MediaWiki\Revision\SlotRecord;
-use MWTimestamp;
-use Parser;
-use ParserOptions;
-use StubObject;
-use Title;
-use User;
-use WikitextContent;
+use MediaWiki\StubObject\StubObject;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
+use MediaWiki\Utils\MWTimestamp;
+use Wikimedia\Rdbms\IDBAccessObject;
 
 /**
  * Imports the header of a wikitext talk page. Does not attempt to

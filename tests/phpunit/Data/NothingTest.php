@@ -8,9 +8,9 @@ use Flow\Tests\FlowTestCase;
 /**
  * @group Flow
  */
-class FlowNothingTest extends FlowTestCase {
+class NothingTest extends FlowTestCase {
 
-	public function sortArrayByKeysProvider() {
+	public static function sortArrayByKeysProvider() {
 		return [
 
 			[

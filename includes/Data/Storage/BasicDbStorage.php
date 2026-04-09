@@ -4,11 +4,11 @@ namespace Flow\Data\Storage;
 
 use Flow\Data\ObjectManager;
 use Flow\Data\Utils\MultiDimArray;
-use Flow\Data\Utils\RawSql;
 use Flow\DbFactory;
 use Flow\Exception\DataModelException;
 use Flow\Exception\DataPersistenceException;
 use Flow\Model\UUID;
+use InvalidArgumentException;
 
 /**
  * Standard backing store for data model with no special cases which is stored
@@ -47,7 +47,7 @@ class BasicDbStorage extends DbStorage {
 	 * Inserts a set of rows into the database
 	 *
 	 * @param array $rows The rows to insert. Also accepts a single row.
-	 * @return array|false An array of the rows that now exist
+	 * @return array An array of the rows that now exist
 	 * in the database. Integrity of keys is guaranteed.
 	 */
 	public function insert( array $rows ) {
@@ -56,15 +56,14 @@ class BasicDbStorage extends DbStorage {
 		if ( is_array( reset( $rows ) ) ) {
 			$insertRows = $this->preprocessNestedSqlArray( $rows );
 		} else {
-			$insertRows = $this->preprocessSqlArray( $rows );
+			$insertRows = [ $this->preprocessSqlArray( $rows ) ];
 		}
-
-		// insert returns boolean true/false
-		$this->dbFactory->getDB( DB_PRIMARY )->insert(
-			$this->table,
-			$insertRows,
-			__METHOD__ . " ({$this->table})"
-		);
+		$queryBuilder = $this->dbFactory->getDB( DB_PRIMARY )->newInsertQueryBuilder()
+			->insertInto( $this->table )
+			->rows( $insertRows )
+			->caller( __METHOD__ . " ({$this->table})" );
+		DbStorage::maybeSetInsertIgnore( $queryBuilder );
+		$queryBuilder->execute();
 
 		return $rows;
 	}
@@ -95,9 +94,14 @@ class BasicDbStorage extends DbStorage {
 
 		$dbw = $this->dbFactory->getDB( DB_PRIMARY );
 		// update returns boolean true/false as $res
-		$dbw->update( $this->table, $updates, $pk, __METHOD__ . " ({$this->table})" );
+		$dbw->newUpdateQueryBuilder()
+			->update( $this->table )
+			->set( $updates )
+			->where( $pk )
+			->caller( __METHOD__ . " ({$this->table})" )
+			->execute();
 		// we also want to check that $pk actually selected a row to update
-		return $dbw->affectedRows() ? true : false;
+		return (bool)$dbw->affectedRows();
 	}
 
 	/**
@@ -115,8 +119,12 @@ class BasicDbStorage extends DbStorage {
 		$pk = $this->preprocessSqlArray( $pk );
 
 		$dbw = $this->dbFactory->getDB( DB_PRIMARY );
-		$res = $dbw->delete( $this->table, $pk, __METHOD__ . " ({$this->table})" );
-		return $res && $dbw->affectedRows();
+		$dbw->newDeleteQueryBuilder()
+			->deleteFrom( $this->table )
+			->where( $pk )
+			->caller( __METHOD__ . " ({$this->table})" )
+			->execute();
+		return (bool)$dbw->affectedRows();
 	}
 
 	/**
@@ -124,13 +132,12 @@ class BasicDbStorage extends DbStorage {
 	 * @param array $options
 	 * @return array Empty array means no result.  Array with results is success.
 	 * @throws DataModelException On query failure
-	 * @throws \MWException
 	 */
 	public function find( array $attributes, array $options = [] ) {
 		$attributes = $this->preprocessSqlArray( $attributes );
 
 		if ( !$this->validateOptions( $options ) ) {
-			throw new \MWException( "Validation error in database options" );
+			throw new InvalidArgumentException( "Validation error in database options" );
 		}
 
 		$dbr = $this->dbFactory->getDB( DB_REPLICA );
@@ -147,13 +154,13 @@ class BasicDbStorage extends DbStorage {
 	}
 
 	protected function doFindQuery( array $preprocessedAttributes, array $options = [] ) {
-		return $this->dbFactory->getDB( DB_REPLICA )->select(
-			$this->table,
-			'*',
-			$preprocessedAttributes,
-			__METHOD__ . " ({$this->table})",
-			$options
-		);
+		return $this->dbFactory->getDB( DB_REPLICA )->newSelectQueryBuilder()
+			->select( '*' )
+			->from( $this->table )
+			->where( $preprocessedAttributes )
+			->caller( __METHOD__ . " ({$this->table})" )
+			->options( $options )
+			->fetchResultSet();
 	}
 
 	protected function fallbackFindMulti( array $queries, array $options ) {
@@ -169,8 +176,6 @@ class BasicDbStorage extends DbStorage {
 	 * @param array $options
 	 * @return array
 	 * @throws DataModelException
-	 * @throws \Wikimedia\Rdbms\DBUnexpectedError
-	 * @throws \MWException
 	 */
 	public function findMulti( array $queries, array $options = [] ) {
 		$keys = array_keys( reset( $queries ) );
@@ -181,14 +186,12 @@ class BasicDbStorage extends DbStorage {
 		$conds = [];
 		$dbr = $this->dbFactory->getDB( DB_REPLICA );
 		foreach ( $queries as $query ) {
-			$conds[] = $dbr->makeList( $this->preprocessSqlArray( $query ), LIST_AND );
+			$conds[] = $dbr->andExpr( $this->preprocessSqlArray( $query ) );
 		}
 		unset( $query );
 
-		$conds = $dbr->makeList( $conds, LIST_OR );
-
 		// options can be ignored for primary key search
-		$res = $this->find( [ new RawSql( $conds ) ] );
+		$res = $this->find( [ $dbr->orExpr( $conds ) ] );
 
 		// create temp array with pk value (usually uuid) as key and full db row
 		// as value

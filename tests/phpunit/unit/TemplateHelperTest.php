@@ -13,7 +13,7 @@ use MediaWikiUnitTestCase;
  */
 class TemplateHelperTest extends MediaWikiUnitTestCase {
 
-	public function provideTraversalAttackFilenames() {
+	public static function provideTraversalAttackFilenames() {
 		return array_map(
 			static function ( $x ) {
 				return [ $x ];
@@ -50,7 +50,7 @@ class TemplateHelperTest extends MediaWikiUnitTestCase {
 		FIXME: Why won't this work!?
 		$code2 = TemplateHelper::compile( "{{#ifCond foo \"===\" bar}}Works{{/ifCond}}", '' );
 		$renderer2 = Lightncandy::prepare( $code2 );
-		$this->assertEquals( 'Works', $renderer2( array( 'foo' => 1, 'bar' => 1 ) ) );
-		$this->assertSame( '', $renderer2( array( 'foo' => 2, 'bar' => 3 ) ) );*/
+		$this->assertEquals( 'Works', $renderer2( [ 'foo' => 1, 'bar' => 1 ] ) );
+		$this->assertSame( '', $renderer2( [ 'foo' => 2, 'bar' => 3 ] ) );*/
 	}
 }

@@ -2,13 +2,14 @@
 
 namespace Flow\Tests;
 
-use ExtensionRegistry;
 use Flow\Container;
 use Flow\Data\FlowObjectCache;
+use Flow\DbFactory;
 use Flow\Model\UUID;
-use HashBagOStuff;
+use MediaWiki\Registration\ExtensionRegistry;
 use MediaWikiIntegrationTestCase;
-use WANObjectCache;
+use Wikimedia\ObjectCache\HashBagOStuff;
+use Wikimedia\ObjectCache\WANObjectCache;
 
 class FlowTestCase extends MediaWikiIntegrationTestCase {
 	protected function setUp(): void {
@@ -30,14 +31,14 @@ class FlowTestCase extends MediaWikiIntegrationTestCase {
 		return parent::dataToString( $data );
 	}
 
-	protected function getCache() {
+	protected function getCache( ?DbFactory $dbFactory = null ) {
 		global $wgFlowCacheTime;
 		$wanCache = new WANObjectCache( [
 			'cache' => new HashBagOStuff(),
 			'pool' => 'testcache-hash',
 		] );
 
-		return new FlowObjectCache( $wanCache, Container::get( 'db.factory' ), $wgFlowCacheTime );
+		return new FlowObjectCache( $wanCache, $dbFactory ?? Container::get( 'db.factory' ), $wgFlowCacheTime );
 	}
 
 	protected function resetPermissions() {
@@ -57,7 +58,6 @@ class FlowTestCase extends MediaWikiIntegrationTestCase {
 			unset( $perms[$registry::MERGE_STRATEGY] );
 		}
 
-		global $wgGroupPermissions;
-		$this->setMwGlobals( 'wgGroupPermissions', wfArrayPlus2d( $perms, $wgGroupPermissions ) );
+		$this->setGroupPermissions( $perms );
 	}
 }

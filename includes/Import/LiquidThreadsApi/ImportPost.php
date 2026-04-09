@@ -7,7 +7,8 @@ use ArrayIterator;
 use Flow\Import\IImportPost;
 use Flow\Import\IObjectRevision;
 use Iterator;
-use Title;
+use MediaWiki\Extension\Notifications\DiscussionParser;
+use MediaWiki\Title\Title;
 
 class ImportPost extends PageRevisionedObject implements IImportPost {
 
@@ -16,10 +17,6 @@ class ImportPost extends PageRevisionedObject implements IImportPost {
 	 */
 	protected $apiResponse;
 
-	/**
-	 * @param ImportSource $source
-	 * @param array $apiResponse
-	 */
 	public function __construct( ImportSource $source, array $apiResponse ) {
 		parent::__construct( $source, $apiResponse['rootid'] );
 		$this->apiResponse = $apiResponse;
@@ -50,7 +47,7 @@ class ImportPost extends PageRevisionedObject implements IImportPost {
 	 * @return string|null Returns username, IP, or null if none could be detected
 	 */
 	public static function extractUserFromSignature( $signatureText ) {
-		$users = \EchoDiscussionParser::extractUsersFromLine( $signatureText );
+		$users = DiscussionParser::extractUsersFromLine( $signatureText );
 
 		if ( count( $users ) > 0 ) {
 			return $users[0];
@@ -138,7 +135,11 @@ class ImportPost extends PageRevisionedObject implements IImportPost {
 	 * @param string $signatureUsername Username extracted from signature
 	 * @return ScriptedImportRevision Generated top import revision
 	 */
-	protected function createSignatureClarificationRevision( IObjectRevision $lastRevision, $authorUsername, $signatureUsername ) {
+	protected function createSignatureClarificationRevision(
+		IObjectRevision $lastRevision,
+		string $authorUsername,
+		string $signatureUsername
+	): ScriptedImportRevision {
 		$wikitextForLastRevision = $lastRevision->getText();
 		$newWikitext = $wikitextForLastRevision;
 
@@ -154,11 +155,9 @@ class ImportPost extends PageRevisionedObject implements IImportPost {
 		);
 
 		$newWikitext .= "\n\n{{{$templateName}|$arguments}}";
-		$clarificationRevision = new ScriptedImportRevision(
+		return new ScriptedImportRevision(
 			$this, $this->importSource->getScriptUser(), $newWikitext, $lastRevision
 		);
-
-		return $clarificationRevision;
 	}
 
 	public function getObjectKey() {

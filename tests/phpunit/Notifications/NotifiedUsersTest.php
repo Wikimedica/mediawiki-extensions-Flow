@@ -2,13 +2,11 @@
 
 namespace Flow\Tests;
 
-use EchoNotificationController;
-use ExtensionRegistry;
 use Flow\Container;
 use Flow\Model\UserTuple;
 use Flow\Model\UUID;
-use MediaWiki\MediaWikiServices;
-use User;
+use MediaWiki\Extension\Notifications\Controller\NotificationController;
+use MediaWiki\User\User;
 
 /**
  * @covers \Flow\Notifications\FlowPresentationModel
@@ -21,28 +19,10 @@ use User;
  * @group Database
  */
 class NotifiedUsersTest extends PostRevisionTestCase {
-	/** @inheritDoc */
-	protected $tablesUsed = [
-		'echo_event',
-		'echo_notification',
-		'flow_revision',
-		'flow_topic_list',
-		'flow_tree_node',
-		'flow_tree_revision',
-		'flow_workflow',
-		'page',
-		'revision',
-		'ip_changes',
-		'text',
-	];
-
 	protected function setUp(): void {
 		parent::setUp();
 
-		if ( !ExtensionRegistry::getInstance()->isLoaded( 'Echo' ) ) {
-			$this->markTestSkipped();
-			return;
-		}
+		$this->markTestSkippedIfExtensionNotLoaded( 'Echo' );
 	}
 
 	/**
@@ -67,7 +47,7 @@ class NotifiedUsersTest extends PostRevisionTestCase {
 		/** @var User $user */
 		$user = $data['user'];
 
-		MediaWikiServices::getInstance()->getWatchlistManager()->addWatch(
+		$this->getServiceContainer()->getWatchlistManager()->addWatch(
 			$user,
 			$data['topicWorkflow']->getArticleTitle()
 		);
@@ -107,7 +87,7 @@ class NotifiedUsersTest extends PostRevisionTestCase {
 		/** @var User $user */
 		$user = $data['user'];
 
-		MediaWikiServices::getInstance()->getWatchlistManager()->addWatch(
+		$this->getServiceContainer()->getWatchlistManager()->addWatch(
 			$user,
 			$data['boardWorkflow']->getArticleTitle()
 		);
@@ -126,7 +106,7 @@ class NotifiedUsersTest extends PostRevisionTestCase {
 	protected function assertNotifiedUser( array $events, User $notifiedUser, User $notNotifiedUser ) {
 		$users = [];
 		foreach ( $events as $event ) {
-			$iterator = EchoNotificationController::getUsersToNotifyForEvent( $event );
+			$iterator = NotificationController::getUsersToNotifyForEvent( $event );
 			foreach ( $iterator as $user ) {
 				$users[] = $user;
 			}
@@ -199,7 +179,6 @@ class NotifiedUsersTest extends PostRevisionTestCase {
 		$secondPost = $topicTitle->reply( $topicWorkflow, $agent, 'lorem ipsum', 'wikitext' );
 		$newId = UUID::getComparisonUUID( (int)$secondPost->getPostId()->getTimestamp( TS_UNIX ) + 2 );
 		$reflection = new \ReflectionProperty( $secondPost, 'postId' );
-		$reflection->setAccessible( true );
 		$reflection->setValue( $secondPost, $newId );
 		$this->store( $secondPost );
 

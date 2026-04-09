@@ -2,13 +2,12 @@
 
 namespace Flow\Maintenance;
 
-use Flow\Hooks;
-use LoggedUpdateMaintenance;
+use Flow\OccupationController;
+use MediaWiki\Content\WikitextContent;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
 use MediaWiki\MediaWikiServices;
-use MWException;
-use Status;
-use Title;
-use WikitextContent;
+use MediaWiki\Status\Status;
+use MediaWiki\Title\Title;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -35,11 +34,15 @@ class FlowCreateTemplates extends LoggedUpdateMaintenance {
 	 * @return array [title i18n key => content callback]
 	 */
 	protected function getTemplates() {
+		if ( defined( 'MW_QUIBBLE_CI' ) ) {
+			// Avoid slowing down CI with these templates, as they're not used in any tests (T389894)
+			return [];
+		}
 		return [
 			// Template:FlowMention, used to render mentions in Flow's Visual Editor
-			'flow-ve-mention-template-title' => static function ( Title $title ) {
+			'flow-ve-mention-template-title' => function ( Title $title ) {
 				// get "User:" namespace prefix in wiki language
-				$namespaces = MediaWikiServices::getInstance()->getContentLanguage()
+				$namespaces = $this->getServiceContainer()->getContentLanguage()
 					->getFormattedNamespaces();
 
 				return '@[[' . $namespaces[NS_USER] . ':{{{1|Example}}}|{{{2|{{{1|Example}}}}}}]]';
@@ -108,19 +111,20 @@ class FlowCreateTemplates extends LoggedUpdateMaintenance {
 	 * @param Title $title
 	 * @param WikitextContent $content
 	 * @return Status
-	 * @throws MWException
 	 */
 	protected function create( Title $title, WikitextContent $content ) {
-		$page = MediaWikiServices::getInstance()->getWikiPageFactory()->newFromTitle( $title );
+		$page = $this->getServiceContainer()->getWikiPageFactory()->newFromTitle( $title );
 
 		if ( $page->getRevisionRecord() !== null ) {
 			// template already exists, don't overwrite it
 			return Status::newGood();
 		}
 
+		/** @var OccupationController $occupationController */
+		$occupationController = MediaWikiServices::getInstance()->getService( 'FlowTalkpageManager' );
 		return $page->doUserEditContent(
 			$content,
-			Hooks::getOccupationController()->getTalkpageManager(),
+			$occupationController->getTalkpageManager(),
 			'/* Automatically created by Flow */',
 			EDIT_FORCE_BOT | EDIT_SUPPRESS_RC
 		);

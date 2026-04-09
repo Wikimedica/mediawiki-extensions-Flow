@@ -7,9 +7,9 @@ use DOMNode;
 use Flow\Conversion\Utils;
 use Flow\Parsoid\Fixer;
 use HtmlArmor;
-use LinkBatch;
+use MediaWiki\Cache\LinkBatch;
 use MediaWiki\MediaWikiServices;
-use Title;
+use MediaWiki\Title\Title;
 
 /**
  * Parsoid ignores red links. With good reason: redlinks should only be
@@ -26,9 +26,6 @@ class WikiLinkFixer implements Fixer {
 	 */
 	protected $batch;
 
-	/**
-	 * @param LinkBatch $batch
-	 */
 	public function __construct( LinkBatch $batch ) {
 		$this->batch = $batch;
 	}

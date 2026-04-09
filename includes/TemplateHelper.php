@@ -5,14 +5,15 @@ namespace Flow;
 use Closure;
 use Flow\Exception\FlowException;
 use Flow\Model\UUID;
-use Html;
 use LightnCandy\LightnCandy;
 use LightnCandy\SafeString;
+use MediaWiki\Context\RequestContext;
+use MediaWiki\Html\Html;
 use MediaWiki\MediaWikiServices;
-use MWTimestamp;
+use MediaWiki\RecentChanges\ChangesList;
+use MediaWiki\Title\Title;
+use MediaWiki\Utils\MWTimestamp;
 use OOUI\IconWidget;
-use RequestContext;
-use Title;
 
 class TemplateHelper {
 
@@ -53,15 +54,15 @@ class TemplateHelper {
 		// Prevent upwards directory traversal using same methods as Title::secureAndSplit,
 		// which is implemented in MediaWikiTitleCodec::splitTitleString.
 		if (
-			strpos( $templateName, '.' ) !== false &&
+			str_contains( $templateName, '.' ) &&
 			(
 				$templateName === '.' || $templateName === '..' ||
-				strpos( $templateName, './' ) === 0 ||
-				strpos( $templateName, '../' ) === 0 ||
-				strpos( $templateName, '/./' ) !== false ||
-				strpos( $templateName, '/../' ) !== false ||
-				substr( $templateName, -2 ) === '/.' ||
-				substr( $templateName, -3 ) === '/..'
+				str_starts_with( $templateName, './' ) ||
+				str_starts_with( $templateName, '../' ) ||
+				str_contains( $templateName, '/./' ) ||
+				str_contains( $templateName, '/../' ) ||
+				str_ends_with( $templateName, '/.' ) ||
+				str_ends_with( $templateName, '/..' )
 			)
 		) {
 			throw new FlowException( "Malformed \$templateName: $templateName" );
@@ -110,7 +111,7 @@ class TemplateHelper {
 
 		/** @var callable $renderer */
 		$renderer = require $filenames['compiled'];
-		$this->renderers[$templateName] = static function ( $args, array $scopes = [] ) use ( $templateName, $renderer ) {
+		$this->renderers[$templateName] = static function ( $args, array $scopes = [] ) use ( $renderer ) {
 			return $renderer( $args, $scopes );
 		};
 		return $this->renderers[$templateName];
@@ -409,7 +410,7 @@ class TemplateHelper {
 	 * @return SafeString
 	 */
 	public static function showCharacterDifference( $old, $new ) {
-		return new SafeString( \ChangesList::showCharacterDifference( (int)$old, (int)$new ) );
+		return new SafeString( ChangesList::showCharacterDifference( (int)$old, (int)$new ) );
 	}
 
 	/**
@@ -497,9 +498,8 @@ class TemplateHelper {
 	 */
 	public static function l10n( ...$args ) {
 		$options = array_pop( $args );
-		$str = array_shift( $args );
-
-		return wfMessage( $str )->params( $args )->text();
+		// @phan-suppress-next-line PhanParamTooFewUnpack
+		return wfMessage( ...$args )->text();
 	}
 
 	/**
@@ -509,8 +509,8 @@ class TemplateHelper {
 	 */
 	public static function l10nParse( ...$args ) {
 		$options = array_pop( $args );
-		$str = array_shift( $args );
-		return new SafeString( wfMessage( $str, $args )->parse() );
+		// @phan-suppress-next-line PhanParamTooFewUnpack
+		return new SafeString( wfMessage( ...$args )->parse() );
 	}
 
 	/**

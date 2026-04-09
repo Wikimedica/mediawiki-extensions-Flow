@@ -26,10 +26,6 @@ class UserMerger {
 	 */
 	protected $config;
 
-	/**
-	 * @param DbFactory $dbFactory
-	 * @param ManagerGroup $storage
-	 */
 	public function __construct( DbFactory $dbFactory, ManagerGroup $storage ) {
 		$this->dbFactory = $dbFactory;
 		$this->storage = $storage;
@@ -107,7 +103,13 @@ class UserMerger {
 	protected function purgeTable( Iterator $it, $oldUserId, $callback, $userTupleGetter ) {
 		foreach ( $it as $batch ) {
 			foreach ( $batch as $pkRow ) {
-				$obj = $callback( $pkRow );
+				try {
+					$obj = $callback( $pkRow );
+				} catch ( \Flow\Exception\DataModelException $e ) {
+					// Skip revisions with corrupt/missing user data (rev_user_* fields empty).
+					wfLogWarning( 'Flow UserMerger skipped corrupt revision: ' . $e->getMessage() );
+					continue;
+				}
 				if ( !$obj ) {
 					continue;
 				}

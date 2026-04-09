@@ -38,7 +38,7 @@ interface ObjectStorage {
 	 * @param array $rows An array of rows, each row is a map of columns => values.
 	 * Currently, the old calling convention of a simple map of columns to values is
 	 * also supported.
-	 * @return array|false The resulting $row including any auto-assigned ids or false on failure
+	 * @return array The resulting $row including any auto-assigned ids
 	 */
 	public function insert( array $rows );
 
@@ -55,7 +55,6 @@ interface ObjectStorage {
 	 * Remove the specified row from the data store.
 	 *
 	 * @param array $row Map of columns to values.  Must contain the primary key columns.
-	 * @return bool true when the row is successfully removed
 	 */
 	public function remove( array $row );
 

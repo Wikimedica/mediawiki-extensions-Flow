@@ -9,18 +9,20 @@ use Flow\Formatter\IRCLineUrlFormatter;
 use Flow\Model\PostRevision;
 use Flow\Model\Workflow;
 use Flow\Repository\UserNameBatch;
-use Title;
-use User;
+use MediaWiki\RecentChanges\RecentChange;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 /**
  * @covers \Flow\Data\Listener\AbstractListener
  * @covers \Flow\Data\Listener\RecentChangesListener
  *
  * @group Flow
+ * @group Database
  */
 class RecentChangesListenerTest extends \MediaWikiIntegrationTestCase {
 
-	public function somethingProvider() {
+	public static function somethingProvider() {
 		return [
 			[
 				'Reply recent change goes to the topic',
@@ -42,7 +44,7 @@ class RecentChangesListenerTest extends \MediaWikiIntegrationTestCase {
 			->method( 'newFromRow' )
 			->willReturnCallback( function ( $obj ) use ( &$ref ) {
 				$ref = $obj;
-				return $this->createMock( \RecentChange::class );
+				return $this->createMock( RecentChange::class );
 			} );
 
 		$rc = new RecentChangesListener(

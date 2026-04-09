@@ -3,16 +3,20 @@
 namespace Flow\Tests;
 
 use Flow\Container;
+use MediaWiki\Context\RequestContext;
+use MediaWiki\Title\Title;
+use Wikimedia\TestingAccessWrapper;
 
 /**
  * @covers \Flow\Container
  *
  * @group Flow
+ * @group Database
  */
 class ContainerTest extends FlowTestCase {
 
 	public function testInstantiateAll() {
-		$this->setMwGlobals( 'wgTitle', \Title::newMainPage() );
+		RequestContext::getMain()->setTitle( Title::newMainPage() );
 		$container = Container::getContainer();
 
 		foreach ( $container->keys() as $key ) {
@@ -20,9 +24,11 @@ class ContainerTest extends FlowTestCase {
 		}
 	}
 
-	public function objectManagerKeyProvider() {
+	public static function objectManagerKeyProvider() {
 		$tests = [];
-		foreach ( array_unique( Container::get( 'storage.manager_list' ) ) as $key ) {
+		$storage = Container::get( 'storage' );
+		$managerList = TestingAccessWrapper::newFromObject( $storage )->classMap;
+		foreach ( array_unique( $managerList ) as $key ) {
 			$tests[] = [ $key ];
 		}
 		return $tests;

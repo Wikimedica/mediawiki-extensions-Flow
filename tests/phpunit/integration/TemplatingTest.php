@@ -9,14 +9,15 @@ use Flow\Repository\UserName\UserNameQuery;
 use Flow\Repository\UserNameBatch;
 use Flow\RevisionActionPermissions;
 use Flow\Templating;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 use MediaWikiIntegrationTestCase;
-use Title;
-use User;
 
 /**
  * @covers \Flow\Templating
  *
  * @group Flow
+ * @group Database
  */
 class TemplatingTest extends MediaWikiIntegrationTestCase {
 

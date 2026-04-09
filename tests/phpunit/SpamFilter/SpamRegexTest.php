@@ -5,7 +5,9 @@ namespace Flow\Tests\SpamFilter;
 use Flow\Model\PostRevision;
 use Flow\SpamFilter\SpamRegex;
 use Flow\Tests\PostRevisionTestCase;
-use Title;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\MainConfigNames;
+use MediaWiki\Title\Title;
 
 /**
  * @covers \Flow\Model\AbstractRevision
@@ -21,7 +23,7 @@ class SpamRegexTest extends PostRevisionTestCase {
 	 */
 	private $spamFilter;
 
-	public function spamProvider() {
+	public static function spamProvider() {
 		return [
 			[
 				// default new topic title revision - no spam
@@ -43,9 +45,15 @@ class SpamRegexTest extends PostRevisionTestCase {
 	 */
 	public function testSpam( $newRevisionRow, ?PostRevision $oldRevision, $expected ) {
 		$newRevision = $this->generateObject( $newRevisionRow );
-		$title = Title::newFromText( 'UTPage' );
+		$title = Title::makeTitle( NS_MAIN, 'SpamRegexTest TestSpam' );
 
-		$status = $this->spamFilter->validate( $this->createMock( \IContextSource::class ), $newRevision, $oldRevision, $title, $title );
+		$status = $this->spamFilter->validate(
+			$this->createMock( IContextSource::class ),
+			$newRevision,
+			$oldRevision,
+			$title,
+			$title
+		);
 		$this->assertEquals( $expected, $status->isOK() );
 	}
 
@@ -53,7 +61,7 @@ class SpamRegexTest extends PostRevisionTestCase {
 		parent::setUp();
 
 		// create a dummy filter
-		$this->setMwGlobals( 'wgSpamRegex', [ '/http:\/\/spam/' ] );
+		$this->overrideConfigValue( MainConfigNames::SpamRegex, [ '/http:\/\/spam/' ] );
 
 		// create spam filter
 		$this->spamFilter = new SpamRegex;

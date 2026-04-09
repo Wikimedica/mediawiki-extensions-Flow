@@ -2,18 +2,15 @@
 
 namespace Flow\Actions;
 
-use Article;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Deferred\LinksUpdate\CategoryLinksTable;
 use MediaWiki\MediaWikiServices;
-use OutputPage;
-use Title;
+use MediaWiki\Output\OutputPage;
+use MediaWiki\Page\Article;
+use MediaWiki\Title\Title;
 
 class ViewAction extends FlowAction {
 
-	/**
-	 * @param Article $article
-	 * @param IContextSource $context
-	 */
 	public function __construct( Article $article, IContextSource $context ) {
 		parent::__construct( $article, $context, 'view' );
 	}
@@ -22,12 +19,12 @@ class ViewAction extends FlowAction {
 		return false;
 	}
 
-	public function showForAction( $action, OutputPage $output = null ) {
+	public function showForAction( $action, ?OutputPage $output = null ) {
 		parent::showForAction( $action, $output );
 
 		$title = $this->context->getTitle();
-		$watchlistNotificationManager = MediaWikiServices::getInstance()->getWatchlistManager();
-		$watchlistNotificationManager->clearTitleUserNotifications( $this->context->getUser(), $title );
+		$watchlistManager = MediaWikiServices::getInstance()->getWatchlistManager();
+		$watchlistManager->clearTitleUserNotifications( $this->context->getUser(), $title );
 
 		$output ??= $this->context->getOutput();
 		$output->addCategoryLinks( $this->getCategories( $title ) );
@@ -39,17 +36,21 @@ class ViewAction extends FlowAction {
 			return [];
 		}
 
-		$dbr = wfGetDB( DB_REPLICA );
-		$res = $dbr->select(
-			/* from */ 'categorylinks',
-			/* select */ [ 'cl_to', 'cl_sortkey' ],
-			/* conditions */ [ 'cl_from' => $id ],
-			__METHOD__
-		);
+		$dbr = MediaWikiServices::getInstance()
+			->getConnectionProvider()
+			->getReplicaDatabase( CategoryLinksTable::VIRTUAL_DOMAIN );
+
+		$res = $dbr->newSelectQueryBuilder()
+			->select( [ 'lt_title', 'cl_sortkey' ] )
+			->from( 'categorylinks' )
+			->join( 'linktarget', null, 'lt_id = cl_target_id' )
+			->where( [ 'cl_from' => $id ] )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 
 		$categories = [];
 		foreach ( $res as $row ) {
-			$categories[$row->cl_to] = $row->cl_sortkey;
+			$categories[$row->lt_title] = $row->cl_sortkey;
 		}
 
 		return $categories;

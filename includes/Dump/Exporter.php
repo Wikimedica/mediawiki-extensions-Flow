@@ -21,14 +21,16 @@ use MediaWiki\CommentStore\CommentStore;
 use MediaWiki\HookContainer\HookContainer;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Revision\RevisionStore;
+use MediaWiki\Title\Title;
+use MediaWiki\Title\TitleParser;
+use MediaWiki\User\CentralId\CentralIdLookup;
+use MediaWiki\User\User;
+use MediaWiki\WikiMap\WikiMap;
+use MediaWiki\Xml\Xml;
 use ReflectionProperty;
-use TitleParser;
-use User;
 use WikiExporter;
-use WikiMap;
-use Wikimedia\Rdbms\IDatabase;
+use Wikimedia\Rdbms\IReadableDatabase;
 use Wikimedia\Timestamp\TimestampException;
-use Xml;
 
 class Exporter extends WikiExporter {
 	/**
@@ -82,7 +84,7 @@ class Exporter extends WikiExporter {
 	/**
 	 * To convert between local and global user ids
 	 *
-	 * @var \CentralIdLookup|null
+	 * @var CentralIdLookup|null
 	 */
 	protected $lookup;
 
@@ -110,10 +112,8 @@ class Exporter extends WikiExporter {
 			$limitNamespaces
 		);
 		$this->prevRevisionProperty = new ReflectionProperty( AbstractRevision::class, 'prevRevision' );
-		$this->prevRevisionProperty->setAccessible( true );
 
 		$this->changeTypeProperty = new ReflectionProperty( AbstractRevision::class, 'changeType' );
-		$this->changeTypeProperty->setAccessible( true );
 
 		try {
 			$this->lookup = MediaWikiServices::getInstance()
@@ -142,7 +142,8 @@ class Exporter extends WikiExporter {
 			[
 				'xmlns' => "http://www.mediawiki.org/xml/flow-$version/",
 				'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
-				'xsi:schemaLocation' => "http://www.mediawiki.org/xml/flow-$version/ https://www.mediawiki.org/xml/flow-$version.xsd",
+				'xsi:schemaLocation' => "http://www.mediawiki.org/xml/flow-$version/ " .
+					"https://www.mediawiki.org/xml/flow-$version.xsd",
 				'version' => $version,
 				'xml:lang' => $wgLanguageCode
 			]
@@ -158,9 +159,9 @@ class Exporter extends WikiExporter {
 	 * @param string|null $workflowEndId wokflow_id, b36-encoded, to end (exclusive)
 	 * @return BatchRowIterator
 	 */
-	public function getWorkflowIterator( array $pages = null, $startId = null, $endId = null,
+	public function getWorkflowIterator( ?array $pages = null, $startId = null, $endId = null,
 		$workflowStartId = null, $workflowEndId = null ) {
-		/** @var IDatabase $dbr */
+		/** @var IReadableDatabase $dbr */
 		$dbr = Container::get( 'db.factory' )->getDB( DB_REPLICA );
 
 		$iterator = new BatchRowIterator( $dbr, 'flow_workflow', 'workflow_id', 300 );
@@ -172,34 +173,31 @@ class Exporter extends WikiExporter {
 		if ( $pages ) {
 			$pageConds = [];
 			foreach ( $pages as $page ) {
-				$title = \Title::newFromDBkey( $page );
-				$pageConds[] = $dbr->makeList(
-					[
-						'workflow_namespace' => $title->getNamespace(),
-						'workflow_title_text' => $title->getDBkey()
-					],
-					LIST_AND
-				);
+				$title = Title::newFromDBkey( $page );
+				$pageConds[] = $dbr->andExpr( [
+					'workflow_namespace' => $title->getNamespace(),
+					'workflow_title_text' => $title->getDBkey()
+				] );
 			}
 
-			$iterator->addConditions( [ $dbr->makeList( $pageConds, LIST_OR ) ] );
+			$iterator->addConditions( [ $dbr->orExpr( $pageConds ) ] );
 		}
 		if ( $startId ) {
-			$iterator->addConditions( [ 'workflow_page_id >= ' . $dbr->addQuotes( $startId ) ] );
+			$iterator->addConditions( [ $dbr->expr( 'workflow_page_id', '>=', $startId ) ] );
 		}
 		if ( $endId ) {
-			$iterator->addConditions( [ 'workflow_page_id < ' . $dbr->addQuotes( $endId ) ] );
+			$iterator->addConditions( [ $dbr->expr( 'workflow_page_id', '<', $endId ) ] );
 		}
 
 		if ( $workflowStartId ) {
 			$tempUUID = UUID::create( $workflowStartId );
 			$decodedId = $tempUUID->getBinary();
-			$iterator->addConditions( [ 'workflow_id >= ' . $dbr->addQuotes( $decodedId ) ] );
+			$iterator->addConditions( [ $dbr->expr( 'workflow_id', '>=', $decodedId ) ] );
 		}
 		if ( $workflowEndId ) {
 			$tempUUID = UUID::create( $workflowEndId );
 			$decodedId = $tempUUID->getBinary();
-			$iterator->addConditions( [ 'workflow_id < ' . $dbr->addQuotes( $decodedId ) ] );
+			$iterator->addConditions( [ $dbr->expr( 'workflow_id', '<', $decodedId ) ] );
 		}
 		return $iterator;
 	}
@@ -273,7 +271,7 @@ class Exporter extends WikiExporter {
 			$summary = $summaryCollection->getLastRevision();
 			'@phan-var PostSummary $summary';
 			$this->formatSummary( $summary );
-		} catch ( \Exception $e ) {
+		} catch ( \Exception ) {
 			// no summary - that's ok!
 		}
 
@@ -455,7 +453,7 @@ class Exporter extends WikiExporter {
 					$user = User::newFromId( (int)$attribs[ $userIdField ] );
 					$globalUserId = $this->lookup->centralIdFromLocalUser(
 						$user,
-						\CentralIdLookup::AUDIENCE_RAW
+						CentralIdLookup::AUDIENCE_RAW
 					);
 					if ( $globalUserId ) {
 						$attribs[ 'global' . $userIdField ] = $globalUserId;

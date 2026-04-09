@@ -10,7 +10,9 @@ use Flow\FlowActions;
 use Flow\Model\AbstractRevision;
 use Flow\Model\Workflow;
 use Flow\RevisionActionPermissions;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Message\Message;
+use MediaWiki\Output\OutputPage;
 
 abstract class AbstractBlock implements Block {
 
@@ -179,7 +181,7 @@ abstract class AbstractBlock implements Block {
 
 	/**
 	 * @param string $type
-	 * @return \Message
+	 * @return Message
 	 */
 	public function getErrorMessage( $type ) {
 		return $this->errors[$type]['message'] ?? null;
@@ -195,10 +197,10 @@ abstract class AbstractBlock implements Block {
 
 	/**
 	 * @param string $type
-	 * @param \Message $message
+	 * @param Message $message
 	 * @param mixed|null $extra
 	 */
-	public function addError( $type, \Message $message, $extra = null ) {
+	public function addError( $type, Message $message, $extra = null ) {
 		$this->errors[$type] = [
 			'message' => $message,
 			'extra' => $extra,
@@ -249,7 +251,13 @@ abstract class AbstractBlock implements Block {
 	protected function checkSpamFilters( ?AbstractRevision $old, AbstractRevision $new ) {
 		/** @var \Flow\SpamFilter\Controller $spamFilter */
 		$spamFilter = Container::get( 'controller.spamfilter' );
-		$status = $spamFilter->validate( $this->context, $new, $old, $this->workflow->getArticleTitle(), $this->workflow->getOwnerTitle() );
+		$status = $spamFilter->validate(
+			$this->context,
+			$new,
+			$old,
+			$this->workflow->getArticleTitle(),
+			$this->workflow->getOwnerTitle()
+		);
 		if ( $status->isOK() ) {
 			return true;
 		}
@@ -272,10 +280,7 @@ abstract class AbstractBlock implements Block {
 		return $this->context->getUser()->getEditToken();
 	}
 
-	/**
-	 * @param \OutputPage $out
-	 */
-	public function setPageTitle( \OutputPage $out ) {
+	public function setPageTitle( OutputPage $out ) {
 		if ( $out->getPageTitle() ) {
 			// Don't override page title if another block has already set it.
 			// If this should *really* be done, the specific block extending

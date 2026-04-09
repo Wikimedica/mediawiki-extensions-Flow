@@ -24,10 +24,6 @@ class WorkflowTopicListListener extends AbstractListener {
 	 */
 	protected $topicListLastUpdatedIndex;
 
-	/**
-	 * @param ObjectManager $topicListStorage
-	 * @param TopKIndex $topicListLastUpdatedIndex
-	 */
 	public function __construct( ObjectManager $topicListStorage, TopKIndex $topicListLastUpdatedIndex ) {
 		$this->topicListStorage = $topicListStorage;
 		$this->topicListLastUpdatedIndex = $topicListLastUpdatedIndex;
@@ -66,6 +62,7 @@ class WorkflowTopicListListener extends AbstractListener {
 		}
 	}
 
+	/** @inheritDoc */
 	public function onAfterUpdate( $object, array $old, array $new, array $metadata ) {
 		$entry = $this->getTopicListEntry( $new['workflow_id'] );
 		if ( $entry ) {

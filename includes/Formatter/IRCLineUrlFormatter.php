@@ -4,11 +4,12 @@ namespace Flow\Formatter;
 
 use Flow\Container;
 use Flow\RevisionActionPermissions;
-use FormatJson;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Context\RequestContext;
+use MediaWiki\Json\FormatJson;
 use MediaWiki\Logger\LoggerFactory;
-use RCFeedFormatter;
-use RecentChange;
+use MediaWiki\RCFeed\RCFeedFormatter;
+use MediaWiki\RecentChanges\RecentChange;
 use SplObjectStorage;
 
 /**
@@ -45,7 +46,7 @@ class IRCLineUrlFormatter extends AbstractFormatter implements RCFeedFormatter {
 	 * @return string|null Text for IRC line, or null on failure
 	 */
 	public function getLine( array $feed, RecentChange $rc, $actionComment ) {
-		$ctx = \RequestContext::getMain();
+		$ctx = RequestContext::getMain();
 
 		$serialized = $this->serializeRcRevision( $rc, $ctx );
 		if ( !$serialized ) {
@@ -81,7 +82,7 @@ class IRCLineUrlFormatter extends AbstractFormatter implements RCFeedFormatter {
 	 * @fixme this looks slow, likely a better way
 	 */
 	protected function serializeRcRevision( RecentChange $rc, IContextSource $ctx ) {
-		/** @var RecentChangesQuery $query */
+		/** @var ChangesListQuery $query */
 		$query = Container::get( 'query.changeslist' );
 		$query->loadMetadataBatch( [ (object)$rc->getAttributes() ] );
 		$rcRow = $query->getResult( null, $rc );
@@ -104,10 +105,10 @@ class IRCLineUrlFormatter extends AbstractFormatter implements RCFeedFormatter {
 	 * Generate a plaintext revision description suitable for IRC consumption
 	 *
 	 * @param array $data
-	 * @param \IContextSource $ctx not used
+	 * @param IContextSource $ctx not used
 	 * @return string
 	 */
-	protected function formatDescription( array $data, \IContextSource $ctx ) {
+	protected function formatDescription( array $data, IContextSource $ctx ) {
 		$msg = $this->getDescription( $data, $ctx );
 		return $msg->inLanguage( 'en' )->text();
 	}

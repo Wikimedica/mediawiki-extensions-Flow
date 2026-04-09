@@ -2,11 +2,11 @@
 	"@metadata": {
 		"authors": [
 			"Arystanbek",
+			"Casserium",
 			"Matiia",
 			"Nnemo",
 			"Quiddity",
-			"СеніңШешең",
-			"Casserium"
+			"СеніңШешең"
 		]
 	},
 	"enablestructureddiscussions": "Flow кеңейтілімін іске қосу",
@@ -365,23 +365,17 @@
 	"flow-no-more-fwd": "Мұнда ескірек тақырыптар жоқ",
 	"flow-newest-topics": "Ең жаңа тақырыптар",
 	"flow-recent-topics": "Жуықтағы белсенді тақырыптар",
-	"flow-sorting-tooltip-newest": "{{GENDER:|Сіз}} алғашқы ең жаңа тақырыптарды оқып отырсыз. Сұрыптау параметрлерін таңдау үшін басыңыз.",
-	"flow-sorting-tooltip-recent": "{{GENDER:|Сіз}} алғашқы ең белсенді тақырыптарды оқып отырсыз. Сұрыптау параметрлерін таңдау үшін басыңыз.",
 	"flow-toggle-small-topics": "Кішкене тақырыптарды көруге ауысу",
 	"flow-toggle-topics": "Тақырыптарды тек қана көруге ауысу",
 	"flow-toggle-topics-posts": "Тақырыптарды және хабарламаларды көруге ауысу",
 	"flow-terms-of-use-summarize": "«{{int:flow-topic-action-update-topic-summary}}» батырмасын басу арқылы сіз осы уикидің қолдану шарттарымен келіскеніңіз болып табылады.",
 	"flow-terms-of-use-lock-topic": "«{{int:flow-topic-action-lock-topic}}» батырмасын басу арқылы сіз осы уикидің қолдану шарттарымен келіскеніңіз болып табылады.",
 	"flow-terms-of-use-unlock-topic": "«{{int:flow-topic-action-unlock-topic}}» батырмасын басу арқылы сіз осы уикидің қолдану шарттарымен келіскеніңіз болып табылады.",
-	"flow-whatlinkshere-post": "[$1 хабарламасынан]",
-	"flow-whatlinkshere-header": "[$1 сипаттамасынан]",
-	"flow-whatlinkshere-post-summary": "[$1 түйіндемесінен]",
 	"structureddiscussions": "Flow",
 	"flow-special-desc": "Бұл арнайы бет UUID берілген Flow хабарламасы немесе Flow   жұмыс легіне бағыттайды",
 	"flow-special-type": "Түрі",
 	"flow-special-type-post": "Хабарлама",
 	"flow-special-type-workflow": "Жұмыс легі",
-	"flow-special-uuid": "UUID",
 	"flow-special-invalid-uuid": "UUID және түрі бойынша мазмұн сәйкестігі табылмады.",
 	"flow-special-enableflow-legend": "Жаңа бетте Flow жұмыс легін іске қосу",
 	"flow-special-enableflow-page": "Бетке Flow жұмыс легін қосу",

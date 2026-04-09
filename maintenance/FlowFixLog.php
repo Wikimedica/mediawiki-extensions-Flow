@@ -11,7 +11,7 @@ use Flow\Data\ManagerGroup;
 use Flow\Exception\InvalidDataException;
 use Flow\Model\PostRevision;
 use Flow\Model\UUID;
-use LoggedUpdateMaintenance;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
 use RowUpdateGenerator;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
@@ -42,7 +42,7 @@ class FlowFixLog extends LoggedUpdateMaintenance {
 	}
 
 	protected function doDBUpdates() {
-		$iterator = new BatchRowIterator( wfGetDB( DB_REPLICA ), 'logging', 'log_id', $this->getBatchSize() );
+		$iterator = new BatchRowIterator( $this->getReplicaDB(), 'logging', 'log_id', $this->getBatchSize() );
 		$iterator->setFetchColumns( [ 'log_id', 'log_params' ] );
 		$iterator->addConditions( [
 			'log_type' => [ 'delete', 'suppress' ],
@@ -53,7 +53,7 @@ class FlowFixLog extends LoggedUpdateMaintenance {
 		] );
 		$iterator->setCaller( __METHOD__ );
 
-		$writer = new BatchRowWriter( wfGetDB( DB_PRIMARY ), 'logging' );
+		$writer = new BatchRowWriter( $this->getPrimaryDB(), 'logging' );
 		$writer->setCaller( __METHOD__ );
 
 		$updater = new BatchRowUpdate(
@@ -73,7 +73,7 @@ class FlowFixLog extends LoggedUpdateMaintenance {
 	 * a Closure.
 	 *
 	 * @param string $out
-	 * @param mixed|null $channel
+	 * @param string|null $channel
 	 */
 	public function output( $out, $channel = null ) {
 		parent::output( $out, $channel );
@@ -97,9 +97,6 @@ class LogRowUpdateGenerator implements RowUpdateGenerator {
 	 */
 	protected $maintenance;
 
-	/**
-	 * @param FlowFixLog $maintenance
-	 */
 	public function __construct( FlowFixLog $maintenance ) {
 		$this->maintenance = $maintenance;
 	}
@@ -133,7 +130,7 @@ class LogRowUpdateGenerator implements RowUpdateGenerator {
 			// log_namespace & log_title used to be board, should be topic
 			$updates['log_namespace'] = $topic->getTitle()->getNamespace();
 			$updates['log_title'] = $topic->getTitle()->getDBkey();
-		} catch ( \Exception $e ) {
+		} catch ( \Exception ) {
 			$this->maintenance->error( "Couldn't load Title for log_id $logId" );
 			$updates = [];
 		}
@@ -183,7 +180,7 @@ class LogRowUpdateGenerator implements RowUpdateGenerator {
 			// this fails (likely will for old data), catch will be invoked
 			$collection->getLastRevision();
 			return $collection;
-		} catch ( InvalidDataException $e ) {
+		} catch ( InvalidDataException ) {
 			// posts used to mistakenly store revision ID instead of post ID
 
 			/** @var ManagerGroup $storage */

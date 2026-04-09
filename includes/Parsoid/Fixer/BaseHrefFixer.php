@@ -3,6 +3,8 @@
 namespace Flow\Parsoid\Fixer;
 
 use Flow\Parsoid\Fixer;
+use MediaWiki\Title\Title;
+use MediaWiki\Utils\UrlUtils;
 
 /**
  * Parsoid markup expects a <base href> of //domain/wiki/ .
@@ -21,10 +23,11 @@ class BaseHrefFixer implements Fixer {
 
 	/**
 	 * @param string $articlePath path setting for wiki
+	 * @param UrlUtils $urlUtils injected url utilities
 	 */
-	public function __construct( $articlePath ) {
+	public function __construct( string $articlePath, UrlUtils $urlUtils ) {
 		$replacedArticlePath = str_replace( '$1', '', $articlePath );
-		$this->baseHref = wfExpandUrl( $replacedArticlePath, PROTO_RELATIVE );
+		$this->baseHref = $urlUtils->expand( $replacedArticlePath, PROTO_RELATIVE ) ?? '';
 	}
 
 	/**
@@ -41,15 +44,15 @@ class BaseHrefFixer implements Fixer {
 	 * Prefixes the href with base href.
 	 *
 	 * @param \DOMNode $node Link
-	 * @param \Title $title
+	 * @param Title $title
 	 */
-	public function apply( \DOMNode $node, \Title $title ) {
+	public function apply( \DOMNode $node, Title $title ) {
 		if ( !$node instanceof \DOMElement ) {
 			return;
 		}
 
 		$href = $node->getAttribute( 'href' );
-		if ( strpos( $href, './' ) !== 0 ) {
+		if ( !str_starts_with( $href, './' ) ) {
 			// If we need to handle more complex cases, we should resolve it
 			// with a library like Net_URL2. This check will then be
 			// unnecessary.

@@ -1,5 +1,5 @@
 ( function () {
-	var apiTransformMap = {
+	const apiTransformMap = {
 		// Map of API submodule name, block name, and prefix name
 		'moderate-post': [ 'topic_', 'mp' ],
 		'new-topic': [ 'topiclist_', 'nt' ],
@@ -39,7 +39,7 @@
 		 * @return {jQuery.Promise}
 		 */
 		function flowApiCall( params, method ) {
-			var mwApi, tokenType,
+			let mwApi, tokenType,
 				$deferred = $.Deferred(),
 				ajaxTimeoutSec = mw.config.get( 'wgFlowAjaxTimeout' ),
 				apiConstructorParams = { ajax: {} };
@@ -122,18 +122,18 @@
 	 * @return {Object}
 	 */
 	function flowApiTransformMap( queryMap ) {
-		var key,
+		let key,
 			map = apiTransformMap[ queryMap.submodule ];
 		if ( !map ) {
 			return queryMap;
 		}
 		for ( key in queryMap ) {
 			if ( Object.prototype.hasOwnProperty.call( queryMap, key ) ) {
-				if ( key.indexOf( map[ 0 ] ) === 0 ) {
+				if ( key.startsWith( map[ 0 ] ) ) {
 					queryMap[ key.replace( map[ 0 ], map[ 1 ] ) ] = queryMap[ key ];
 					delete queryMap[ key ];
 				}
-				if ( key.indexOf( 'flow_' ) === 0 ) {
+				if ( key.startsWith( 'flow_' ) ) {
 					queryMap[ key.replace( 'flow_', map[ 1 ] ) ] = queryMap[ key ];
 					delete queryMap[ key ];
 				}
@@ -162,31 +162,25 @@
 	 * @return {Object}
 	 */
 	function flowApiGetQueryMap( url, queryMap ) {
-		var uri,
-			queryKey,
-			queryValue,
-			i = 0,
-			$node, $form, formData;
-
 		queryMap = queryMap || {};
 
 		// If URL is an Element...
 		if ( typeof url !== 'string' ) {
-			$node = $( url );
+			const $node = $( url );
 
 			// Get the data-flow-api-action override from the node itself
 			queryMap.submodule = $node.data( 'flow-api-action' );
 
 			if ( $node.is( 'form, input, button, textarea, select, option' ) ) {
 				// We are processing a form
-				$form = $node.closest( 'form' );
-				formData = $form.serializeArray();
+				const $form = $node.closest( 'form' );
+				const formData = $form.serializeArray();
 
 				// Get the data-flow-api-action override from the form
 				queryMap.submodule = queryMap.submodule || $form.data( 'flow-api-action' );
 
 				// Build the queryMap manually from a serialized form
-				for ( i = 0; i < formData.length; i++ ) {
+				for ( let i = 0; i < formData.length; i++ ) {
 					// skip wpEditToken, its handle independently
 					if ( formData[ i ].name !== 'wpEditToken' ) {
 						queryMap[ formData[ i ].name ] = formData[ i ].value;
@@ -210,10 +204,9 @@
 		}
 
 		// Parse the URL query params
-		uri = new mw.Uri( url );
+		const uri = new URL( url, location.origin );
 
-		for ( queryKey in uri.query ) {
-			queryValue = uri.query[ queryKey ];
+		for ( let [ queryKey, queryValue ] of uri.searchParams.entries() ) {
 			if ( queryKey === 'action' ) {
 				// Submodule is the action
 				queryKey = 'submodule';
@@ -253,7 +246,7 @@
 	 * @return {jQuery.Promise}
 	 */
 	function flowApiRequestFromForm( button, queryMap ) {
-		var $button = $( button ),
+		const $button = $( button ),
 			method = $button.closest( 'form' ).attr( 'method' ) || 'GET';
 
 		// Cancel any old form request, and also trigger a new one
@@ -271,7 +264,7 @@
 	 * @return {jQuery.Promise}
 	 */
 	function flowApiRequestFromAnchor( anchor, queryMap ) {
-		var $anchor = $( anchor ),
+		const $anchor = $( anchor ),
 			method = $anchor.data( 'flow-api-method' ) || 'GET';
 
 		// Abort any old requests, and have it issue a new one via GET or POST
@@ -284,11 +277,10 @@
 	 * Automatically calls requestFromAnchor or requestFromForm depending on the type of node given.
 	 *
 	 * @param {HTMLElement} node
-	 * @param {Object} queryMap
 	 * @return {jQuery.Promise}
 	 */
 	function flowApiRequestFromNode( node ) {
-		var $node = $( node );
+		const $node = $( node );
 
 		if ( $node.is( 'a' ) ) {
 			return this.requestFromAnchor.apply( this, arguments );
@@ -311,7 +303,7 @@
 	 * @return {undefined|jQuery.Promise}
 	 */
 	function flowApiAbortOldRequestFromNode( $node, queryMap, startNewMethod ) {
-		var str, prevApiCall, newApiCall;
+		let str, prevApiCall, newApiCall;
 
 		$node = $( $node );
 
@@ -345,7 +337,7 @@
 			);
 
 			// Remove the request on success
-			newApiCall.always( function () {
+			newApiCall.always( () => {
 				$node.removeData( 'flow-api-query-temp-' + queryMap.action + '-' + queryMap.submodule );
 			} );
 

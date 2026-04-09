@@ -6,7 +6,10 @@ use Flow\DbFactory;
 use Flow\Model\UUID;
 use Flow\Repository\TreeRepository;
 use Flow\Tests\FlowTestCase;
+use Wikimedia\Rdbms\FakeResultWrapper;
 use Wikimedia\Rdbms\IDatabase;
+use Wikimedia\Rdbms\InsertQueryBuilder;
+use Wikimedia\Rdbms\SelectQueryBuilder;
 
 /**
  * @covers \Flow\Repository\TreeRepository
@@ -27,8 +30,9 @@ class TreeRepositoryTest extends FlowTestCase {
 	}
 
 	public function testSuccessfulInsert() {
-		$cache = $this->getCache();
-		$treeRepository = new TreeRepository( $this->mockDbFactory( true ), $cache );
+		$dbFactory = $this->mockDbFactory( true );
+		$cache = $this->getCache( $dbFactory );
+		$treeRepository = new TreeRepository( $dbFactory, $cache );
 		$this->assertTrue( $treeRepository->insert( $this->descendant, $this->ancestor ) );
 	}
 
@@ -40,11 +44,21 @@ class TreeRepositoryTest extends FlowTestCase {
 	}
 
 	private function mockDb( $dbResult ) {
+		$queryBuilder = $this->createMock( SelectQueryBuilder::class );
+		$queryBuilder->method( $this->logicalOr( 'select', 'from', 'where', 'caller' ) )->willReturnSelf();
+		$queryBuilder->method( 'fetchResultSet' )
+			->willReturn( new FakeResultWrapper( [] ) );
 		$db = $this->createMock( IDatabase::class );
 		$db->method( $this->logicalOr( 'insert', 'insertSelect' ) )
 			->willReturn( $dbResult );
 		$db->method( 'addQuotes' )
 			->willReturn( '' );
+		$db->method( 'getSessionLagStatus' )->willReturn( [ 'lag' => 0, 'since' => 0 ] );
+		$db->method( 'newInsertQueryBuilder' )->willReturnCallback( static function () use ( $db ) {
+			return new InsertQueryBuilder( $db );
+		} );
+		$db->method( 'newSelectQueryBuilder' )
+			->willReturn( $queryBuilder );
 		return $db;
 	}
 

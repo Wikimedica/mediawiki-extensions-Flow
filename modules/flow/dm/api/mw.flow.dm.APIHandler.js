@@ -8,15 +8,15 @@
 	 * @param {string} page Full page name with its namespace;
 	 *  for example: "User_talk:Foo"
 	 * @param {Object} [config] Configuration options
-	 * @cfg {Object} [currentRevision] Current revision Id. Mostly used
+	 * @param {Object} [config.currentRevision] Current revision Id. Mostly used
 	 *  for edit conflict check.
-	 * @cfg {Object} [apiConstructorParams] Parameters for mw.Api()
-	 * @cfg {Object} [requestParams] Parameters for the request
+	 * @param {Object} [config.apiConstructorParams] Parameters for mw.Api()
+	 * @param {Object} [config.requestParams] Parameters for the request
 	 */
 	mw.flow.dm.APIHandler = function FlowDmAPIHandler( page, config ) {
 		config = config || {};
 
-		this.apiConstructorParams = $.extend( {
+		this.apiConstructorParams = Object.assign( {
 			ajax: {
 				timeout: 5 * 1000, // 5 seconds
 				cache: false
@@ -26,7 +26,7 @@
 		this.page = page;
 		this.setCurrentRevision( config.currentRevision );
 
-		this.requestParams = $.extend( {
+		this.requestParams = Object.assign( {
 			action: 'flow',
 			uselang: mw.config.get( 'wgUserLanguage' )
 		}, config.requestParams );
@@ -53,14 +53,12 @@
 	 *  is done, with the API result.
 	 */
 	mw.flow.dm.APIHandler.prototype.get = function ( submodule, requestParams ) {
-		var xhr,
-			params = $.extend( { submodule: submodule }, this.requestParams, requestParams );
+		let xhr,
+			params = Object.assign( { submodule: submodule }, this.requestParams, requestParams );
 
 		xhr = ( new mw.Api() ).get( params );
 		return xhr
-			.then( function ( data ) {
-				return data.flow[ submodule ].result;
-			} )
+			.then( ( data ) => data.flow[ submodule ].result )
 			.promise( { abort: xhr.abort } );
 	};
 
@@ -73,8 +71,8 @@
 	 *  is done, with the API result.
 	 */
 	mw.flow.dm.APIHandler.prototype.postEdit = function ( submodule, requestParams ) {
-		var api = new mw.Api(),
-			params = $.extend( { submodule: submodule }, this.requestParams, requestParams );
+		const api = new mw.Api(),
+			params = Object.assign( { submodule: submodule }, this.requestParams, requestParams );
 
 		return api.postWithToken( 'csrf', api.assertCurrentUser( params ) );
 	};
@@ -87,17 +85,15 @@
 	 *  is done, with the API result.
 	 */
 	mw.flow.dm.APIHandler.prototype.getCategories = function () {
-		var params = {
+		const params = {
 			action: 'query',
 			titles: this.page,
 			generator: 'categories',
 			gcllimit: 'max'
 		};
 
-		return ( new mw.Api() ).get( $.extend( {}, this.requestParams, params ) )
-			.then( function ( response ) {
-				return OO.getProp( response, 'query', 'pages' );
-			} );
+		return ( new mw.Api() ).get( Object.assign( {}, this.requestParams, params ) )
+			.then( ( response ) => OO.getProp( response, 'query', 'pages' ) );
 	};
 
 	/**
@@ -108,7 +104,7 @@
 	 * @return {string} return.done.reason Reason, as HTML
 	 */
 	mw.flow.dm.APIHandler.prototype.getProtectionReason = function () {
-		var params = {
+		const params = {
 			action: 'query',
 			list: 'logevents',
 			leprop: 'parsedcomment',
@@ -117,10 +113,8 @@
 			lelimit: 1
 		};
 
-		return ( new mw.Api() ).get( $.extend( {}, this.requestParams, params ) )
-			.then( function ( response ) {
-				return OO.getProp( response, 'query', 'logevents', 0, 'parsedcomment' );
-			} );
+		return ( new mw.Api() ).get( Object.assign( {}, this.requestParams, params ) )
+			.then( ( response ) => OO.getProp( response, 'query', 'logevents', 0, 'parsedcomment' ) );
 	};
 
 	/**
@@ -128,16 +122,16 @@
 	 *
 	 * @param {string} orderType Sort order type, 'newest' or 'updated'
 	 * @param {Object} config Configuration
-	 * @cfg {string} [offset] Topic offset id or timestamp offset
+	 * @param {string} [config.offset] Topic offset id or timestamp offset
 	 *  if given, the topic list will be returned with topics that
 	 *  are after (and including) the topic with the given uuid or
 	 *  after the given timestamp.
-	 * @cfg {string} [toconly] Receive a stripped reply that fits the ToC. For more information
+	 * @param {string} [config.toconly] Receive a stripped reply that fits the ToC. For more information
 	 *  see 'toconly' in the API documentation.
 	 * @return {jQuery.Promise} Promise that is resolved with the topiclist response
 	 */
 	mw.flow.dm.APIHandler.prototype.getTopicList = function ( orderType, config ) {
-		var params = {
+		const params = {
 			page: this.page
 		};
 
@@ -155,9 +149,7 @@
 		}
 
 		return this.get( 'view-topiclist', params )
-			.then( function ( data ) {
-				return data.topiclist;
-			} );
+			.then( ( data ) => data.topiclist );
 	};
 
 	/**
@@ -198,7 +190,7 @@
 	 *  that this reply belongs to
 	 */
 	mw.flow.dm.APIHandler.prototype.saveReply = function ( topicId, replyTo, content, format, captcha ) {
-		var api = new mw.Api(),
+		let api = new mw.Api(),
 			params = {
 				action: 'flow',
 				submodule: 'reply',
@@ -211,10 +203,8 @@
 		params = api.assertCurrentUser( params );
 		this.addCaptcha( params, captcha );
 
-		return api.postWithToken( 'csrf', $.extend( {}, this.requestParams, params ) )
-			.then( function ( data ) {
-				return data.flow.reply.workflow;
-			} );
+		return api.postWithToken( 'csrf', Object.assign( {}, this.requestParams, params ) )
+			.then( ( data ) => data.flow.reply.workflow );
 	};
 
 	/**
@@ -227,7 +217,7 @@
 	 * @return {jQuery.Promise} Promise that is resolved with the new topic id
 	 */
 	mw.flow.dm.APIHandler.prototype.saveNewTopic = function ( title, content, format, captcha ) {
-		var api = new mw.Api(),
+		let api = new mw.Api(),
 			params = {
 				submodule: 'new-topic',
 				page: this.page,
@@ -239,10 +229,8 @@
 		params = api.assertCurrentUser( params );
 		this.addCaptcha( params, captcha );
 
-		return api.postWithToken( 'csrf', $.extend( {}, this.requestParams, params ) )
-			.then( function ( response ) {
-				return OO.getProp( response.flow, 'new-topic', 'committed', 'topiclist', 'topic-id' );
-			} );
+		return api.postWithToken( 'csrf', Object.assign( {}, this.requestParams, params ) )
+			.then( ( response ) => OO.getProp( response.flow, 'new-topic', 'committed', 'topiclist', 'topic-id' ) );
 	};
 
 	/**
@@ -252,15 +240,13 @@
 	 * @return {jQuery.Promise} Promise that is resolved with the header revision data
 	 */
 	mw.flow.dm.APIHandler.prototype.getDescription = function ( contentFormat ) {
-		var params = {
+		const params = {
 			page: this.page,
 			vhformat: contentFormat || 'fixed-html'
 		};
 
 		return this.get( 'view-header', params )
-			.then( function ( data ) {
-				return data.header.revision;
-			} );
+			.then( ( data ) => data.header.revision );
 	};
 
 	/**
@@ -272,7 +258,7 @@
 	 * @return {jQuery.Promise} Promise that is resolved with the saved header revision id
 	 */
 	mw.flow.dm.APIHandler.prototype.saveDescription = function ( content, format, captcha ) {
-		var xhr,
+		let xhr,
 			params = {
 				page: this.page,
 				ehcontent: content,
@@ -283,9 +269,7 @@
 		this.addCaptcha( params, captcha );
 
 		xhr = this.postEdit( 'edit-header', params )
-			.then( function ( data ) {
-				return OO.getProp( data.flow, 'edit-header', 'committed', 'header', 'header-revision-id' );
-			} );
+			.then( ( data ) => OO.getProp( data.flow, 'edit-header', 'committed', 'header', 'header-revision-id' ) );
 
 		return xhr.promise( { abort: xhr.abort } );
 	};
@@ -299,16 +283,14 @@
 	 * @return {jQuery.Promise} Promise that is resolved with the post revision data
 	 */
 	mw.flow.dm.APIHandler.prototype.getPost = function ( topicId, postId, format ) {
-		var params = {
+		const params = {
 			page: this.getTopicTitle( topicId ),
 			vppostId: postId,
 			vpformat: format || 'html'
 		};
 
 		return this.get( 'view-post', params )
-			.then( function ( data ) {
-				return data.topic.revisions[ data.topic.posts[ postId ] ];
-			} );
+			.then( ( data ) => data.topic.revisions[ data.topic.posts[ postId ] ] );
 	};
 
 	/**
@@ -322,7 +304,7 @@
 	 * @return {jQuery.Promise} Promise that is resolved with the saved post revision id
 	 */
 	mw.flow.dm.APIHandler.prototype.savePost = function ( topicId, postId, content, format, captcha ) {
-		var params = {
+		const params = {
 			page: this.getTopicTitle( topicId ),
 			epcontent: content,
 			epformat: format,
@@ -333,9 +315,7 @@
 		this.addCaptcha( params, captcha );
 
 		return this.postEdit( 'edit-post', params )
-			.then( function ( data ) {
-				return OO.getProp( data.flow, 'edit-post', 'workflow' );
-			} );
+			.then( ( data ) => OO.getProp( data.flow, 'edit-post', 'workflow' ) );
 	};
 
 	/**
@@ -346,15 +326,13 @@
 	 * @return {jQuery.Promise} Promise that is resolved with the topic summary revision
 	 */
 	mw.flow.dm.APIHandler.prototype.getTopicSummary = function ( topicId, format ) {
-		var params = {
+		const params = {
 			page: this.getTopicTitle( topicId ),
 			vtsformat: format || 'html'
 		};
 
 		return this.get( 'view-topic-summary', params )
-			.then( function ( data ) {
-				return data.topicsummary.revision;
-			} );
+			.then( ( data ) => data.topicsummary.revision );
 	};
 
 	/**
@@ -367,7 +345,7 @@
 	 * @return {jQuery.Promise} Promise that is resolved with workflow id
 	 */
 	mw.flow.dm.APIHandler.prototype.saveTopicSummary = function ( topicId, content, format, captcha ) {
-		var params = {
+		const params = {
 			page: this.getTopicTitle( topicId ),
 			etssummary: content,
 			etsformat: format,
@@ -377,9 +355,7 @@
 		this.addCaptcha( params, captcha );
 
 		return this.postEdit( 'edit-topic-summary', params )
-			.then( function ( data ) {
-				return OO.getProp( data.flow, 'edit-topic-summary', 'workflow' );
-			} );
+			.then( ( data ) => OO.getProp( data.flow, 'edit-topic-summary', 'workflow' ) );
 	};
 
 	/**
@@ -391,7 +367,7 @@
 	 * @return {jQuery.Promise} Promise that is resolved with workflow id
 	 */
 	mw.flow.dm.APIHandler.prototype.saveTopicTitle = function ( topicId, content, captcha ) {
-		var params = {
+		const params = {
 			page: this.getTopicTitle( topicId ),
 			etcontent: content,
 			etprev_revision: this.currentRevision
@@ -400,9 +376,7 @@
 		this.addCaptcha( params, captcha );
 
 		return this.postEdit( 'edit-title', params )
-			.then( function ( data ) {
-				return OO.getProp( data.flow, 'edit-title', 'workflow' );
-			} );
+			.then( ( data ) => OO.getProp( data.flow, 'edit-title', 'workflow' ) );
 	};
 
 	/**
@@ -414,7 +388,7 @@
 	 * @return {jQuery.Promise} Promise that is resolved with workflow id
 	 */
 	mw.flow.dm.APIHandler.prototype.lockTopic = function ( topicId, moderationState, reasonMsgKey ) {
-		var params = {
+		const params = {
 			page: this.getTopicTitle( topicId ),
 			cotmoderationState: moderationState,
 			// The following messages are used here:
@@ -424,9 +398,7 @@
 		};
 
 		return this.postEdit( 'lock-topic', params )
-			.then( function ( data ) {
-				return OO.getProp( data.flow, 'lock-topic', 'workflow' );
-			} );
+			.then( ( data ) => OO.getProp( data.flow, 'lock-topic', 'workflow' ) );
 	};
 
 	/**

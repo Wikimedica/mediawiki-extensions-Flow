@@ -12,8 +12,8 @@ use Flow\Data\ObjectMapper;
 use Flow\Data\ObjectStorage;
 use Flow\Exception\DataModelException;
 use Flow\Model\UUID;
-use FormatJson;
-use WikiMap;
+use MediaWiki\Json\FormatJson;
+use MediaWiki\WikiMap\WikiMap;
 
 /**
  * Index objects with equal features($indexedColumns) into the same buckets.
@@ -72,13 +72,6 @@ abstract class FeatureIndex implements Index {
 	abstract public function queryOptions();
 
 	/**
-	 * @todo this doesn't need to be abstract
-	 * @param array $values The current contents of a single feature bucket
-	 * @return array $values trimmed to respect self::getLimit()
-	 */
-	abstract public function limitIndexSize( array $values );
-
-	/**
 	 * @todo Similar, Could the cache key be passed in instead of $indexed?
 	 * @param array $indexed The portion of $row that makes up the cache key
 	 * @param array $row A single row of data to remove from its related feature bucket
@@ -92,7 +85,13 @@ abstract class FeatureIndex implements Index {
 	 * @param string $prefix Prefix to utilize for all cache keys
 	 * @param string[] $indexedColumns List of columns to index
 	 */
-	public function __construct( FlowObjectCache $cache, ObjectStorage $storage, ObjectMapper $mapper, $prefix, array $indexedColumns ) {
+	public function __construct(
+		FlowObjectCache $cache,
+		ObjectStorage $storage,
+		ObjectMapper $mapper,
+		$prefix,
+		array $indexedColumns
+	) {
 		$this->cache = $cache;
 		$this->storage = $storage;
 		$this->mapper = $mapper;

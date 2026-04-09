@@ -3,19 +3,19 @@
 namespace Flow\Utils;
 
 use BatchRowIterator;
-use EchoCallbackIterator;
 use Iterator;
 use IteratorAggregate;
+use MediaWiki\Extension\Notifications\Iterator\CallbackIterator;
+use MediaWiki\Title\Title;
 use RecursiveIteratorIterator;
-use Title;
-use Wikimedia\Rdbms\IDatabase;
+use Wikimedia\Rdbms\IReadableDatabase;
 
 /**
  * Iterates over all titles that have the specified page property
  */
 class PagesWithPropertyIterator implements IteratorAggregate {
 	/**
-	 * @var IDatabase
+	 * @var IReadableDatabase
 	 */
 	protected $db;
 
@@ -39,12 +39,12 @@ class PagesWithPropertyIterator implements IteratorAggregate {
 	protected $stopId = null;
 
 	/**
-	 * @param IDatabase $db
+	 * @param IReadableDatabase $db
 	 * @param string $propName
 	 * @param int|null $startId Page id to start at (inclusive)
 	 * @param int|null $stopId Page id to stop at (exclusive)
 	 */
-	public function __construct( IDatabase $db, $propName, $startId = null, $stopId = null ) {
+	public function __construct( IReadableDatabase $db, $propName, $startId = null, $stopId = null ) {
 		$this->db = $db;
 		$this->propName = $propName;
 		$this->startId = $startId;
@@ -54,7 +54,7 @@ class PagesWithPropertyIterator implements IteratorAggregate {
 	/**
 	 * @return Iterator<Title>
 	 */
-	public function getIterator() {
+	public function getIterator(): Iterator {
 		$it = new BatchRowIterator(
 			$this->db,
 			/* tables */ [ 'page_props', 'page' ],
@@ -64,10 +64,10 @@ class PagesWithPropertyIterator implements IteratorAggregate {
 
 		$conditions = [ 'pp_propname' => $this->propName ];
 		if ( $this->startId !== null ) {
-			$conditions[] = 'pp_page >= ' . $this->db->addQuotes( $this->startId );
+			$conditions[] = $this->db->expr( 'pp_page', '>=', $this->startId );
 		}
 		if ( $this->stopId !== null ) {
-			$conditions[] = 'pp_page < ' . $this->db->addQuotes( $this->stopId );
+			$conditions[] = $this->db->expr( 'pp_page', '<', $this->stopId );
 		}
 		$it->addConditions( $conditions );
 
@@ -79,7 +79,7 @@ class PagesWithPropertyIterator implements IteratorAggregate {
 
 		$it = new RecursiveIteratorIterator( $it );
 
-		return new EchoCallbackIterator( $it, static function ( $row ) {
+		return new CallbackIterator( $it, static function ( $row ) {
 			return Title::makeTitle( $row->page_namespace, $row->page_title );
 		} );
 	}

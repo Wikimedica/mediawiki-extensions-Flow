@@ -17,13 +17,13 @@ use Flow\Model\PostRevision;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\Repository\RootPostLoader;
-use Maintenance;
+use MediaWiki\Maintenance\Maintenance;
 use MediaWiki\MediaWikiServices;
-use MWTimestamp;
+use MediaWiki\Utils\MWTimestamp;
+use MediaWiki\WikiMap\WikiMap;
 use RowUpdateGenerator;
 use stdClass;
-use WikiMap;
-use Wikimedia\Rdbms\IDatabase;
+use Wikimedia\Rdbms\IReadableDatabase;
 use Wikimedia\Timestamp\TimestampException;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
@@ -79,7 +79,7 @@ class FlowFixWorkflowLastUpdateTimestamp extends Maintenance {
 	 * a Closure.
 	 *
 	 * @param string $out
-	 * @param mixed|null $channel
+	 * @param string|null $channel
 	 */
 	public function output( $out, $channel = null ) {
 		parent::output( $out, $channel );
@@ -98,16 +98,11 @@ class UpdateWorkflowLastUpdateTimestampGenerator implements RowUpdateGenerator {
 	protected $rootPostLoader;
 
 	/**
-	 * @var IDatabase
+	 * @var IReadableDatabase
 	 */
 	protected $db;
 
-	/**
-	 * @param ManagerGroup $storage
-	 * @param RootPostLoader $rootPostLoader
-	 * @param IDatabase $db
-	 */
-	public function __construct( ManagerGroup $storage, RootPostLoader $rootPostLoader, IDatabase $db ) {
+	public function __construct( ManagerGroup $storage, RootPostLoader $rootPostLoader, IReadableDatabase $db ) {
 		$this->storage = $storage;
 		$this->rootPostLoader = $rootPostLoader;
 		$this->db = $db;
@@ -190,7 +185,7 @@ class UpdateWorkflowLastUpdateTimestampWriter extends BatchRowWriter {
 
 	/**
 	 * @param ManagerGroup $storage
-	 * @param bool $clusterName
+	 * @param string|false $clusterName
 	 */
 	public function __construct( ManagerGroup $storage, $clusterName = false ) {
 		$this->storage = $storage;
@@ -206,12 +201,12 @@ class UpdateWorkflowLastUpdateTimestampWriter extends BatchRowWriter {
 	public function write( array $updates ) {
 		/*
 		 * from:
-		 * array(
-		 *     'primaryKey' => array( 'workflow_id' => $id ),
-		 *     'updates' => array( 'workflow_last_update_timestamp' => $timestamp ),
-		 * )
+		 * [
+		 *     'primaryKey' => [ 'workflow_id' => $id ],
+		 *     'updates' => [ 'workflow_last_update_timestamp' => $timestamp ],
+		 * ]
 		 * to:
-		 * array( $id => $timestamp );
+		 * [ $id => $timestamp ]
 		 */
 		$timestamps = array_combine(
 			$this->arrayColumn( $this->arrayColumn( $updates, 'primaryKey' ), 'workflow_id' ),

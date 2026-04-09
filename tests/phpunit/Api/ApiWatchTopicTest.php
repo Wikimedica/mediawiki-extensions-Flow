@@ -3,11 +3,11 @@
 namespace Flow\Tests\Api;
 
 use MediaWiki\MediaWikiServices;
-use Title;
-use User;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 /**
- * @covers Flow\Hooks
+ * @covers \Flow\Hooks
  *
  * @group Flow
  * @group medium
@@ -15,7 +15,7 @@ use User;
  */
 class ApiWatchTopicTest extends ApiTestCase {
 
-	public function watchTopicProvider() {
+	public static function watchTopicProvider() {
 		return [
 			[
 				'Watch a topic',
@@ -49,7 +49,7 @@ class ApiWatchTopicTest extends ApiTestCase {
 		$topic = $this->createTopic();
 
 		$title = Title::newFromText( $topic['topic-page'] );
-		$init( self::$users['sysop']->getUser(), $title );
+		$init( $this->getTestSysop()->getUser(), $title );
 
 		// issue a watch api request
 		$data = $this->doApiRequestWithToken( $request + [

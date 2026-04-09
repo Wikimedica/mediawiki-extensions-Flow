@@ -2,9 +2,6 @@
 
 namespace Flow\Notifications;
 
-use EchoEvent;
-use ExtensionRegistry;
-use Flow\Container;
 use Flow\Conversion\Utils;
 use Flow\Exception\FlowException;
 use Flow\Model\AbstractRevision;
@@ -14,13 +11,19 @@ use Flow\Model\PostSummary;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\Repository\TreeRepository;
-use Language;
+use MediaWiki\Config\ServiceOptions;
+use MediaWiki\Deferred\DeferredUpdates;
 use MediaWiki\Extension\Notifications\Controller\ModerationController;
 use MediaWiki\Extension\Notifications\Mapper\EventMapper;
+use MediaWiki\Extension\Notifications\Model\Event;
+use MediaWiki\Language\Language;
 use MediaWiki\MediaWikiServices;
-use ParserOptions;
-use Title;
-use User;
+use MediaWiki\Parser\ParserOptions;
+use MediaWiki\Parser\ParserOutputLinkTypes;
+use MediaWiki\Registration\ExtensionRegistry;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
+use Wikimedia\Rdbms\IDBAccessObject;
 
 class Controller {
 	/**
@@ -33,11 +36,19 @@ class Controller {
 	 */
 	protected $treeRepository;
 
+	public const CONSTRUCTOR_OPTIONS = [
+		'FlowNotificationTruncateLength'
+	];
+	private ?int $truncateLength;
+
 	/**
+	 * @param ServiceOptions $options
 	 * @param Language $language
 	 * @param TreeRepository $treeRepository
 	 */
-	public function __construct( Language $language, TreeRepository $treeRepository ) {
+	public function __construct( ServiceOptions $options, Language $language, TreeRepository $treeRepository ) {
+		$options->assertRequiredOptions( self::CONSTRUCTOR_OPTIONS );
+		$this->truncateLength = $options->get( 'FlowNotificationTruncateLength' );
 		$this->language = $language;
 		$this->treeRepository = $treeRepository;
 	}
@@ -93,10 +104,10 @@ class Controller {
 	 * * board-workflow: The Workflow object for the board. Always required.
 	 * * timestamp: Original event timestamp, for imports. Optional.
 	 * * extra-data: Additional data to pass along to Event extra.
-	 * @return array Array of created EchoEvent objects.
+	 * @return Event[]
 	 * @throws FlowException When $data contains unexpected types/values
 	 */
-	public function notifyHeaderChange( $data = [] ) {
+	public function notifyHeaderChange( array $data ): array {
 		if ( !ExtensionRegistry::getInstance()->isLoaded( 'Echo' ) ) {
 			return [];
 		}
@@ -113,9 +124,9 @@ class Controller {
 		}
 
 		$user = $revision->getUser();
-		list( $mentionedUsers, $mentionsSkipped ) = $this->getMentionedUsersAndSkipState( $revision );
+		[ $mentionedUsers, $mentionsSkipped ] = $this->getMentionedUsersAndSkipState( $revision );
 
-		$extraData['content'] = Utils::htmlToPlaintext( $revision->getContent(), 200, $this->language );
+		$extraData['content'] = Utils::htmlToPlaintext( $revision->getContent(), $this->truncateLength, $this->language );
 		$extraData['revision-id'] = $revision->getRevisionId();
 		$extraData['collection-id'] = $revision->getCollectionId();
 		$extraData['target-page'] = $boardWorkflow->getArticleTitle()->getArticleID();
@@ -134,23 +145,21 @@ class Controller {
 			$info['timestamp'] = $data['timestamp'];
 		}
 
-		$events = [ EchoEvent::create( [ 'type' => 'flow-description-edited' ] + $info ) ];
+		$events = [ Event::create( [ 'type' => 'flow-description-edited' ] + $info ) ];
 		if ( $title->getNamespace() === NS_USER_TALK ) {
-			$events[] = EchoEvent::create( [ 'type' => 'flowusertalk-description-edited' ] + $info );
+			$events[] = Event::create( [ 'type' => 'flowusertalk-description-edited' ] + $info );
 		}
-		if ( $mentionedUsers ) {
-			$mentionEvents = $this->generateMentionEvents(
+		return [
+			...$events,
+			...$this->generateMentionEvents(
 				$revision,
 				null,
 				$boardWorkflow,
 				$user,
 				$mentionedUsers,
 				$mentionsSkipped
-			);
-			$events = array_merge( $events, $mentionEvents );
-		}
-
-		return $events;
+			)
+		];
 	}
 
 	/**
@@ -167,10 +176,10 @@ class Controller {
 	 * * topic-title: The Title of the Topic that the post belongs to. Required except for topic renames.
 	 * * old-subject: The old subject of a Topic. Required for topic renames.
 	 * * new-subject: The new subject of a Topic. Required for topic renames.
-	 * @return array Array of created EchoEvent objects.
+	 * @return Event[]
 	 * @throws FlowException When $data contains unexpected types/values
 	 */
-	public function notifyPostChange( $eventName, $data = [] ) {
+	public function notifyPostChange( $eventName, array $data ): array {
 		if ( !ExtensionRegistry::getInstance()->isLoaded( 'Echo' ) ) {
 			return [];
 		}
@@ -191,7 +200,7 @@ class Controller {
 		}
 
 		$user = $revision->getUser();
-		list( $mentionedUsers, $mentionsSkipped ) = $this->getMentionedUsersAndSkipState( $revision );
+		[ $mentionedUsers, $mentionsSkipped ] = $this->getMentionedUsersAndSkipState( $revision );
 		$title = $topicWorkflow->getOwnerTitle();
 
 		$extraData['revision-id'] = $revision->getRevisionId();
@@ -205,8 +214,10 @@ class Controller {
 			case 'flow-post-reply':
 				$extraData += [
 					'reply-to' => $revision->getReplyToId(),
-					'content' => Utils::htmlToPlaintext( $revision->getContent(), 200, $this->language ),
-					'topic-title' => $this->language->truncateForVisual( $topicRevision->getContent( 'topic-title-plaintext' ), 200 ),
+					'content' => Utils::htmlToPlaintext( $revision->getContent(), $this->truncateLength, $this->language ),
+					'topic-title' => $this->language->truncateForVisual(
+						$topicRevision->getContent( 'topic-title-plaintext' ), 200
+					),
 				];
 
 				// if we're looking at the initial post (submitted along with the topic
@@ -217,7 +228,7 @@ class Controller {
 					// that they weren't also mentioned in the topic title (in
 					// which case they would get 2 notifications...)
 					if ( $mentionedUsers ) {
-						list( $mentionedInTitle, $mentionsSkippedInTitle ) =
+						[ $mentionedInTitle, $mentionsSkippedInTitle ] =
 							$this->getMentionedUsersAndSkipState( $topicRevision );
 						$mentionedUsers = array_diff_key( $mentionedUsers, $mentionedInTitle );
 						$mentionsSkipped = $mentionsSkipped || $mentionsSkippedInTitle;
@@ -238,14 +249,20 @@ class Controller {
 			case 'flow-topic-renamed':
 				$previousRevision = $revision->getCollection()->getPrevRevision( $revision );
 				$extraData += [
-					'old-subject' => $this->language->truncateForVisual( $previousRevision->getContent( 'topic-title-plaintext' ), 200 ),
-					'new-subject' => $this->language->truncateForVisual( $revision->getContent( 'topic-title-plaintext' ), 200 ),
+					'old-subject' => $this->language->truncateForVisual(
+						$previousRevision->getContent( 'topic-title-plaintext' ), 200
+					),
+					'new-subject' => $this->language->truncateForVisual(
+						$revision->getContent( 'topic-title-plaintext' ), 200
+					),
 				];
 				break;
 			case 'flow-post-edited':
 				$extraData += [
-					'content' => Utils::htmlToPlaintext( $revision->getContent(), 200, $this->language ),
-					'topic-title' => $this->language->truncateForVisual( $topicRevision->getContent( 'topic-title-plaintext' ), 200 ),
+					'content' => Utils::htmlToPlaintext( $revision->getContent(), $this->truncateLength, $this->language ),
+					'topic-title' => $this->language->truncateForVisual(
+						$topicRevision->getContent( 'topic-title-plaintext' ), 200
+					),
 				];
 				break;
 		}
@@ -261,24 +278,22 @@ class Controller {
 			$info['timestamp'] = $data['timestamp'];
 		}
 
-		$events = [ EchoEvent::create( [ 'type' => $eventName ] + $info ) ];
+		$events = [ Event::create( [ 'type' => $eventName ] + $info ) ];
 		if ( $title->getNamespace() === NS_USER_TALK ) {
 			$usertalkEvent = str_replace( 'flow-', 'flowusertalk-', $eventName );
-			$events[] = EchoEvent::create( [ 'type' => $usertalkEvent ] + $info );
+			$events[] = Event::create( [ 'type' => $usertalkEvent ] + $info );
 		}
-		if ( $mentionedUsers ) {
-			$mentionEvents = $this->generateMentionEvents(
+		return [
+			...$events,
+			...$this->generateMentionEvents(
 				$revision,
 				$topicRevision,
 				$topicWorkflow,
 				$user,
 				$mentionedUsers,
 				$mentionsSkipped
-			);
-			$events = array_merge( $events, $mentionEvents );
-		}
-
-		return $events;
+			)
+		];
 	}
 
 	/**
@@ -288,10 +303,10 @@ class Controller {
 	 * * topic-title: The PostRevision object for the topic title. Always required.
 	 * * topic-workflow: The Workflow object for the board. Always required.
 	 * * extra-data: Additional data to pass along to Event extra.
-	 * @return array Array of created EchoEvent objects.
+	 * @return Event[]
 	 * @throws FlowException When $data contains unexpected types/values
 	 */
-	public function notifySummaryChange( $data = [] ) {
+	public function notifySummaryChange( array $data ): array {
 		if ( !ExtensionRegistry::getInstance()->isLoaded( 'Echo' ) ) {
 			return [];
 		}
@@ -310,14 +325,16 @@ class Controller {
 		}
 
 		$user = $revision->getUser();
-		list( $mentionedUsers, $mentionsSkipped ) = $this->getMentionedUsersAndSkipState( $revision );
+		[ $mentionedUsers, $mentionsSkipped ] = $this->getMentionedUsersAndSkipState( $revision );
 
 		$extraData = [];
-		$extraData['content'] = Utils::htmlToPlaintext( $revision->getContent(), 200, $this->language );
+		$extraData['content'] = Utils::htmlToPlaintext( $revision->getContent(), $this->truncateLength, $this->language );
 		$extraData['revision-id'] = $revision->getRevisionId();
 		$extraData['prev-revision-id'] = $revision->getPrevRevisionId();
 		$extraData['topic-workflow'] = $topicWorkflow->getId();
-		$extraData['topic-title'] = $this->language->truncateForVisual( $topicRevision->getContent( 'topic-title-plaintext' ), 200 );
+		$extraData['topic-title'] = $this->language->truncateForVisual(
+			$topicRevision->getContent( 'topic-title-plaintext' ), 200
+		);
 		$extraData['target-page'] = $topicWorkflow->getArticleTitle()->getArticleID();
 		// pass along mentioned users to other notification, so it knows who to ignore
 		$extraData['mentioned-users'] = $mentionedUsers;
@@ -334,23 +351,21 @@ class Controller {
 			$info['timestamp'] = $data['timestamp'];
 		}
 
-		$events = [ EchoEvent::create( [ 'type' => 'flow-summary-edited' ] + $info ) ];
+		$events = [ Event::create( [ 'type' => 'flow-summary-edited' ] + $info ) ];
 		if ( $title->getNamespace() === NS_USER_TALK ) {
-			$events[] = EchoEvent::create( [ 'type' => 'flowusertalk-summary-edited' ] + $info );
+			$events[] = Event::create( [ 'type' => 'flowusertalk-summary-edited' ] + $info );
 		}
-		if ( $mentionedUsers ) {
-			$mentionEvents = $this->generateMentionEvents(
+		return [
+			...$events,
+			...$this->generateMentionEvents(
 				$revision,
 				$topicRevision,
 				$topicWorkflow,
 				$user,
 				$mentionedUsers,
 				$mentionsSkipped
-			);
-			$events = array_merge( $events, $mentionEvents );
-		}
-
-		return $events;
+			)
+		];
 	}
 
 	/**
@@ -362,10 +377,10 @@ class Controller {
 	 *    title.
 	 * * first-post: PostRevision object for the first post, or null when no first post.
 	 * * user: The User who created the topic.
-	 * @return array Array of created EchoEvent objects.
+	 * @return Event[]
 	 * @throws FlowException When $params contains unexpected types/values
 	 */
-	public function notifyNewTopic( $params ) {
+	public function notifyNewTopic( array $params ): array {
 		if ( !ExtensionRegistry::getInstance()->isLoaded( 'Echo' ) ) {
 			// Nothing to do here.
 			return [];
@@ -389,7 +404,7 @@ class Controller {
 			throw new FlowException( 'Expected Workflow but received ' . get_class( $boardWorkflow ) );
 		}
 
-		list( $mentionedUsers, $mentionsSkipped ) = $this->getMentionedUsersAndSkipState( $topicTitle );
+		[ $mentionedUsers, $mentionsSkipped ] = $this->getMentionedUsersAndSkipState( $topicTitle );
 
 		$title = $boardWorkflow->getArticleTitle();
 		$events = [];
@@ -402,12 +417,12 @@ class Controller {
 				'post-id' => $firstPost ? $firstPost->getRevisionId() : null,
 				'topic-title' => $this->language->truncateForVisual( $topicTitle->getContent( 'topic-title-plaintext' ), 200 ),
 				'content' => $firstPost
-					? Utils::htmlToPlaintext( $firstPost->getContent(), 200, $this->language )
+					? Utils::htmlToPlaintext( $firstPost->getContent(), $this->truncateLength, $this->language )
 					: null,
 				// Force a read from primary database since this could be a new page
 				'target-page' => [
-					$topicWorkflow->getOwnerTitle()->getArticleID( Title::GAID_FOR_UPDATE ),
-					$topicWorkflow->getArticleTitle()->getArticleID( Title::GAID_FOR_UPDATE ),
+					$topicWorkflow->getOwnerTitle()->getArticleID( IDBAccessObject::READ_LATEST ),
+					$topicWorkflow->getArticleTitle()->getArticleID( IDBAccessObject::READ_LATEST ),
 				],
 				// pass along mentioned users to other notification, so it knows who to ignore
 				// also look at users mentioned in first post: if there are any, this
@@ -416,24 +431,22 @@ class Controller {
 				'mentioned-users' => $mentionedUsers,
 			]
 		];
-		$events[] = EchoEvent::create( [ 'type' => 'flow-new-topic' ] + $eventData );
+		$events[] = Event::create( [ 'type' => 'flow-new-topic' ] + $eventData );
 		if ( $title->getNamespace() === NS_USER_TALK ) {
-			$events[] = EchoEvent::create( [ 'type' => 'flowusertalk-new-topic' ] + $eventData );
+			$events[] = Event::create( [ 'type' => 'flowusertalk-new-topic' ] + $eventData );
 		}
 
-		if ( $mentionedUsers ) {
-			$mentionEvents = $this->generateMentionEvents(
+		return [
+			...$events,
+			...$this->generateMentionEvents(
 				$topicTitle,
 				$topicTitle,
 				$topicWorkflow,
 				$user,
 				$mentionedUsers,
 				$mentionsSkipped
-			);
-			$events = array_merge( $events, $mentionEvents );
-		}
-
-		return $events;
+			)
+		];
 	}
 
 	/**
@@ -441,12 +454,9 @@ class Controller {
 	 *
 	 * @param string $type flow-topic-resolved|flow-topic-reopened
 	 * @param array $data
-	 * @return array
-	 * @throws \Flow\Exception\InvalidDataException
-	 * @throws FlowException
-	 * @throws \MWException
+	 * @return Event[]
 	 */
-	public function notifyTopicLocked( $type, $data = [] ) {
+	public function notifyTopicLocked( $type, array $data ): array {
 		if ( !ExtensionRegistry::getInstance()->isLoaded( 'Echo' ) ) {
 			return [];
 		}
@@ -480,9 +490,9 @@ class Controller {
 			$info['timestamp'] = $data['timestamp'];
 		}
 
-		$events = [ EchoEvent::create( [ 'type' => 'flow-topic-resolved' ] + $info ) ];
+		$events = [ Event::create( [ 'type' => 'flow-topic-resolved' ] + $info ) ];
 		if ( $title->getNamespace() === NS_USER_TALK ) {
-			$events[] = EchoEvent::create( [ 'type' => 'flowusertalk-topic-resolved' ] + $info );
+			$events[] = Event::create( [ 'type' => 'flowusertalk-topic-resolved' ] + $info );
 		}
 		return $events;
 	}
@@ -494,7 +504,7 @@ class Controller {
 		}
 
 		$events = [];
-		$events[] = EchoEvent::create( [
+		$events[] = Event::create( [
 			'type' => 'flow-enabled-on-talkpage',
 			'agent' => $user,
 			'title' => $user->getTalkPage(),
@@ -508,11 +518,10 @@ class Controller {
 	 * @param PostRevision|null $topic Topic PostRevision object, if relevant (e.g. not for Header)
 	 * @param Workflow $workflow
 	 * @param User $user User who created the new post
-	 * @param array $mentionedUsers
+	 * @param int[] $mentionedUsers
 	 * @param bool $mentionsSkipped Were mentions skipped due to too many mentions being attempted?
-	 * @return bool|EchoEvent[]
+	 * @return Event[]
 	 * @throws \Flow\Exception\InvalidDataException
-	 * @throws \MWException
 	 */
 	protected function generateMentionEvents(
 		AbstractRevision $content,
@@ -521,18 +530,19 @@ class Controller {
 		User $user,
 		array $mentionedUsers,
 		$mentionsSkipped
-	) {
+	): array {
 		global $wgEchoMentionStatusNotifications, $wgFlowMaxMentionCount;
 
-		if ( count( $mentionedUsers ) === 0 ) {
-			return false;
+		if ( !$mentionedUsers ) {
+			return [];
 		}
 
 		$extraData = [];
 		$extraData['mentioned-users'] = $mentionedUsers;
 		$extraData['target-page'] = $workflow->getArticleTitle()->getArticleID();
 		// don't include topic content again if the notification IS in the title
-		$extraData['content'] = $content === $topic ? '' : Utils::htmlToPlaintext( $content->getContent(), 200, $this->language );
+		$extraData['content'] = $content === $topic ? '' :
+			Utils::htmlToPlaintext( $content->getContent(), $this->truncateLength, $this->language );
 		// lets us differentiate between different revision types
 		$extraData['revision-type'] = $content->getRevisionType();
 
@@ -547,7 +557,7 @@ class Controller {
 		}
 
 		$events = [];
-		$events[] = EchoEvent::create( [
+		$events[] = Event::create( [
 			'type' => 'flow-mention',
 			'title' => $workflow->getOwnerTitle(),
 			'extra' => $extraData,
@@ -564,7 +574,7 @@ class Controller {
 			if ( $content->getRevisionType() === 'post' ) {
 				$extra['post-id'] = $content->getCollection()->getId();
 			}
-			$events[] = EchoEvent::create( [
+			$events[] = Event::create( [
 				'type' => 'flow-mention-failure-too-many',
 				'title' => $workflow->getOwnerTitle(),
 				'extra' => $extra,
@@ -657,16 +667,10 @@ class Controller {
 		$output = MediaWikiServices::getInstance()->getParser()
 			->parse( $wikitext, $title, $options );
 
-		$links = $output->getLinks();
-
-		if ( !isset( $links[NS_USER] ) || !is_array( $links[NS_USER] ) ) {
-			// Nothing
-			return [];
-		}
-
 		$users = [];
-		foreach ( $links[NS_USER] as $dbk => $page_id ) {
-			$user = User::newFromName( $dbk );
+		foreach ( $output->getLinkList( ParserOutputLinkTypes::LOCAL, NS_USER )
+				  as [ 'link' => $link ] ) {
+			$user = User::newFromName( $link->getDBkey() );
 			if ( !$user || !$user->isRegistered() ) {
 				continue;
 			}
@@ -680,7 +684,7 @@ class Controller {
 	/**
 	 * Handler for EchoGetBundleRule hook, which defines the bundle rules for each notification
 	 *
-	 * @param EchoEvent $event
+	 * @param Event $event
 	 * @param string &$bundleString Determines how the notification should be bundled
 	 * @return bool True for success
 	 */
@@ -718,31 +722,6 @@ class Controller {
 	}
 
 	/**
-	 * Get the owner of the page if the workflow belongs to a talk page
-	 *
-	 * @param string $topicId Topic workflow UUID
-	 * @return array Map from userid to User object
-	 */
-	protected static function getTalkPageOwner( $topicId ) {
-		$talkUser = [];
-		// Owner of talk page should always get a reply notification
-		/** @var Workflow|null $workflow */
-		$workflow = Container::get( 'storage' )
-			->getStorage( 'Workflow' )
-			->get( UUID::create( $topicId ) );
-		if ( $workflow ) {
-			$title = $workflow->getOwnerTitle();
-			if ( $title->isTalkPage() ) {
-				$user = User::newFromName( $title->getDBkey() );
-				if ( $user && $user->getId() ) {
-					$talkUser[$user->getId()] = $user;
-				}
-			}
-		}
-		return $talkUser;
-	}
-
-	/**
 	 * @param PostRevision $revision
 	 * @param Workflow $workflow
 	 * @return bool
@@ -777,7 +756,7 @@ class Controller {
 	 * This is the lowest-number post, numbering them using a pre-order depth-first
 	 *  search
 	 *
-	 * @param EchoEvent[] $bundledEvents
+	 * @param Event[] $bundledEvents
 	 * @return UUID|null Post ID, or null on failure
 	 */
 	public function getTopmostPostId( array $bundledEvents ) {
@@ -883,7 +862,7 @@ class Controller {
 
 		$title = Title::makeTitle( NS_TOPIC, ucfirst( $topicId->getAlphadecimal() ) );
 		$pageId = $title->getArticleID();
-		\DeferredUpdates::addCallableUpdate( static function () use ( $pageId, $moderated ) {
+		DeferredUpdates::addCallableUpdate( static function () use ( $pageId, $moderated ) {
 			$eventMapper = new EventMapper();
 			$eventIds = $eventMapper->fetchIdsByPage( $pageId );
 
@@ -907,7 +886,7 @@ class Controller {
 
 		$title = Title::makeTitle( NS_TOPIC, ucfirst( $topicId->getAlphadecimal() ) );
 		$pageId = $title->getArticleID();
-		\DeferredUpdates::addCallableUpdate( static function () use ( $pageId, $postId, $moderated ) {
+		DeferredUpdates::addCallableUpdate( static function () use ( $pageId, $postId, $moderated ) {
 			$eventMapper = new EventMapper();
 			$moderatedPostIdAlpha = $postId->getAlphadecimal();
 			$eventIds = [];

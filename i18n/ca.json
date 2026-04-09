@@ -2,6 +2,7 @@
 	"@metadata": {
 		"authors": [
 			"Annamerida",
+			"Arnaugir",
 			"Eduardo Martinez",
 			"Fitoschido",
 			"Hiperpobla",
@@ -13,13 +14,13 @@
 			"Nnemo",
 			"Paucabot",
 			"QuimGil",
+			"SMP",
 			"Ssola",
 			"Syum90",
 			"Toniher",
 			"Unapersona",
 			"Vriullop",
-			"Xavier Dengra",
-			"SMP"
+			"Xavier Dengra"
 		]
 	},
 	"enablestructureddiscussions": "Habilita el Flow",
@@ -385,17 +386,12 @@
 	"flow-no-more-fwd": "Cap més tema anterior",
 	"flow-newest-topics": "Temes més recents",
 	"flow-recent-topics": "Temes amb activitat més recent",
-	"flow-sorting-tooltip-newest": "{{GENDER:|Esteu}} veient primer els temes més recents. Cliqueu per altres opcions d'ordenació.",
-	"flow-sorting-tooltip-recent": "{{GENDER:|Esteu}} veient primer els temes amb activitat més recent. Cliqueu per altres opcions d'ordenació.",
 	"flow-toggle-small-topics": "Canvia a la vista reduïda de temes",
 	"flow-toggle-topics": "Canvia a la vista plegada de temes",
 	"flow-toggle-topics-posts": "Canvia a la vista de temes i apunts",
 	"flow-terms-of-use-summarize": "En clicar «{{int:flow-topic-action-update-topic-summary}}», esteu acceptant les condicions d'ús d'aquest wiki.",
 	"flow-terms-of-use-lock-topic": "En clicar «{{int:flow-topic-action-lock-topic}}», esteu acceptant les condicions d'ús d'aquest wiki.",
 	"flow-terms-of-use-unlock-topic": "En clicar «{{int:flow-topic-action-unlock-topic}}», esteu acceptant les condicions d'ús d'aquest wiki.",
-	"flow-whatlinkshere-post": "[$1 apunt]",
-	"flow-whatlinkshere-header": "a partir de la [$1 descripció]",
-	"flow-whatlinkshere-post-summary": "des del [$1 resum]",
 	"structureddiscussions": "Flow",
 	"flow-special-type": "Tipus",
 	"flow-special-type-post": "Apunt",
@@ -473,5 +469,6 @@
 	"flow-guidedtour-optin-find-old-conversations": "{{GENDER:$1|Vegeu}} les vostres converses anteriors",
 	"flow-guidedtour-optin-find-old-conversations-description": "Les converses prèvies han estat traslladades a una pàgina d'arxiu.",
 	"flow-guidedtour-optin-feedback": "Doneu-nos el {{GENDER:$1|vostre}} parer!",
-	"flow-guidedtour-optin-feedback-description": "{{GENDER:$1|Podeu}} obtenir més informació, fer comentaris o desactivar el nou sistema en qualsevol moment en la secció de funcionalitats beta."
+	"flow-guidedtour-optin-feedback-description": "{{GENDER:$1|Podeu}} obtenir més informació, fer comentaris o desactivar el nou sistema en qualsevol moment en la secció de funcionalitats beta.",
+	"flow-preference-visualeditor": "Activa l'editor visual i el nou mode de wikitext en Discussions Estructurades"
 }

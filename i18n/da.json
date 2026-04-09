@@ -1,11 +1,11 @@
 {
 	"@metadata": {
 		"authors": [
+			"Dipsacus fullonum",
 			"Jens Jensen",
 			"Joedalton",
 			"Saederup92",
 			"Sarrus",
-			"Dipsacus fullonum",
 			"Zakawer2"
 		]
 	},
@@ -137,7 +137,6 @@
 	"flow-moderation-title-hide-topic": "Skjul emne?",
 	"flow-topic-html-title": "$1 på $2",
 	"flow-load-more": "Indlæs mere",
-	"flow-whatlinkshere-header": "fra [$1 beskrivelsen]",
 	"structureddiscussions": "Strukturerede diskussioner",
 	"flow-special-type": "Type",
 	"flow-special-type-workflow": "Workflow",
@@ -158,6 +157,7 @@
 	"flow-ve-mention-tool-title": "Nævn en bruger",
 	"flow-ve-mention-inspector-invalid-user": "Brugernavnet «$1» er ikke registreret.",
 	"flow-wikitext-editor-help": "Wikitekst $1.",
+	"flow-talk-page-beta-feature-description": "Gav {{GENDER:|dig}} tilladelse til at aktivere et struktureret diskussionssystem på {{GENDEE:|din}} brugerdiskussionsside. »Strukturerede diskussioner« blev tilbudt som en betafunktion, men [[mw:Special:MyLanguage/Structured_Discussions/Deprecation|denne funktion vil blive fjernet fra wikierne]]. Vi inviterer {{GENDER:|dig}} til at overveje at deaktivere denne funktion proaktivt.<br><br>At deaktivere denne funktion vil flytte »Struktureret diskussion«-forumet til en underside og fjerne arkiveringen af den forrige diskussionsside. [[mw:Special:MyLanguage/Help:Structured_Discussions/Activation#deactivate|Klik her for at få flere oplysninger om deaktivering.]] [[mw:Special:MyLanguage/Talk:Structured_Discussions/Deprecation|Kontakt os, hvis {{GENDER:|du}} oplever problemer.]]",
 	"flow-dialog-cancelconfirm-title": "Er {{GENDER:|du}} sikker?",
 	"flow-dialog-cancelconfirm-keep": "Fortsæt med at redigere",
 	"flow-guidedtour-optin-welcome-description": "{{GENDER:$1|Din}} diskussionsside er stedet hvor andre bidragsydere kan kontakte {{GENDER:$1|dig}}. Med strukturerede diskussioner er det nemmere at oprette nye emner og holde styr på samtalerne."

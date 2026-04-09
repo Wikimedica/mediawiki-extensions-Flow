@@ -10,12 +10,11 @@ use Flow\Data\ManagerGroup;
 use Flow\DbFactory;
 use Flow\Exception\UnknownWorkflowIdException;
 use Flow\WorkflowLoaderFactory;
-use Maintenance;
-use MediaWiki\MediaWikiServices;
+use MediaWiki\Maintenance\Maintenance;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Revision\SlotRecord;
-use Title;
-use WikiMap;
+use MediaWiki\Title\Title;
+use MediaWiki\WikiMap\WikiMap;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -57,7 +56,7 @@ class FlowFixInconsistentBoards extends Maintenance {
 		parent::__construct();
 
 		$this->addDescription( 'Changes Flow boards and their topics to be associated with their ' .
-			'current title, based on the JSON content.  Must be run separately for each affected wiki.' );
+			'current title, based on the JSON content. Must be run separately for each affected wiki.' );
 
 		$this->addOption( 'dry-run', 'Only prints the board names, without changing anything.' );
 		$this->addOption( 'namespaceName', 'Name of namespace to check, otherwise all', false, true );
@@ -69,6 +68,9 @@ class FlowFixInconsistentBoards extends Maintenance {
 		$this->requireExtension( 'Flow' );
 	}
 
+	/**
+	 * @return false|void
+	 */
 	public function execute() {
 		global $wgLang;
 
@@ -109,7 +111,7 @@ class FlowFixInconsistentBoards extends Maintenance {
 			] );
 		} else {
 			$iterator->addConditions( [
-				'page_namespace != ' . NS_TOPIC,
+				$wikiDbw->expr( 'page_namespace', '!=', NS_TOPIC ),
 			] );
 		}
 
@@ -123,20 +125,20 @@ class FlowFixInconsistentBoards extends Maintenance {
 			foreach ( $rows as $row ) {
 				$checkedCount++;
 				$coreTitle = Title::makeTitle( $row->page_namespace, $row->page_title );
-				$revision = MediaWikiServices::getInstance()->getRevisionLookup()->getRevisionById( $row->page_latest );
+				$revision = $this->getServiceContainer()->getRevisionLookup()->getRevisionById( $row->page_latest );
 				$content = $revision->getContent( SlotRecord::MAIN, RevisionRecord::RAW );
 				if ( !$content instanceof BoardContent ) {
-					$actualClass = ( is_object( $content ) ? get_class( $content ) : gettype( $content ) );
+					$actualClass = get_debug_type( $content );
 					$this->error( "ERROR: '$coreTitle' content is a '$actualClass', but should be '"
 						. BoardContent::class . "'." );
 					continue;
 				}
 				$workflowId = $content->getWorkflowId();
 				if ( $workflowId === null ) {
-					// See T153320.  If the workflow exists, it could
+					// See T153320. If the workflow exists, it could
 					// be looked up by title/page ID and the JSON could
 					// be fixed with an edit.
-					// Otherwise, the core revision has to be deleted.  This
+					// Otherwise, the core revision has to be deleted. This
 					// script does not do either of these things.
 					$this->error( "ERROR: '$coreTitle' JSON content does not have a valid workflow ID." );
 					continue;
@@ -146,7 +148,7 @@ class FlowFixInconsistentBoards extends Maintenance {
 
 				try {
 					$workflow = $this->workflowLoaderFactory->loadWorkflowById( false, $workflowId );
-				} catch ( UnknownWorkflowIdException $ex ) {
+				} catch ( UnknownWorkflowIdException ) {
 					// This is a different error (a core page refers to
 					// a non-existent workflow), which this script can not fix.
 					$this->error( "ERROR: '$coreTitle' refers to workflow ID " .
@@ -191,7 +193,7 @@ class FlowFixInconsistentBoards extends Maintenance {
 			}
 
 			$action = $dryRun ? 'identified as fixable' : 'fixed';
-			$this->output( "\nChecked a total of $checkedCount Flow boards.  Of those, " .
+			$this->output( "\nChecked a total of $checkedCount Flow boards. Of those, " .
 				"$inconsistentCount boards had an inconsistent title; $fixableInconsistentCount " .
 				"were $action.\n" );
 			if ( $limit !== null && $fixableInconsistentCount >= $limit ) {

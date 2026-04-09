@@ -3,16 +3,16 @@
 namespace Flow;
 
 use Flow\Model\Workflow;
-use Status;
-use Title;
-use User;
-use WikiPage;
+use MediaWiki\Page\WikiPage;
+use MediaWiki\Status\Status;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 interface OccupationController {
 	/**
 	 * @param WikiPage $wikipage
 	 * @param Workflow $workflow
-	 * @return Status
+	 * @return Status<array>
 	 */
 	public function ensureFlowRevision( WikiPage $wikipage, Workflow $workflow );
 
@@ -57,8 +57,6 @@ interface OccupationController {
 	 * checkIfCreationIsPossible *MUST* be called earlier, and
 	 * checkIfUserHasPermission *MUST* be called earlier except when permission checks
 	 * are deliberately being bypassed (very rare cases like global rename)
-	 *
-	 * @param Title $title
 	 */
 	public function forceAllowCreation( Title $title );
 
@@ -66,7 +64,6 @@ interface OccupationController {
 	 * Gives a user object used to manage talk pages
 	 *
 	 * @return User User to manage talkpages
-	 * @throws \MWException If a user cannot be created.
 	 */
 	public function getTalkpageManager();
 }

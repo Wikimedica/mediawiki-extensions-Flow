@@ -5,7 +5,9 @@ namespace Flow\Model;
 use Flow\Exception\DataModelException;
 use MediaWiki\MediaWikiServices;
 
-// TODO: We shouldn't need this class
+/**
+ * TODO: We shouldn't need this class
+ */
 class TopicListEntry {
 
 	/**
@@ -66,9 +68,7 @@ class TopicListEntry {
 			'topic_id' => $obj->topicId->getAlphadecimal(),
 		];
 		if ( $obj->topicWorkflowLastUpdated ) {
-			$dbr = MediaWikiServices::getInstance()
-				->getDBLoadBalancer()
-				->getConnection( DB_REPLICA );
+			$dbr = MediaWikiServices::getInstance()->getConnectionProvider()->getReplicaDatabase();
 			$row['workflow_last_update_timestamp'] = $dbr->timestamp( $obj->topicWorkflowLastUpdated );
 		}
 		return $row;

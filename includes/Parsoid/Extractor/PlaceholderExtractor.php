@@ -6,12 +6,13 @@ use DOMElement;
 use Flow\Model\WikiReference;
 use Flow\Parsoid\Extractor;
 use Flow\Parsoid\ReferenceFactory;
-use FormatJson;
+use MediaWiki\Json\FormatJson;
 use MediaWiki\MediaWikiServices;
-use ParserOptions;
-use Title;
+use MediaWiki\Parser\ParserOptions;
+use MediaWiki\Parser\ParserOutputLinkTypes;
+use MediaWiki\Title\Title;
 
-/*
+/**
  * phpcs:disable Generic.Files.LineLength
  * Parsoid currently returns images that don't exist like:
  * <meta typeof="mw:Placeholder" data-parsoid='{"src":"[[File:Image.png|25px]]","optList":[{"ck":"width","ak":"25px"}],"dsr":[0,23,null,null]}'>
@@ -50,12 +51,11 @@ class PlaceholderExtractor implements Extractor {
 			ParserOptions::newFromAnon()
 		);
 
-		$file = $output->getImages();
+		$file = $output->getLinkList( ParserOutputLinkTypes::MEDIA );
 		if ( !$file ) {
 			return null;
 		}
-		// $file looks like array( 'Foo.jpg' => 1 )
-		$image = Title::newFromText( key( $file ), NS_FILE );
+		$image = Title::newFromLinkTarget( $file[0]['link'] );
 
 		return $factory->createWikiReference( WikiReference::TYPE_FILE, $image->getPrefixedDBkey() );
 	}

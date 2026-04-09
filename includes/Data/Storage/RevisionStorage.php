@@ -9,8 +9,9 @@ use Flow\Data\Utils\ResultDuplicator;
 use Flow\DbFactory;
 use Flow\Exception\DataModelException;
 use Flow\Model\UUID;
-use MWException;
-use Wikimedia\Rdbms\IDatabase;
+use InvalidArgumentException;
+use MediaWiki\Json\FormatJson;
+use Wikimedia\Rdbms\IReadableDatabase;
 
 /**
  * Abstract storage implementation for models extending from AbstractRevision
@@ -82,11 +83,8 @@ abstract class RevisionStorage extends DbStorage {
 
 	/**
 	 * Remove from joinTable upone revision delete
-	 * @param array $row
-	 * @return bool
 	 */
 	protected function removeRelated( array $row ) {
-		return true;
 	}
 
 	/**
@@ -121,33 +119,28 @@ abstract class RevisionStorage extends DbStorage {
 	 * @param array $attributes
 	 * @param array $options
 	 * @return array
-	 * @throws DataModelException
-	 * @throws MWException
 	 */
 	protected function findInternal( array $attributes, array $options = [] ) {
 		$dbr = $this->dbFactory->getDB( DB_REPLICA );
 
 		if ( !$this->validateOptions( $options ) ) {
-			throw new MWException( "Validation error in database options" );
+			throw new InvalidArgumentException( "Validation error in database options" );
 		}
 
 		// Add rev_type if rev_type_id exists in query condition
 		$attributes = $this->addRevTypeToQuery( $attributes );
 
-		$tables = [ 'rev' => 'flow_revision' ];
-		$joins = [];
+		$queryBuilder = $dbr->newSelectQueryBuilder()
+			->select( '*' )
+			->from( 'flow_revision' )
+			->where( $this->preprocessSqlArray( $attributes ) )
+			->options( $options )
+			->caller( __METHOD__ );
 		if ( $this->joinTable() ) {
-			$tables[] = $this->joinTable();
-			$joins = [ 'rev' => [ 'JOIN', $this->joinField() . ' = rev_id' ] ];
+			$queryBuilder->join( $this->joinTable(), null, $this->joinField() . ' = rev_id' );
 		}
 
-		$res = $dbr->select(
-			$tables, '*', $this->preprocessSqlArray( $attributes ), __METHOD__, $options, $joins
-		);
-		if ( $res === false ) {
-			throw new DataModelException( __METHOD__ . ': Query failed: ' . $dbr->lastError(),
-				'process-data' );
-		}
+		$res = $queryBuilder->fetchResultSet();
 
 		$retval = [];
 		foreach ( $res as $row ) {
@@ -219,7 +212,7 @@ abstract class RevisionStorage extends DbStorage {
 				. ': Unoptimizable query for keys: '
 				. implode( ',', array_keys( $queriedKeys ) )
 				. ' with options '
-				. \FormatJson::encode( $options )
+				. FormatJson::encode( $options )
 			);
 			return $this->fallbackFindMulti( $queries, $options );
 		}
@@ -232,7 +225,7 @@ abstract class RevisionStorage extends DbStorage {
 			$query = UUID::convertUUIDs( (array)$query, 'alphadecimal' );
 			$duplicator->add( $query, $idx );
 			$id = $query['rev_id'];
-			$pks[$id] = UUID::create( $id )->getBinary();
+			$pks[] = UUID::create( $id )->getBinary();
 		}
 
 		return $this->findRevIdReal( $duplicator, $pks );
@@ -250,18 +243,14 @@ abstract class RevisionStorage extends DbStorage {
 		}
 
 		$dbr = $this->dbFactory->getDB( DB_REPLICA );
-		$res = $dbr->select(
-			[ 'flow_revision' ],
-			[ 'rev_id' => "MAX( 'rev_id' )" ],
-			[ 'rev_type' => $this->getRevType() ] + $this->preprocessSqlArray(
-				$this->buildCompositeInCondition( $dbr, $duplicator->getUniqueQueries() ) ),
-			__METHOD__,
-			[ 'GROUP BY' => 'rev_type_id' ]
-		);
-		if ( $res === false ) {
-			throw new DataModelException( __METHOD__ . ': Query failed: ' . $dbr->lastError(),
-				'process-data' );
-		}
+		$res = $dbr->newSelectQueryBuilder()
+			->select( [ 'rev_id' => "MAX( 'rev_id' )" ] )
+			->from( 'flow_revision' )
+			->where( [ 'rev_type' => $this->getRevType() ] )
+			->andWhere( $this->buildCompositeInCondition( $dbr, $duplicator->getUniqueQueries() ) )
+			->groupBy( 'rev_type_id' )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 
 		$revisionIds = [];
 		foreach ( $res as $row ) {
@@ -278,7 +267,6 @@ abstract class RevisionStorage extends DbStorage {
 	 * @param ResultDuplicator $duplicator
 	 * @param array $revisionIds Binary strings representing revision uuid's
 	 * @return array
-	 * @throws DataModelException
 	 */
 	protected function findRevIdReal( ResultDuplicator $duplicator, array $revisionIds ) {
 		if ( $revisionIds ) {
@@ -287,25 +275,16 @@ abstract class RevisionStorage extends DbStorage {
 			// WHERE rev_id IN (...)
 			$dbr = $this->dbFactory->getDB( DB_REPLICA );
 
-			$tables = [ 'flow_revision' ];
-			$joins  = [];
+			$queryBuilder = $dbr->newSelectQueryBuilder()
+				->select( '*' )
+				->from( 'flow_revision' )
+				->where( [ 'rev_id' => $revisionIds ] )
+				->caller( __METHOD__ );
 			if ( $this->joinTable() ) {
-				$tables['rev'] = $this->joinTable();
-				$joins = [ 'rev' => [ 'JOIN', "rev_id = " . $this->joinField() ] ];
+				$queryBuilder->join( $this->joinTable(), null, "rev_id = " . $this->joinField() );
 			}
 
-			$res = $dbr->select(
-				$tables,
-				'*',
-				[ 'rev_id' => $revisionIds ],
-				__METHOD__,
-				[],
-				$joins
-			);
-			if ( $res === false ) {
-				throw new DataModelException( __METHOD__ . ': Query failed: ' . $dbr->lastError(),
-					'process-data' );
-			}
+			$res = $queryBuilder->fetchResultSet();
 
 			foreach ( $res as $row ) {
 				$row = UUID::convertUUIDs( (array)$row, 'alphadecimal' );
@@ -351,7 +330,7 @@ abstract class RevisionStorage extends DbStorage {
 		);
 	}
 
-	protected function buildCompositeInCondition( IDatabase $dbr, array $queries ) {
+	protected function buildCompositeInCondition( IReadableDatabase $dbr, array $queries ) {
 		$keys = array_keys( reset( $queries ) );
 		$conditions = [];
 		if ( count( $keys ) === 1 ) {
@@ -360,15 +339,15 @@ abstract class RevisionStorage extends DbStorage {
 			foreach ( $queries as $query ) {
 				$conditions[$key][] = reset( $query );
 			}
-			return $conditions;
+			return $this->preprocessSqlArray( $conditions );
 		} else {
 			// composite in condition: ( foo = 1 AND bar = 2 ) OR ( foo = 1 AND bar = 3 )...
 			// Could be more efficient if composed as a range scan, but seems more complex than
 			// its benefit.
 			foreach ( $queries as $query ) {
-				$conditions[] = $dbr->makeList( $query, LIST_AND );
+				$conditions[] = $dbr->andExpr( $this->preprocessSqlArray( $query ) );
 			}
-			return $dbr->makeList( $conditions, LIST_OR );
+			return $dbr->orExpr( $conditions );
 		}
 	}
 
@@ -385,12 +364,15 @@ abstract class RevisionStorage extends DbStorage {
 			$revisions[$key] = $this->splitUpdate( $row, 'rev' );
 		}
 
-		$dbw = $this->dbFactory->getDB( DB_PRIMARY );
-		$dbw->insert(
-			'flow_revision',
-			$this->preprocessNestedSqlArray( $revisions ),
-			__METHOD__
-		);
+		if ( $revisions ) {
+			$dbw = $this->dbFactory->getDB( DB_PRIMARY );
+			$queryBuilder = $dbw->newInsertQueryBuilder()
+				->insertInto( 'flow_revision' )
+				->rows( $this->preprocessNestedSqlArray( $revisions ) )
+				->caller( __METHOD__ );
+			DbStorage::maybeSetInsertIgnore( $queryBuilder );
+			$queryBuilder->execute();
+		}
 
 		return $this->insertRelated( $rows );
 	}
@@ -418,7 +400,7 @@ abstract class RevisionStorage extends DbStorage {
 		$diff = array_diff( $requiredColumnNames, $this->allowedUpdateColumns );
 
 		// we're able to update all columns we need: go ahead!
-		if ( empty( $diff ) ) {
+		if ( !$diff ) {
 			return true;
 		}
 
@@ -523,12 +505,12 @@ abstract class RevisionStorage extends DbStorage {
 
 		if ( $rev ) {
 			$dbw = $this->dbFactory->getDB( DB_PRIMARY );
-			$dbw->update(
-				'flow_revision',
-				$this->preprocessSqlArray( $rev ),
-				$this->preprocessSqlArray( [ 'rev_id' => $old['rev_id'] ] ),
-				__METHOD__
-			);
+			$dbw->newUpdateQueryBuilder()
+				->update( 'flow_revision' )
+				->set( $this->preprocessSqlArray( $rev ) )
+				->where( $this->preprocessSqlArray( [ 'rev_id' => $old['rev_id'] ] ) )
+				->caller( __METHOD__ )
+				->execute();
 			if ( !$dbw->affectedRows() ) {
 				return false;
 			}
@@ -542,19 +524,14 @@ abstract class RevisionStorage extends DbStorage {
 	 * Also note this doesnt delete the whole post, it just deletes the revision.
 	 * The post will *always* exist in the tree structure, it will just show up as
 	 * [deleted] or something
-	 * @param array $row
-	 * @return bool
 	 */
 	public function remove( array $row ) {
-		$res = $this->dbFactory->getDB( DB_PRIMARY )->delete(
-			'flow_revision',
-			$this->preprocessSqlArray( [ 'rev_id' => $row['rev_id'] ] ),
-			__METHOD__
-		);
-		if ( !$res ) {
-			return false;
-		}
-		return $this->removeRelated( $row );
+		$this->dbFactory->getDB( DB_PRIMARY )->newDeleteQueryBuilder()
+			->deleteFrom( 'flow_revision' )
+			->where( $this->preprocessSqlArray( [ 'rev_id' => $row['rev_id'] ] ) )
+			->caller( __METHOD__ )
+			->execute();
+		$this->removeRelated( $row );
 	}
 
 	/**

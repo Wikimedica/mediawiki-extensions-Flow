@@ -9,9 +9,9 @@
 	 * @param {string} topicId The id of the topic this reply belongs to
 	 * @param {string} replyTo The id this reply is a child of
 	 * @param {Object} [config] Configuration object
-	 * @cfg {boolean} [expandable=true] Initialize the widget with a trigger input. Otherwise,
+	 * @param {boolean} [config.expandable=true] Initialize the widget with a trigger input. Otherwise,
 	 *   the widget will be initialized with the editor already open.
-	 * @cfg {Object} [editor] Config options to pass to mw.flow.ui.EditorWidget
+	 * @param {Object} [config.editor] Config options to pass to mw.flow.ui.EditorWidget
 	 */
 	mw.flow.ui.ReplyWidget = function mwFlowUiReplyWidget( topicId, replyTo, config ) {
 		config = config || {};
@@ -135,7 +135,7 @@
 	 * @param {string} format Format
 	 */
 	mw.flow.ui.ReplyWidget.prototype.onEditorSaveContent = function ( content, format ) {
-		var widget = this,
+		let widget = this,
 			captchaResponse;
 
 		captchaResponse = this.captchaWidget.getResponse();
@@ -144,7 +144,7 @@
 		this.error.toggle( false );
 		this.editor.pushPending();
 		this.api.saveReply( this.topicId, this.replyTo, content, format, captchaResponse )
-			.then( function ( workflow ) {
+			.then( ( workflow ) => {
 				widget.captchaWidget.toggle( false );
 
 				if ( widget.expandable ) {
@@ -159,7 +159,7 @@
 				// otherwise destroying it breaks (T166634)
 				widget.editor.popPending();
 				widget.emit( 'saveContent', workflow, content, format );
-			}, function ( errorCode, errorObj ) {
+			}, ( errorCode, errorObj ) => {
 				widget.captcha.update( errorCode, errorObj );
 				if ( !widget.captcha.isRequired() ) {
 					widget.error.setLabel( new OO.ui.HtmlSnippet( errorObj.error && errorObj.error.info || errorObj.exception ) );
@@ -174,7 +174,7 @@
 	 */
 	mw.flow.ui.ReplyWidget.prototype.initializeEditor = function () {
 		if ( !this.editor ) {
-			this.editor = new mw.flow.ui.EditorWidget( $.extend( {
+			this.editor = new mw.flow.ui.EditorWidget( Object.assign( {
 				placeholder: this.placeholder,
 				saveMsgKey: mw.user.isAnon() ? 'flow-reply-link-anonymously' : 'flow-reply-link',
 				classes: [ 'flow-ui-replyWidget-editor' ],

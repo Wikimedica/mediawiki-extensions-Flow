@@ -4,7 +4,7 @@
 	 *
 	 * @class
 	 * @extends mw.flow.dm.ModeratedRevisionedContent
-	 * @mixins mw.flow.dm.List
+	 * @mixes mw.flow.dm.List
 	 *
 	 * @constructor
 	 * @param {string} id Topic Id
@@ -57,7 +57,7 @@
 	 * @return {Object} Revision data
 	 */
 	mw.flow.dm.Topic.static.getTopicRevisionFromApi = function ( topiclist, topicId ) {
-		var revisionId = topiclist.posts[ topicId ] && topiclist.posts[ topicId ][ 0 ];
+		const revisionId = topiclist.posts[ topicId ] && topiclist.posts[ topicId ][ 0 ];
 
 		return topiclist.revisions[ revisionId ];
 	};
@@ -66,11 +66,10 @@
 	 * Get an array of topic objects from a topiclist api response.
 	 *
 	 * @param {Object} topiclist API data for topiclist
-	 * @param {string} topicId Topic id
 	 * @return {mw.flow.dm.Topic[]} Array of topic models
 	 */
 	mw.flow.dm.Topic.static.extractTopicsFromAPI = function ( topiclist ) {
-		var i, len, topicId,
+		let i, len, topicId,
 			topics = [];
 
 		for ( i = 0, len = topiclist.roots.length; i < len; i++ ) {
@@ -95,7 +94,7 @@
 	 * @return {Object} Hash object
 	 */
 	mw.flow.dm.Topic.prototype.getHashObject = function () {
-		return $.extend(
+		return Object.assign(
 			{
 				stub: this.isStub(),
 				summary: this.getSummary()

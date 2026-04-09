@@ -2,12 +2,12 @@
 
 namespace Flow\Notifications;
 
-use EchoEventPresentationModel;
 use Flow\Container;
 use Flow\Model\UUID;
 use Flow\UrlGenerator;
+use MediaWiki\Extension\Notifications\Formatters\EchoEventPresentationModel;
 use MediaWiki\MediaWikiServices;
-use Title;
+use MediaWiki\Title\Title;
 
 abstract class FlowPresentationModel extends EchoEventPresentationModel {
 
@@ -129,7 +129,7 @@ abstract class FlowPresentationModel extends EchoEventPresentationModel {
 	}
 
 	protected function getTopicTitle( $extraParamName = 'topic-title' ) {
-		$topicTitle = $this->event->getExtraParam( $extraParamName );
+		$topicTitle = $this->event->getExtraParam( $extraParamName, '' );
 		return $this->truncateTopicTitle( $topicTitle );
 	}
 

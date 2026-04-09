@@ -7,12 +7,13 @@ use Flow\Exception\DataModelException;
 use Flow\Exception\FailCommitException;
 use Flow\Exception\InvalidInputException;
 use MapCacheLRU;
+use MediaWiki\Context\RequestContext;
 use MediaWiki\MediaWikiServices;
-use MWTimestamp;
-use RequestContext;
-use Title;
-use User;
-use WikiMap;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
+use MediaWiki\Utils\MWTimestamp;
+use MediaWiki\WikiMap\WikiMap;
+use Wikimedia\Rdbms\IDBAccessObject;
 
 class Workflow {
 
@@ -117,16 +118,14 @@ class Workflow {
 
 			// store ID of newly created page & reset exists status
 			$title = $obj->getOwnerTitle();
-			$obj->pageId = $title->getArticleID( Title::GAID_FOR_UPDATE );
+			$obj->pageId = $title->getArticleID( IDBAccessObject::READ_LATEST );
 			$obj->exists = null;
 
 			if ( $obj->pageId === 0 ) {
 				throw new FailCommitException( 'No page for workflow: ' . serialize( $obj ) );
 			}
 		}
-		$dbr = MediaWikiServices::getInstance()
-			->getDBLoadBalancer()
-			->getConnection( DB_REPLICA );
+		$dbr = MediaWikiServices::getInstance()->getConnectionProvider()->getReplicaDatabase();
 
 		return [
 			'workflow_id' => $obj->id->getAlphadecimal(),
@@ -301,7 +300,7 @@ class Workflow {
 			// recent changes event can propagate.
 			$this->exists = Title::newFromID(
 				$this->pageId,
-				RequestContext::getMain()->getRequest()->wasPosted() ? Title::GAID_FOR_UPDATE : 0
+				RequestContext::getMain()->getRequest()->wasPosted() ? IDBAccessObject::READ_LATEST : 0
 			) !== null;
 		}
 
@@ -327,7 +326,7 @@ class Workflow {
 	}
 
 	/**
-	 * @return \MWTimestamp
+	 * @return MWTimestamp
 	 */
 	public function getLastUpdatedObj() {
 		return new MWTimestamp( $this->lastUpdated );

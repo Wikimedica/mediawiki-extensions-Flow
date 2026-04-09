@@ -8,7 +8,7 @@ use Flow\FlowActions;
 use Flow\Model\PostRevision;
 use Flow\Model\Workflow;
 use Flow\WatchedTopicItems;
-use User;
+use MediaWiki\User\User;
 
 /**
  * Auto-watch topics when the user performs one of the actions specified
@@ -21,6 +21,7 @@ abstract class AbstractTopicInsertListener extends AbstractListener {
 	 */
 	abstract protected function onAfterInsertExpectedChange( $changeType, Workflow $workflow );
 
+	/** @inheritDoc */
 	public function onAfterInsert( $object, array $row, array $metadata ) {
 		if ( !$object instanceof PostRevision ) {
 			wfWarn( __METHOD__ . ': Object is no PostRevision instance' );
@@ -41,9 +42,7 @@ abstract class AbstractTopicInsertListener extends AbstractListener {
 			return;
 		}
 
-		/** @var $title Title */
-		$title = $workflow->getArticleTitle();
-		if ( !$title ) {
+		if ( !$workflow->getArticleTitle() ) {
 			return;
 		}
 
@@ -66,7 +65,7 @@ abstract class AbstractTopicInsertListener extends AbstractListener {
 		// Find users defined for this action, in FlowActions.php
 		try {
 			$users = $actions->getValue( $changeType, 'watch', $watchType );
-		} catch ( \Exception $e ) {
+		} catch ( \Exception ) {
 			return [];
 		}
 

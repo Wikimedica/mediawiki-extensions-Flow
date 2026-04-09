@@ -12,9 +12,10 @@ use Flow\Exception\FlowException;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\Repository\TreeRepository;
-use FormSpecialPage;
-use HTMLForm;
-use Status;
+use Flow\UrlGenerator;
+use MediaWiki\HTMLForm\HTMLForm;
+use MediaWiki\SpecialPage\FormSpecialPage;
+use MediaWiki\Status\Status;
 
 class SpecialStructuredDiscussions extends FormSpecialPage {
 
@@ -79,7 +80,7 @@ class SpecialStructuredDiscussions extends FormSpecialPage {
 				'type' => 'select',
 				'label-message' => 'flow-special-type',
 				'options' => $this->getTypes(),
-				'default' => empty( $this->type ) ? 'post' : $this->type,
+				'default' => $this->type === '' ? 'post' : $this->type,
 			],
 			'uuid' => [
 				'id' => 'mw-flow-special-uuid',
@@ -134,7 +135,7 @@ class SpecialStructuredDiscussions extends FormSpecialPage {
 			} else {
 				return null;
 			}
-		} catch ( FlowException $e ) {
+		} catch ( FlowException ) {
 			return null; // The UUID is invalid or has no root post.
 		}
 	}
@@ -159,7 +160,7 @@ class SpecialStructuredDiscussions extends FormSpecialPage {
 			} else {
 				return null;
 			}
-		} catch ( FlowException $e ) {
+		} catch ( FlowException ) {
 			return null; // The UUID is invalid or has no root post.
 		}
 	}
@@ -177,7 +178,7 @@ class SpecialStructuredDiscussions extends FormSpecialPage {
 		}
 
 		// Assume no data has been passed in if there is no UUID.
-		if ( empty( $this->uuid ) ) {
+		if ( $this->uuid === null ) {
 			return false; // Display the form.
 		}
 

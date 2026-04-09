@@ -5,8 +5,8 @@ namespace Flow\Tests\Data;
 use Flow\Data\Listener\UserNameListener;
 use Flow\Repository\UserNameBatch;
 use Flow\Tests\FlowTestCase;
+use MediaWiki\WikiMap\WikiMap;
 use ReflectionClass;
-use WikiMap;
 
 /**
  * @covers \Flow\Data\Listener\AbstractListener
@@ -17,7 +17,7 @@ use WikiMap;
  */
 class UserNameListenerTest extends FlowTestCase {
 
-	public function onAfterLoadDataProvider() {
+	public static function onAfterLoadDataProvider() {
 		return [
 			[ [ 'user_id' => '1', 'user_wiki' => 'frwiki' ], [ 'user_id' => 'user_wiki' ], 'frwiki', 'enwiki' ],
 			[ [ 'user_id' => '2' ], [ 'user_id' => null ], 'enwiki', 'enwiki' ],
@@ -41,7 +41,6 @@ class UserNameListenerTest extends FlowTestCase {
 
 		$reflection = new ReflectionClass( $batch );
 		$prop = $reflection->getProperty( 'queued' );
-		$prop->setAccessible( true );
 		$queued = $prop->getValue( $batch );
 
 		if ( is_callable( $expectedWiki ) ) {

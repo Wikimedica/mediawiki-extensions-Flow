@@ -7,8 +7,8 @@ use Flow\Container;
 use Flow\Exception\DataModelException;
 use Flow\Exception\FlowException;
 use Flow\Repository\TreeRepository;
-use Title;
-use User;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 class PostRevision extends AbstractRevision {
 	public const MAX_TOPIC_LENGTH = 260;
@@ -86,8 +86,7 @@ class PostRevision extends AbstractRevision {
 	 * via a workflow, ...
 	 *
 	 * The only reasons we have this method are for creating root posts
-	 * (called from PostRevision->create), and so when failing to load a
-	 * post, we can create a stub object.
+	 * (called from PostRevision->create).
 	 *
 	 * @param UUID $uuid
 	 * @param User $user
@@ -96,7 +95,7 @@ class PostRevision extends AbstractRevision {
 	 * @param Title|null $title
 	 * @return PostRevision
 	 */
-	public static function newFromId( UUID $uuid, User $user, $content, $format, Title $title = null ) {
+	public static function newFromId( UUID $uuid, User $user, $content, $format, ?Title $title = null ) {
 		$obj = new self;
 		$obj->revId = UUID::create();
 		$obj->postId = $uuid;
@@ -261,7 +260,7 @@ class PostRevision extends AbstractRevision {
 	/**
 	 * @param UUID|null $id
 	 */
-	public function setReplyToId( UUID $id = null ) {
+	public function setReplyToId( ?UUID $id = null ) {
 		$this->replyToId = $id;
 	}
 

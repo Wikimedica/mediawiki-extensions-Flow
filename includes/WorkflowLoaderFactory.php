@@ -13,8 +13,8 @@ use Flow\Exception\UnknownWorkflowIdException;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use MediaWiki\MediaWikiServices;
-use Title;
-use WikiMap;
+use MediaWiki\Title\Title;
+use MediaWiki\WikiMap\WikiMap;
 
 class WorkflowLoaderFactory {
 	/**
@@ -92,10 +92,10 @@ class WorkflowLoaderFactory {
 			// so we'll want to clear LinkCache (we're likely be in
 			// the process of creating a new workflow, so we don't
 			// want lingering cache data)
-			// Workflow::create doesn't GAID_FOR_UPDATE to fetch the
+			// Workflow::create doesn't READ_LATEST to fetch the
 			// article id. Let's forcibly make it look like the title
 			// does not yet exist (in which case it will be
-			// GAID_FOR_UPDATE when we actually want to store it)
+			// READ_LATEST when we actually want to store it)
 			$title = clone $pageTitle;
 			$title->resetArticleID( 0 );
 
@@ -161,8 +161,8 @@ class WorkflowLoaderFactory {
 
 		try {
 			return UUID::create( strtolower( $dbKey ) );
-		} catch ( InvalidInputException $e ) {
-			throw new InvalidTopicUuidException( "$dbKey is not a valid UUID" );
+		} catch ( InvalidInputException ) {
+			throw new InvalidTopicUuidException( "$dbKey is not a valid UUID", 'invalid-input', $dbKey );
 		}
 	}
 }

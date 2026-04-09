@@ -2,15 +2,15 @@
 
 namespace Flow\Api;
 
-use ApiBase;
-use ApiMessage;
 use Flow\Block\AbstractBlock;
 use Flow\Container;
 use Flow\Model\AbstractRevision;
 use Flow\WorkflowLoader;
 use Flow\WorkflowLoaderFactory;
-use Status;
-use Title;
+use MediaWiki\Api\ApiBase;
+use MediaWiki\Api\ApiMessage;
+use MediaWiki\Status\Status;
+use MediaWiki\Title\Title;
 
 abstract class ApiFlowBase extends ApiBase {
 
@@ -55,9 +55,6 @@ abstract class ApiFlowBase extends ApiBase {
 		return true;
 	}
 
-	/**
-	 * @param Title $page
-	 */
 	public function setPage( Title $page ) {
 		$this->page = $page;
 	}
@@ -95,9 +92,7 @@ abstract class ApiFlowBase extends ApiBase {
 
 		if ( $addAliases ) {
 			// aliases for AbstractRevision::MODERATED_NONE
-			$states = array_merge( $states, [
-				'restore', 'unhide', 'undelete', 'unsuppress',
-			] );
+			return [ ...$states, 'restore', 'unhide', 'undelete', 'unsuppress' ];
 		}
 
 		return $states;

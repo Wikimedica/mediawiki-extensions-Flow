@@ -9,7 +9,6 @@
 	 * @class
 	 * @extends FlowComponent
 	 * @constructor
-	 * @param {jQuery} $container
 	 */
 	function FlowBoardComponentApiEventsMixin() {
 		// Bind event callbacks
@@ -44,7 +43,7 @@
 	 * @return {Object}
 	 */
 	FlowBoardComponentApiEventsMixin.UI.events.globalApiPreHandlers.prepareEditConflict = function ( event, info, queryMap ) {
-		var $form = $( this ).closest( 'form' ),
+		const $form = $( this ).closest( 'form' ),
 			prevRevisionId = $form.data( 'flow-prev-revision' );
 
 		if ( !prevRevisionId ) {
@@ -60,7 +59,7 @@
 		 * be properly applied for the respective API call; e.g.
 		 * epprev_revision (for edit post)
 		 */
-		return $.extend( {}, queryMap, {
+		return Object.assign( {}, queryMap, {
 			flow_prev_revision: prevRevisionId
 		} );
 	};
@@ -74,7 +73,7 @@
 	 * @return {Object}
 	 */
 	FlowBoardComponentApiEventsMixin.UI.events.apiPreHandlers.watchItem = function ( event, info, queryMap ) {
-		var params = {
+		const params = {
 			action: 'watch',
 			titles: queryMap.page,
 			_internal: {
@@ -101,11 +100,10 @@
 	 * @param {string} info.status "done" or "fail"
 	 * @param {jQuery} info.$target
 	 * @param {Object} data
-	 * @param {jQuery.jqXHR} jqxhr
 	 * @return {jQuery.Promise}
 	 */
 	FlowBoardComponentApiEventsMixin.UI.events.apiHandlers.board = function ( info, data ) {
-		var $rendered,
+		let $rendered,
 			flowBoard = info.component,
 			dfd = $.Deferred();
 
@@ -123,7 +121,7 @@
 
 		// Run this on a short timeout so that the other board handler in FlowBoardComponentLoadMoreFeatureMixin can run
 		// TODO: Using a timeout doesn't seem like the right way to do this.
-		setTimeout( function () {
+		setTimeout( () => {
 			// Reinitialize the whole board with these nodes
 			flowBoard.reinitializeContainer( $rendered );
 			dfd.resolve();
@@ -137,7 +135,6 @@
 	 * @param {string} info.status "done" or "fail"
 	 * @param {jQuery} info.$target
 	 * @param {Object} data
-	 * @param {jQuery.jqXHR} jqxhr
 	 * @return {jQuery.Promise}
 	 */
 	FlowBoardComponentApiEventsMixin.UI.events.apiHandlers.submitTopicTitle = function ( info, data ) {
@@ -158,11 +155,10 @@
 	 * @param {string} info.status "done" or "fail"
 	 * @param {jQuery} info.$target
 	 * @param {Object} data
-	 * @param {jQuery.jqXHR} jqxhr
 	 * @return {jQuery.Promise}
 	 */
 	FlowBoardComponentApiEventsMixin.UI.events.apiHandlers.watchItem = function ( info, data ) {
-		var watchUrl, unwatchUrl,
+		let watchUrl, unwatchUrl,
 			watchType, watchLinkTemplate, $newLink,
 			$target = $( this ),
 			$tooltipTarget = $target.closest( '.flow-watch-link' ),
@@ -224,8 +220,8 @@
 	 */
 	FlowBoardComponentApiEventsMixin.UI.events.apiHandlers.moderateTopic = _genModerateHandler(
 		'moderate-topic',
-		function ( flowBoard, revision ) {
-			var $replacement, $target;
+		( flowBoard, revision ) => {
+			let $replacement, $target;
 
 			if ( !revision.isModerated ) {
 				return;
@@ -251,8 +247,8 @@
 	 */
 	FlowBoardComponentApiEventsMixin.UI.events.apiHandlers.moderatePost = _genModerateHandler(
 		'moderate-post',
-		function ( flowBoard, revision ) {
-			var $replacement, $target;
+		( flowBoard, revision ) => {
+			let $replacement, $target;
 
 			if ( !revision.isModerated ) {
 				return;
@@ -285,12 +281,11 @@
 	 * @return {Function} Callback processing the response after submit of a moderation form
 	 * @return {Object} return.info `{status: done|fail, $target: jQuery}`
 	 * @return {Object} return.data
-	 * @return {jQuery.jqXHR} return.jqxhr
 	 * @return {jQuery.Promise} return.return
 	 */
 	function _genModerateHandler( action, successCallback ) {
 		return function ( info, data ) {
-			var $form, revisionId, $target, flowBoard,
+			let $form, revisionId, $target, flowBoard,
 				$this = $( this );
 
 			if ( info.status !== 'done' ) {
@@ -305,10 +300,10 @@
 
 			// @todo: add 3rd argument (target selector); there's no need to refresh entire topic if only post was moderated
 			return _flowBoardComponentRefreshTopic( $target, data.flow[ action ].workflow )
-				.done( function ( result ) {
+				.done( ( result ) => {
 					successCallback( flowBoard, result.flow[ 'view-topic' ].result.topic.revisions[ revisionId ] );
 				} )
-				.done( function () {
+				.done( () => {
 					// we're done here, close moderation pop-up
 					flowBoard.emitWithReturn( 'cancelForm', $form );
 				} );
@@ -325,7 +320,7 @@
 	 * @return {jQuery.Promise}
 	 */
 	function _flowBoardComponentRefreshTopic( $targetElement, workflowId, selector ) {
-		var $target = $targetElement.closest( '.flow-topic' ),
+		let $target = $targetElement.closest( '.flow-topic' ),
 			flowBoard = mw.flow.getPrototypeMethod( 'board', 'getInstanceByElement' )( $targetElement );
 
 		$targetElement.addClass( 'flow-api-inprogress' );
@@ -334,9 +329,9 @@
 			submodule: 'view-topic',
 			// Flow topic title, in Topic:<topicId> format (2600 is topic namespace id)
 			page: ( new mw.Title( workflowId, 2600 ) ).getPrefixedDb()
-		} ).done( function ( result ) {
+		} ).done( ( result ) => {
 			// Update view of the full topic
-			var $replacement = $( flowBoard.constructor.static.TemplateEngine.processTemplateGetFragment(
+			let $replacement = $( flowBoard.constructor.static.TemplateEngine.processTemplateGetFragment(
 				'flow_topiclist_loop.partial',
 				result.flow[ 'view-topic' ].result.topic
 			) ).children();
@@ -357,13 +352,13 @@
 			// HACK: Emit an event here so that the flow data model can update
 			// itself based on the API response
 			flowBoard.emit( 'refreshTopic', workflowId, result );
-		} ).fail( function ( code, result ) {
-			var errorMsg = flowBoard.constructor.static.getApiErrorMessage( code, result );
+		} ).fail( ( code, result ) => {
+			let errorMsg = flowBoard.constructor.static.getApiErrorMessage( code, result );
 			errorMsg = mw.msg( 'flow-error-external', errorMsg );
 
 			flowBoard.emitWithReturn( 'removeError', $target );
 			flowBoard.emitWithReturn( 'showError', $target, errorMsg );
-		} ).always( function () {
+		} ).always( () => {
 			$targetElement.removeClass( 'flow-api-inprogress' );
 		} );
 	}

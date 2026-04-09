@@ -3,12 +3,12 @@
 namespace Flow\Utils;
 
 use BatchRowIterator;
-use EchoCallbackIterator;
 use Iterator;
 use IteratorAggregate;
+use MediaWiki\Extension\Notifications\Iterator\CallbackIterator;
+use MediaWiki\Title\Title;
 use RecursiveIteratorIterator;
-use Title;
-use Wikimedia\Rdbms\IDatabase;
+use Wikimedia\Rdbms\IReadableDatabase;
 
 /**
  * Iterates over all titles within the specified namespace. Batches
@@ -16,7 +16,7 @@ use Wikimedia\Rdbms\IDatabase;
  */
 class NamespaceIterator implements IteratorAggregate {
 	/**
-	 * @var IDatabase A wiki database to read from
+	 * @var IReadableDatabase A wiki database to read from
 	 */
 	protected $db;
 
@@ -26,10 +26,10 @@ class NamespaceIterator implements IteratorAggregate {
 	protected $namespace;
 
 	/**
-	 * @param IDatabase $db A wiki database to read from
+	 * @param IReadableDatabase $db A wiki database to read from
 	 * @param int $namespace An NS_* namespace to iterate over
 	 */
-	public function __construct( IDatabase $db, $namespace ) {
+	public function __construct( IReadableDatabase $db, $namespace ) {
 		$this->db = $db;
 		$this->namespace = $namespace;
 	}
@@ -37,7 +37,7 @@ class NamespaceIterator implements IteratorAggregate {
 	/**
 	 * @return Iterator<Title>
 	 */
-	public function getIterator() {
+	public function getIterator(): Iterator {
 		$it = new BatchRowIterator(
 			$this->db,
 			/* tables */ [ 'page' ],
@@ -52,7 +52,7 @@ class NamespaceIterator implements IteratorAggregate {
 		$it = new RecursiveIteratorIterator( $it );
 
 		$namespace = $this->namespace;
-		return new EchoCallbackIterator( $it, static function ( $row ) use ( $namespace ) {
+		return new CallbackIterator( $it, static function ( $row ) use ( $namespace ) {
 			return Title::makeTitle( $namespace, $row->page_title );
 		} );
 	}

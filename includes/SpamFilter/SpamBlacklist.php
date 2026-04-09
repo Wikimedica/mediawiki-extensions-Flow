@@ -2,14 +2,14 @@
 
 namespace Flow\SpamFilter;
 
-use ExtensionRegistry;
 use Flow\Model\AbstractRevision;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
 use MediaWiki\Extension\SpamBlacklist\BaseBlacklist;
 use MediaWiki\MediaWikiServices;
-use ParserOptions;
-use Status;
-use Title;
+use MediaWiki\Parser\ParserOptions;
+use MediaWiki\Registration\ExtensionRegistry;
+use MediaWiki\Status\Status;
+use MediaWiki\Title\Title;
 
 class SpamBlacklist implements SpamFilter {
 	/**

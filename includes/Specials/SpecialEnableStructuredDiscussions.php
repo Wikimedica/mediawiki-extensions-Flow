@@ -2,15 +2,17 @@
 
 namespace Flow\Specials;
 
-use ExtensionRegistry;
 use Flow\Container;
 use Flow\Import\Converter;
 use Flow\Import\EnableFlow\EnableFlowWikitextConversionStrategy;
 use Flow\Import\SourceStore\NullImportSourceStore;
-use FormSpecialPage;
+use MediaWiki\Exception\MWExceptionHandler;
 use MediaWiki\MediaWikiServices;
-use Status;
-use Title;
+use MediaWiki\Registration\ExtensionRegistry;
+use MediaWiki\SpecialPage\FormSpecialPage;
+use MediaWiki\Status\Status;
+use MediaWiki\Title\Title;
+use Wikimedia\Rdbms\IDBAccessObject;
 
 /**
  * A special page that allows users with the flow-create-board right to create
@@ -97,7 +99,7 @@ class SpecialEnableStructuredDiscussions extends FormSpecialPage {
 
 		$status = Status::newGood();
 
-		if ( $title->exists( Title::GAID_FOR_UPDATE ) ) {
+		if ( $title->exists( IDBAccessObject::READ_LATEST ) ) {
 			if ( ExtensionRegistry::getInstance()->isLoaded( 'Liquid Threads' ) && \LqtDispatch::isLqtPage( $title ) ) {
 				return Status::newFatal( 'flow-special-enableflow-page-is-liquidthreads', $page );
 			}
@@ -105,7 +107,7 @@ class SpecialEnableStructuredDiscussions extends FormSpecialPage {
 			$logger = Container::get( 'default_logger' );
 
 			$converter = new Converter(
-				wfGetDB( DB_PRIMARY ),
+				MediaWikiServices::getInstance()->getConnectionProvider()->getPrimaryDatabase(),
 				Container::get( 'importer' ),
 				$logger,
 				$this->getUser(),
@@ -122,7 +124,7 @@ class SpecialEnableStructuredDiscussions extends FormSpecialPage {
 			try {
 				$converter->convert( $title );
 			} catch ( \Exception $e ) {
-				\MWExceptionHandler::logException( $e );
+				MWExceptionHandler::logException( $e );
 				$status->fatal( 'flow-error-external', $e->getMessage() );
 			}
 

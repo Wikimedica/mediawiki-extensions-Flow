@@ -4,34 +4,32 @@ namespace Flow\Import;
 
 use DateTime;
 use DateTimeZone;
-use DeferredUpdates;
-use DerivativeContext;
 use Exception;
 use Flow\Block\AbstractBlock;
 use Flow\Collection\HeaderCollection;
 use Flow\Container;
 use Flow\Content\BoardContent;
 use Flow\Conversion\Utils;
-use Flow\DbFactory;
 use Flow\Exception\InvalidDataException;
 use Flow\Notifications\Controller;
 use Flow\OccupationController;
 use Flow\WorkflowLoader;
 use Flow\WorkflowLoaderFactory;
-use FormatJson;
-use IContextSource;
+use MediaWiki\Content\WikitextContent;
+use MediaWiki\Context\DerivativeContext;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Context\RequestContext;
+use MediaWiki\Deferred\DeferredUpdates;
+use MediaWiki\Json\FormatJson;
 use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Parser\ParserOptions;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Revision\SlotRecord;
-use MovePage;
-use ParserOptions;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 use Psr\Log\LoggerInterface;
-use RequestContext;
-use Title;
-use User;
-use WikiPage;
-use WikitextContent;
+use Wikimedia\Rdbms\IDBAccessObject;
 
 /**
  * Entry point for enabling Flow on a page.
@@ -56,11 +54,6 @@ class OptInController {
 	private $archiveNameHelper;
 
 	/**
-	 * @var DbFactory
-	 */
-	private $dbFactory;
-
-	/**
 	 * @var LoggerInterface
 	 */
 	private $logger;
@@ -79,7 +72,6 @@ class OptInController {
 	 * @param OccupationController $occupationController
 	 * @param Controller $notificationController
 	 * @param ArchiveNameHelper $archiveNameHelper
-	 * @param DbFactory $dbFactory
 	 * @param LoggerInterface $logger Logger for errors and exceptions
 	 * @param User $scriptUser User that takes actions, such as creating the board or
 	 *   editing descriptions
@@ -88,14 +80,12 @@ class OptInController {
 		OccupationController $occupationController,
 		Controller $notificationController,
 		ArchiveNameHelper $archiveNameHelper,
-		DbFactory $dbFactory,
 		LoggerInterface $logger,
 		User $scriptUser
 	) {
 		$this->occupationController = $occupationController;
 		$this->notificationController = $notificationController;
 		$this->archiveNameHelper = $archiveNameHelper;
-		$this->dbFactory = $dbFactory;
 		$this->logger = $logger;
 		$this->user = $scriptUser;
 		$this->context = new DerivativeContext( RequestContext::getMain() );
@@ -142,10 +132,6 @@ class OptInController {
 		);
 	}
 
-	/**
-	 * @param Title $title
-	 * @param User $user
-	 */
 	public function enable( Title $title, User $user ) {
 		if ( $this->isFlowBoard( $title ) ) {
 			// already a Flow board
@@ -155,7 +141,7 @@ class OptInController {
 		// archive existing wikitext talk page
 		$currentTemplate = null;
 		$templatesFromTalkpage = null;
-		if ( $title->exists( Title::GAID_FOR_UPDATE ) ) {
+		if ( $title->exists( IDBAccessObject::READ_LATEST ) ) {
 			$templatesFromTalkpage = $this->extractTemplatesAboveFirstSection( $title );
 			$wikitextTalkpageArchiveTitle = $this->archiveExistingTalkpage( $title );
 			$currentTemplate = $this->getFormattedCurrentTemplate( $wikitextTalkpageArchiveTitle );
@@ -171,9 +157,6 @@ class OptInController {
 		}
 	}
 
-	/**
-	 * @param Title $title
-	 */
 	public function disable( Title $title ) {
 		if ( !$this->isFlowBoard( $title ) ) {
 			return;
@@ -207,7 +190,7 @@ class OptInController {
 	 * @return bool
 	 */
 	private function isFlowBoard( Title $title ) {
-		return $title->getContentModel( Title::GAID_FOR_UPDATE ) === CONTENT_MODEL_FLOW_BOARD;
+		return $title->getContentModel( IDBAccessObject::READ_LATEST ) === CONTENT_MODEL_FLOW_BOARD;
 	}
 
 	/**
@@ -227,8 +210,10 @@ class OptInController {
 		 * Article IDs are cached inside title objects. Since we'll be
 		 * reusing these objects, we have to make sure they reflect the
 		 * correct IDs.
-		 * We could just Title::GAID_FOR_UPDATE everywhere, but that would
+		 *
+		 * We could just IDBAccessObject::READ_LATEST everywhere, but that would
 		 * result in a lot of unneeded calls to primary database.
+		 *
 		 * If these IDs are wrong, we could end up associating workflows
 		 * with an incorrect page (that was just moved)
 		 *
@@ -243,7 +228,7 @@ class OptInController {
 		 * Force id cached inside $title to be updated, as well as info
 		 * inside LinkCache.
 		 */
-		$to->getArticleID( Title::GAID_FOR_UPDATE );
+		$to->getArticleID( IDBAccessObject::READ_LATEST );
 	}
 
 	/**
@@ -311,7 +296,6 @@ class OptInController {
 	 * @param string $contentText
 	 * @param string $summary
 	 * @throws ImportException
-	 * @throws \MWException
 	 * @param-taint $contentText escapes_escaped
 	 */
 	private function createRevision( Title $title, $contentText, $summary ) {
@@ -325,6 +309,14 @@ class OptInController {
 		);
 
 		if ( !$status->isGood() ) {
+			$statusFormatter = MediaWikiServices::getInstance()->getFormatterFactory()->getStatusFormatter(
+				$this->context
+			);
+			$this->logger->error( 'Failed creating revision at {title} because {status}', [
+				'title' => $title->getPrefixedText(),
+				'status' => $statusFormatter->getWikiText( $status, [ 'lang' => 'en' ] ),
+				'exception' => new \RuntimeException(),
+			] );
 			throw new ImportException( "Failed creating revision at {$title}" );
 		}
 	}
@@ -416,7 +408,8 @@ class OptInController {
 				$templateName = wfMessage( 'flow-importer-wt-converted-archive-template' )->inContentLanguage()->plain();
 				$content = TemplateHelper::removeFromHtml( $content, $templateName );
 				if ( $currentTemplate ) {
-					$content = Utils::convert( 'wikitext', 'html', $currentTemplate, $archivedFlowPage ) . "<br/><br/>" . $content;
+					$content = Utils::convert( 'wikitext', 'html', $currentTemplate, $archivedFlowPage ) .
+						'<br/><br/>' . $content;
 				}
 				return $content;
 			},
@@ -430,11 +423,10 @@ class OptInController {
 	/**
 	 * @param Title $title
 	 * @return string
-	 * @throws \MWException
 	 */
 	private function getContent( Title $title ) {
 		$page = MediaWikiServices::getInstance()->getWikiPageFactory()->newFromTitle( $title );
-		$page->loadPageData( WikiPage::READ_LATEST );
+		$page->loadPageData( IDBAccessObject::READ_LATEST );
 		$revision = $page->getRevisionRecord();
 		if ( $revision ) {
 			$content = $revision->getContent( SlotRecord::MAIN, RevisionRecord::FOR_PUBLIC );
@@ -692,9 +684,6 @@ class OptInController {
 		return $flowArchiveTitle;
 	}
 
-	/**
-	 * @param array $blocks
-	 */
 	private function logBlockErrors( array $blocks ) {
 		$errors = [];
 		/** @var AbstractBlock $block */

@@ -6,9 +6,7 @@ use Flow\Container;
 use Flow\Model\PostRevision;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
-use LoggedUpdateMaintenance;
-use MediaWiki\MediaWikiServices;
-use MWException;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -48,7 +46,6 @@ class FlowUpdateUserWiki extends LoggedUpdateMaintenance {
 	 * add a check user_id != 0 and user_ip is not null to the query, but this will
 	 * result in more db queries
 	 * @return true
-	 * @throws \MWException
 	 */
 	protected function doDBUpdates() {
 		$id = '';
@@ -65,32 +62,27 @@ class FlowUpdateUserWiki extends LoggedUpdateMaintenance {
 
 		while ( $count == $this->mBatchSize ) {
 			$count = 0;
-			$res = $dbr->select(
-				[ 'flow_workflow' ],
-				[ 'workflow_wiki', 'workflow_id', 'workflow_type' ],
-				[
-					'workflow_id > ' . $dbr->addQuotes( $id ),
-				],
-				__METHOD__,
-				[ 'ORDER BY' => 'workflow_id ASC', 'LIMIT' => $batchSize ]
-			);
-			if ( $res ) {
-				foreach ( $res as $row ) {
-					$count++;
-					$id = $row->workflow_id;
-					$uuid = UUID::create( $row->workflow_id );
-					$workflow = Container::get( 'storage.workflow' )->get( $uuid );
-					if ( $workflow ) {
-						// definition type 'topic' is always under a 'discussion' and they
-						// will be handled while processing 'discussion'
-						if ( $row->workflow_type == 'discussion' ) {
-							$this->updateHeader( $workflow, $row->workflow_wiki );
-							$this->updateTopicList( $workflow, $row->workflow_wiki );
-						}
+			$res = $dbr->newSelectQueryBuilder()
+				->select( [ 'workflow_wiki', 'workflow_id', 'workflow_type' ] )
+				->from( 'flow_workflow' )
+				->where( $dbr->expr( 'workflow_id', '>', $id ) )
+				->orderBy( 'workflow_id' )
+				->limit( $batchSize )
+				->caller( __METHOD__ )
+				->fetchResultSet();
+			foreach ( $res as $row ) {
+				$count++;
+				$id = $row->workflow_id;
+				$uuid = UUID::create( $row->workflow_id );
+				$workflow = Container::get( 'storage.workflow' )->get( $uuid );
+				if ( $workflow ) {
+					// definition type 'topic' is always under a 'discussion' and they
+					// will be handled while processing 'discussion'
+					if ( $row->workflow_type == 'discussion' ) {
+						$this->updateHeader( $workflow, $row->workflow_wiki );
+						$this->updateTopicList( $workflow, $row->workflow_wiki );
 					}
 				}
-			} else {
-				throw new MWException( 'SQL error in maintenance script ' . __CLASS__ . '::' . __METHOD__ );
 			}
 		}
 
@@ -110,30 +102,26 @@ class FlowUpdateUserWiki extends LoggedUpdateMaintenance {
 
 		while ( $count == $batchSize ) {
 			$count = 0;
-			$res = $dbr->select(
-				[ 'flow_header_revision', 'flow_revision' ],
-				[ 'rev_id', 'rev_type' ],
-				[
-					'rev_id > ' . $dbr->addQuotes( $id ),
-					'header_rev_id = rev_id',
+			$res = $dbr->newSelectQueryBuilder()
+				->select( [ 'rev_id', 'rev_type' ] )
+				->from( 'flow_header_revision' )
+				->join( 'flow_revision', null, 'header_rev_id = rev_id' )
+				->where( [
+					$dbr->expr( 'rev_id', '>', $id ),
 					'header_workflow_id' => $workflow->getId()->getBinary()
-				],
-				__METHOD__,
-				[ 'ORDER BY' => 'header_rev_id ASC', 'LIMIT' => $batchSize ]
-			);
-			if ( $res ) {
-				foreach ( $res as $row ) {
-					$count++;
-					$id = $row->rev_id;
-					$revision = Container::get( 'storage.header' )->get( UUID::create( $row->rev_id ) );
-					if ( $revision ) {
-						$this->updateRevision( $revision, $wiki );
-					}
+				] )
+				->orderBy( 'header_rev_id' )
+				->limit( $batchSize )
+				->caller( __METHOD__ )
+				->fetchResultset();
+			foreach ( $res as $row ) {
+				$count++;
+				$id = $row->rev_id;
+				$revision = Container::get( 'storage.header' )->get( UUID::create( $row->rev_id ) );
+				if ( $revision ) {
+					$this->updateRevision( $revision, $wiki );
 				}
-			} else {
-				throw new MWException( 'SQL error in maintenance script ' . __CLASS__ . '::' . __METHOD__ );
 			}
-
 		}
 	}
 
@@ -150,29 +138,26 @@ class FlowUpdateUserWiki extends LoggedUpdateMaintenance {
 
 		while ( $count == $batchSize ) {
 			$count = 0;
-			$res = $dbr->select(
-				[ 'flow_topic_list' ],
-				[ 'topic_id' ],
-				[
+			$res = $dbr->newSelectQueryBuilder()
+				->select( 'topic_id' )
+				->from( 'flow_topic_list' )
+				->where( [
 					'topic_list_id' => $workflow->getId()->getBinary(),
-					'topic_id > ' . $dbr->addQuotes( $id ),
-				],
-				__METHOD__,
-				[ 'ORDER BY' => 'topic_id ASC', 'LIMIT' => $batchSize ]
-			);
-			if ( $res ) {
-				$index = 0;
-				foreach ( $res as $row ) {
-					$count++;
-					$index++;
-					$id = $row->topic_id;
-					$post = Container::get( 'loader.root_post' )->get( UUID::create( $row->topic_id ) );
-					if ( $post ) {
-						$this->updatePost( $post, $wiki );
-					}
+					$dbr->expr( 'topic_id', '>', $id ),
+				] )
+				->orderBy( 'topic_id' )
+				->limit( $batchSize )
+				->caller( __METHOD__ )
+				->fetchResultSet();
+			$index = 0;
+			foreach ( $res as $row ) {
+				$count++;
+				$index++;
+				$id = $row->topic_id;
+				$post = Container::get( 'loader.root_post' )->get( UUID::create( $row->topic_id ) );
+				if ( $post ) {
+					$this->updatePost( $post, $wiki );
 				}
-			} else {
-				throw new MWException( 'SQL error in maintenance script ' . __CLASS__ . '::' . __METHOD__ );
 			}
 		}
 	}
@@ -217,37 +202,31 @@ class FlowUpdateUserWiki extends LoggedUpdateMaintenance {
 		$type = $revision->getRevisionType();
 
 		$dbw = Container::get( 'db.factory' )->getDB( DB_PRIMARY );
-		$res = $dbw->update(
-			'flow_revision',
-			[
+		$dbw->newUpdateQueryBuilder()
+			->update( 'flow_revision' )
+			->set( [
 				'rev_user_wiki' => $wiki,
 				'rev_mod_user_wiki' => $wiki,
 				'rev_edit_user_wiki' => $wiki,
-			],
-			[
+			] )
+			->where( [
 				'rev_id' => $revision->getRevisionId()->getBinary(),
-			],
-			__METHOD__
-		);
-		if ( !$res ) {
-			throw new MWException( 'SQL error in maintenance script ' . __CLASS__ . '::' . __METHOD__ );
-		}
+			] )
+			->caller( __METHOD__ )
+			->execute();
 		$this->checkForReplica();
 
 		if ( $type === 'post' ) {
-			$res = $dbw->update(
-				'flow_tree_revision',
-				[
+			$dbw->newUpdateQueryBuilder()
+				->update( 'flow_tree_revision' )
+				->set( [
 					'tree_orig_user_wiki' => $wiki,
-				],
-				[
+				] )
+				->where( [
 					'tree_rev_id' => $revision->getRevisionId()->getBinary(),
-				],
-				__METHOD__
-			);
-			if ( !$res ) {
-				throw new MWException( 'SQL error in maintenance script ' . __CLASS__ . '::' . __METHOD__ );
-			}
+				] )
+				->caller( __METHOD__ )
+				->execute();
 			$this->checkForReplica();
 		}
 	}
@@ -257,7 +236,7 @@ class FlowUpdateUserWiki extends LoggedUpdateMaintenance {
 
 		$this->updatedCount++;
 		if ( $this->updatedCount > $this->getBatchSize() ) {
-			$lbFactory = MediaWikiServices::getInstance()->getDBLoadBalancerFactory();
+			$lbFactory = $this->getServiceContainer()->getDBLoadBalancerFactory();
 			$lbFactory->waitForReplication( [ 'cluster' => $wgFlowCluster ] );
 			$this->updatedCount = 0;
 		}

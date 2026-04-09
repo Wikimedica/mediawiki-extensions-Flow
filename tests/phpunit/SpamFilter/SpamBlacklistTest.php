@@ -5,10 +5,10 @@ namespace Flow\Tests\SpamFilter;
 use Flow\Model\PostRevision;
 use Flow\SpamFilter\SpamBlacklist;
 use Flow\Tests\PostRevisionTestCase;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
 use MediaWiki\Extension\SpamBlacklist\BaseBlacklist;
-use MediaWiki\MediaWikiServices;
-use Title;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 /**
  * @covers \Flow\Model\AbstractRevision
@@ -39,7 +39,7 @@ class SpamBlacklistTest extends PostRevisionTestCase {
 	 */
 	private const WHITELIST = [ 'a5b\.sytes\.net' ];
 
-	public function spamProvider() {
+	public static function spamProvider() {
 		return [
 			'default new topic title revision - no spam' => [
 				[],
@@ -64,9 +64,9 @@ class SpamBlacklistTest extends PostRevisionTestCase {
 	 */
 	public function testSpam( $newRevisionRow, ?PostRevision $oldRevision, $expected ) {
 		$newRevision = $this->generateObject( $newRevisionRow );
-		$title = Title::newFromText( 'UTPage' );
+		$title = Title::makeTitle( NS_MAIN, 'SpamBlacklistTest TestSpam' );
 		$ctx = $this->createMock( IContextSource::class );
-		$ctx->method( 'getUser' )->willReturn( $this->createMock( \User::class ) );
+		$ctx->method( 'getUser' )->willReturn( $this->createMock( User::class ) );
 
 		$status = $this->spamFilter->validate( $ctx, $newRevision, $oldRevision, $title, $title );
 		$this->assertEquals( $expected, $status->isOK() );
@@ -81,25 +81,24 @@ class SpamBlacklistTest extends PostRevisionTestCase {
 			$this->markTestSkipped( 'SpamBlacklist not enabled' );
 		}
 
-		$this->setMwGlobals( 'wgBlacklistSettings', [
+		$this->overrideConfigValue( 'BlacklistSettings', [
 			'files' => [],
 		] );
 
 		BaseBlacklist::clearInstanceCache();
 
-		MediaWikiServices::getInstance()->getMessageCache()->enable();
+		$this->getServiceContainer()->getMessageCache()->enable();
 		$this->insertPage( 'MediaWiki:Spam-blacklist', implode( "\n", self::BLACKLIST ) );
 		$this->insertPage( 'MediaWiki:Spam-whitelist', implode( "\n", self::WHITELIST ) );
 
 		// That only works if the spam blacklist is really reset
 		$instance = BaseBlacklist::getSpamBlacklist();
 		$reflProp = new \ReflectionProperty( $instance, 'regexes' );
-		$reflProp->setAccessible( true );
 		$reflProp->setValue( $instance, false );
 	}
 
 	protected function tearDown(): void {
-		MediaWikiServices::getInstance()->getMessageCache()->disable();
+		$this->getServiceContainer()->getMessageCache()->disable();
 		parent::tearDown();
 	}
 }

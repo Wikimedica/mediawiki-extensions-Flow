@@ -17,9 +17,10 @@ use Flow\Formatter\RevisionViewQuery;
 use Flow\Model\PostRevision;
 use Flow\Model\PostSummary;
 use Flow\Model\UUID;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
 use MediaWiki\MediaWikiServices;
-use Message;
+use MediaWiki\Message\Message;
+use MediaWiki\Output\OutputPage;
 
 class TopicSummaryBlock extends AbstractBlock {
 	/**
@@ -312,7 +313,7 @@ class TopicSummaryBlock extends AbstractBlock {
 				if ( isset( $options['oldRevision'] ) ) {
 					$oldRevision = $options['oldRevision'];
 				}
-				list( $new, $old ) = Container::get( 'query.postsummary.view' )->getDiffViewResult(
+				[ $new, $old ] = Container::get( 'query.postsummary.view' )->getDiffViewResult(
 					UUID::create( $options['newRevision'] ),
 					UUID::create( $oldRevision )
 				);
@@ -400,7 +401,7 @@ class TopicSummaryBlock extends AbstractBlock {
 			throw new InvalidInputException( 'Both startId and endId must be provided' );
 		}
 
-		/** @var RevisionViewQuery */
+		/** @var RevisionViewQuery $query */
 		$query = Container::get( 'query.postsummary.view' );
 		$rows = $query->getUndoDiffResult( $options['startId'], $options['endId'] );
 		if ( !$rows ) {
@@ -415,14 +416,11 @@ class TopicSummaryBlock extends AbstractBlock {
 		return 'topicsummary';
 	}
 
-	/**
-	 * @param \OutputPage $out
-	 */
-	public function setPageTitle( \OutputPage $out ) {
+	public function setPageTitle( OutputPage $out ) {
 		$topic = $this->findTopicTitle();
 		$title = $this->workflow->getOwnerTitle();
 		$convertedTitle = Utils::getConvertedTitle( $title );
-		$out->setPageTitle( $out->msg( 'flow-topic-first-heading', $convertedTitle ) );
+		$out->setPageTitleMsg( $out->msg( 'flow-topic-first-heading', $convertedTitle ) );
 		if ( $this->permissions->isAllowed( $topic, 'view' ) ) {
 			if ( $this->action === 'undo-edit-topic-summary' ) {
 				$key = 'flow-undo-edit-topic-summary';

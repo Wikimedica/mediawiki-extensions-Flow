@@ -4,8 +4,8 @@ namespace Flow\Import;
 
 use Flow\Import\Postprocessor\Postprocessor;
 use Flow\Import\SourceStore\SourceStoreInterface;
-use Title;
-use WikitextContent;
+use MediaWiki\Content\WikitextContent;
+use MediaWiki\Title\Title;
 
 /**
  * Interface between the Converter and an implementation of IImportSource.
@@ -41,7 +41,7 @@ interface IConversionStrategy {
 	 * @return bool True when the conversion is complete and nothing
 	 *  more can be done
 	 */
-	public function isConversionFinished( Title $title, Title $movedFrom = null );
+	public function isConversionFinished( Title $title, ?Title $movedFrom = null );
 
 	/**
 	 * Create an ImportSource implementation for the provided Title.

@@ -5,6 +5,7 @@ namespace Flow\Tests\Collection;
 use Flow\Collection\PostCollection;
 use Flow\Model\PostRevision;
 use Flow\Tests\PostRevisionTestCase;
+use MediaWiki\Tests\User\TempUser\TempUserTestTrait;
 
 /**
  * @covers \Flow\Collection\AbstractCollection
@@ -17,11 +18,15 @@ use Flow\Tests\PostRevisionTestCase;
  * @group Database
  */
 class PostCollectionTest extends PostRevisionTestCase {
-	/** @inheritDoc */
-	protected $tablesUsed = [ 'flow_revision', 'flow_tree_revision' ];
+
+	use TempUserTestTrait;
 
 	protected function setUp(): void {
 		parent::setUp();
+
+		// These tests would require some rewriting to use a named user. Instead, disable temp
+		// accounts when running them.
+		$this->disableAutoCreateTempUser();
 
 		// recent changes isn't fully setup here, just skip it
 		$this->clearExtraLifecycleHandlers();
@@ -138,6 +143,6 @@ class PostCollectionTest extends PostRevisionTestCase {
 
 		$revisions = $collection->getAllRevisions();
 
-		$this->assertCount( count( $this->revisions ), $revisions );
+		$this->assertSameSize( $this->revisions, $revisions );
 	}
 }

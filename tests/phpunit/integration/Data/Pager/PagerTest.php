@@ -9,6 +9,7 @@ use Flow\Data\Pager\Pager;
 use Flow\Data\Pager\PagerPage;
 use Flow\Model\TopicListEntry;
 use Flow\Model\UUID;
+use PHPUnit\Framework\MockObject\MockObject;
 
 /**
  * @covers \Flow\Data\Pager\Pager
@@ -372,7 +373,7 @@ class PagerTest extends \MediaWikiIntegrationTestCase {
 	/**
 	 * @param array[] $found
 	 *
-	 * @return ObjectManager
+	 * @return ObjectManager&MockObject
 	 */
 	private function mockObjectManager( array $found = [] ) {
 		$index = $this->createMock( Index::class );
@@ -388,39 +389,37 @@ class PagerTest extends \MediaWikiIntegrationTestCase {
 
 		if ( $found ) {
 			$om->method( 'find' )
-				->will( $this->onConsecutiveCalls(
+				->willReturnOnConsecutiveCalls(
 					...array_map( [ $this, 'returnValue' ], $found )
-				) );
+				);
 		}
 
 		return $om;
 	}
 
-	public function provideDataMakePagingLink() {
+	public static function provideDataMakePagingLink() {
 		return [
 			[
-				$this->mockStorage(
+				[
 					[
-						$this->createMock( TopicListEntry::class ),
-						$this->createMock( TopicListEntry::class ),
-						$this->createMock( TopicListEntry::class )
+						TopicListEntry::class,
+						TopicListEntry::class,
+						TopicListEntry::class,
 					],
-					UUID::create(),
 					[ 'topic_id' ]
-				),
+				],
 				[ 'topic_list_id' => '123456' ],
 				[ 'pager-limit' => 2, 'order' => 'desc', 'sort' => 'topic_id' ],
 				'offset-id'
 			],
 			[
-				$this->mockStorage(
+				[
 					[
-						$this->createMock( TopicListEntry::class ),
-						$this->createMock( TopicListEntry::class )
+						TopicListEntry::class,
+						TopicListEntry::class
 					],
-					UUID::create(),
 					[ 'workflow_last_update_timestamp' ]
-				),
+				],
 				[ 'topic_list_id' => '123456' ],
 				[ 'pager-limit' => 1, 'order' => 'desc', 'sort' => 'workflow_last_update_timestamp', 'sortby' => 'updated' ],
 				'offset'
@@ -431,7 +430,17 @@ class PagerTest extends \MediaWikiIntegrationTestCase {
 	/**
 	 * @dataProvider provideDataMakePagingLink
 	 */
-	public function testMakePagingLink( ObjectManager $storage, array $query, array $options, $offsetKey ) {
+	public function testMakePagingLink( array $storageSpec, array $query, array $options, $offsetKey ) {
+		$storageFindList = [];
+		foreach ( $storageSpec[0] as $spec ) {
+			$storageFindList[] = $this->createMock( $spec );
+		}
+		$storage = $this->mockStorage(
+			$storageFindList,
+			UUID::create(),
+			$storageSpec[1]
+		);
+
 		$pager = new Pager( $storage, $query, $options );
 		$page = $pager->getPage();
 		$pagingOption = $page->getPagingLinksOptions();

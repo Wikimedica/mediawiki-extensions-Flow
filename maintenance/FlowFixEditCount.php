@@ -5,11 +5,10 @@ namespace Flow\Maintenance;
 use Flow\Container;
 use Flow\FlowActions;
 use Flow\Model\UUID;
-use LoggedUpdateMaintenance;
-use MediaWiki\MediaWikiServices;
-use User;
-use WikiMap;
-use Wikimedia\Rdbms\IDatabase;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
+use MediaWiki\User\User;
+use MediaWiki\WikiMap\WikiMap;
+use Wikimedia\Rdbms\IReadableDatabase;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -49,7 +48,7 @@ class FlowFixEditCount extends LoggedUpdateMaintenance {
 	}
 
 	protected function doDBUpdates() {
-		/** @var IDatabase $dbr */
+		/** @var IReadableDatabase $dbr */
 		$dbr = Container::get( 'db.factory' )->getDB( DB_REPLICA );
 		$countableActions = $this->getCountableActions();
 
@@ -57,13 +56,11 @@ class FlowFixEditCount extends LoggedUpdateMaintenance {
 		$continue = UUID::getComparisonUUID( $this->getOption( 'start', '20130710230511' ) );
 		$stop = UUID::getComparisonUUID( $this->getOption( 'stop', time() ) );
 
-		$lbFactory = MediaWikiServices::getInstance()->getDBLoadBalancerFactory();
-
 		while ( $continue !== false ) {
 			$continue = $this->refreshBatch( $dbr, $continue, $countableActions, $stop );
 
 			// wait for core (we're updating user table) replicas to catch up
-			$lbFactory->waitForReplication();
+			$this->waitForReplication();
 		}
 
 		$this->output( "Done increasing edit counts. Increased:\n" );
@@ -75,30 +72,28 @@ class FlowFixEditCount extends LoggedUpdateMaintenance {
 		return true;
 	}
 
-	public function refreshBatch( IDatabase $dbr, UUID $continue, array $countableActions, UUID $stop ) {
-		$rows = $dbr->select(
-			'flow_revision',
-			[ 'rev_id', 'rev_user_id' ],
-			[
-				'rev_id > ' . $dbr->addQuotes( $continue->getBinary() ),
-				'rev_id <= ' . $dbr->addQuotes( $stop->getBinary() ),
-				'rev_user_id > 0',
+	public function refreshBatch( IReadableDatabase $dbr, UUID $continue, array $countableActions, UUID $stop ) {
+		$rows = $dbr->newSelectQueryBuilder()
+			->select( [ 'rev_id', 'rev_user_id' ] )
+			->from( 'flow_revision' )
+			->where( [
+				$dbr->expr( 'rev_id', '>', $continue->getBinary() ),
+				$dbr->expr( 'rev_id', '<=', $stop->getBinary() ),
+				$dbr->expr( 'rev_user_id', '>', 0 ),
 				'rev_user_wiki' => WikiMap::getCurrentWikiId(),
 				'rev_change_type' => $countableActions,
-			],
-			__METHOD__,
-			[
-				'ORDER BY' => 'rev_id ASC',
-				'LIMIT' => $this->getBatchSize(),
-			]
-		);
+			] )
+			->orderBy( 'rev_id' )
+			->limit( $this->getBatchSize() )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 
 		// end of data
-		if ( !$rows || $rows->numRows() === 0 ) {
+		if ( $rows->numRows() === 0 ) {
 			return false;
 		}
 
-		$userEditTracker = MediaWikiServices::getInstance()->getUserEditTracker();
+		$userEditTracker = $this->getServiceContainer()->getUserEditTracker();
 		foreach ( $rows as $row ) {
 			// UserEditTracker::incrementUserEditCount only allows for edit count to be
 			// increased 1 at a time. It'd be better to immediately be able to increase

@@ -9,13 +9,16 @@ use ExternalStore;
 use Flow\Container;
 use Flow\DbFactory;
 use Flow\Model\UUID;
-use Maintenance;
+use MediaWiki\Maintenance\Maintenance;
 use MediaWiki\MediaWikiServices;
-use MWException;
+use MediaWiki\WikiMap\WikiMap;
 use RowUpdateGenerator;
+use RuntimeException;
 use stdClass;
-use WikiMap;
 use Wikimedia\Rdbms\IDatabase;
+use Wikimedia\Rdbms\IExpression;
+use Wikimedia\Rdbms\IReadableDatabase;
+use Wikimedia\Rdbms\LikeValue;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -30,14 +33,14 @@ require_once "$IP/maintenance/Maintenance.php";
 abstract class ExternalStoreMoveCluster extends Maintenance {
 	/**
 	 * Must return an array in the form:
-	 * array(
-	 * 	'dbr' => IDatabase object,
+	 * [
+	 * 	'dbr' => IReadableDatabase object,
 	 * 	'dbw' => IDatabase object,
 	 * 	'table' => 'flow_revision',
 	 * 	'pk' => 'rev_id',
 	 * 	'content' => 'rev_content',
 	 * 	'flags' => 'rev_flags',
-	 * )
+	 * ]
 	 *
 	 * It will roughly translate into these queries, where PK is the
 	 * unique key to control batching & updates, content & flags are
@@ -55,7 +58,7 @@ abstract class ExternalStoreMoveCluster extends Maintenance {
 	 * SET <content> = ..., <flags> = ...
 	 * WHERE <pk> = ...;
 	 *
-	 * @return array
+	 * @return array{dbr:IReadableDatabase,dbw:IDatabase,table:string,pk:string,content:string,flags:string,wiki:string}
 	 */
 	abstract protected function schema();
 
@@ -83,7 +86,7 @@ abstract class ExternalStoreMoveCluster extends Maintenance {
 		$to = explode( ',', $this->getOption( 'to' ) );
 
 		$schema = $this->schema();
-		/** @var IDatabase $dbr */
+		/** @var IReadableDatabase $dbr */
 		$dbr = $schema['dbr'];
 		/** @var IDatabase $dbw */
 		$dbw = $schema['dbw'];
@@ -93,12 +96,13 @@ abstract class ExternalStoreMoveCluster extends Maintenance {
 
 		$clusterConditions = [];
 		foreach ( $from as $cluster ) {
-			$clusterConditions[] = $schema['content'] . $dbr->buildLike( "DB://$cluster/", $dbr->anyString() );
+			$clusterConditions[] = $dbr->expr( $schema['content'], IExpression::LIKE,
+				new LikeValue( "DB://$cluster/", $dbr->anyString() ) );
 		}
 		$iterator->addConditions( [
 			$schema['wiki'] => WikiMap::getCurrentWikiId(),
-			$schema['flags'] . $dbr->buildLike( $dbr->anyString(), 'external', $dbr->anyString() ),
-			$dbr->makeList( $clusterConditions, LIST_OR ),
+			$dbr->expr( $schema['flags'], IExpression::LIKE, new LikeValue( $dbr->anyString(), 'external', $dbr->anyString() ) ),
+			$dbr->orExpr( $clusterConditions ),
 		] );
 
 		$iterator->setCaller( __METHOD__ );
@@ -163,7 +167,7 @@ abstract class ExternalStoreMoveCluster extends Maintenance {
 	 * a Closure.
 	 *
 	 * @param string $out
-	 * @param mixed|null $channel
+	 * @param string|null $channel
 	 */
 	public function output( $out, $channel = null ) {
 		parent::output( $out, $channel );
@@ -235,12 +239,11 @@ class ExternalStoreUpdateGenerator implements RowUpdateGenerator {
 	 * @param string $url
 	 * @param array $flags
 	 * @return string
-	 * @throws MWException
 	 */
 	public function read( $url, array $flags = [] ) {
 		$content = ExternalStore::fetchFromURL( $url );
 		if ( $content === false ) {
-			throw new MWException( "Failed to fetch content from URL: $url" );
+			throw new RuntimeException( "Failed to fetch content from URL: $url" );
 		}
 
 		$content = MediaWikiServices::getInstance()
@@ -248,7 +251,7 @@ class ExternalStoreUpdateGenerator implements RowUpdateGenerator {
 			->newSqlBlobStore()
 			->decompressData( $content, $flags );
 		if ( $content === false ) {
-			throw new MWException( "Failed to decompress content from URL: $url" );
+			throw new RuntimeException( "Failed to decompress content from URL: $url" );
 		}
 
 		return $content;
@@ -257,8 +260,7 @@ class ExternalStoreUpdateGenerator implements RowUpdateGenerator {
 	/**
 	 * @param string $content
 	 * @param array $flags
-	 * @return array New ExternalStore data in the form of ['content' => ..., 'flags' => array( ... )]
-	 * @throws MWException
+	 * @return array New ExternalStore data in the form of ['content' => ..., 'flags' => [ ... ]]
 	 */
 	protected function write( $content, array $flags = [] ) {
 		// external, utf-8 & gzip flags are no longer valid at this point
@@ -286,7 +288,7 @@ class ExternalStoreUpdateGenerator implements RowUpdateGenerator {
 		}
 		$url = ExternalStore::insertWithFallback( $stores, $content );
 		if ( $url === false ) {
-			throw new MWException( 'Failed to write content to stores ' . json_encode( $stores ) );
+			throw new RuntimeException( 'Failed to write content to stores ' . json_encode( $stores ) );
 		}
 
 		// add flag indicating content is external again, and restore unrelated flags

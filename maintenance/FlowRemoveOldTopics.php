@@ -4,18 +4,18 @@ namespace Flow\Maintenance;
 
 use Flow\Container;
 use Flow\Data\ManagerGroup;
-use Flow\Data\Utils\RawSql;
 use Flow\DbFactory;
 use Flow\Exception\FlowException;
-use Flow\Hooks;
 use Flow\Model\AbstractRevision;
 use Flow\Model\Header;
 use Flow\Model\PostRevision;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
+use Flow\OccupationController;
 use Flow\Repository\TreeRepository;
-use Maintenance;
-use WikiMap;
+use MediaWiki\Maintenance\Maintenance;
+use MediaWiki\MediaWikiServices;
+use MediaWiki\WikiMap\WikiMap;
 use Wikimedia\Rdbms\DBUnexpectedError;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
@@ -96,8 +96,8 @@ class FlowRemoveOldTopics extends Maintenance {
 				[
 					'rev_user_wiki' => WikiMap::getCurrentWikiId(),
 					'rev_type' => 'header',
-					new RawSql( 'rev_id > ' . $dbr->addQuotes( $startId->getBinary() ) ),
-					new RawSql( 'rev_id < ' . $dbr->addQuotes( $endId->getBinary() ) ),
+					$dbr->expr( 'rev_id', '>', $startId->getBinary() ),
+					$dbr->expr( 'rev_id', '<', $endId->getBinary() ),
 					// only fetch original post at this point: we still need to
 					// narrow down the results
 					'rev_parent_id' => null,
@@ -109,7 +109,7 @@ class FlowRemoveOldTopics extends Maintenance {
 				]
 			);
 
-			if ( empty( $revisions ) ) {
+			if ( !$revisions ) {
 				break;
 			}
 
@@ -130,7 +130,7 @@ class FlowRemoveOldTopics extends Maintenance {
 				$conds[] = [
 					'rev_user_wiki' => WikiMap::getCurrentWikiId(),
 					'rev_type' => 'header',
-					new RawSql( 'rev_id >= ' . $dbr->addQuotes( $endId->getBinary() ) ),
+					$dbr->expr( 'rev_id', '>=', $endId->getBinary() ),
 					'rev_type_id' => $revision->getCollectionId()->getBinary(),
 				];
 			}
@@ -148,7 +148,7 @@ class FlowRemoveOldTopics extends Maintenance {
 
 			// by now, there may be nothing left to remove, so move on to the
 			// next batch...
-			if ( empty( $uuids ) ) {
+			if ( !$uuids ) {
 				continue;
 			}
 
@@ -178,7 +178,7 @@ class FlowRemoveOldTopics extends Maintenance {
 				$this->dbFactory->getDB( DB_PRIMARY )->commit( __METHOD__ );
 				$this->dbFactory->waitForReplicas();
 			}
-		} while ( !empty( $revisions ) );
+		} while ( $revisions );
 	}
 
 	/**
@@ -195,10 +195,10 @@ class FlowRemoveOldTopics extends Maintenance {
 			$workflows = $this->storage->find(
 				'Workflow',
 				[
-					new RawSql( 'workflow_id > ' . $dbr->addQuotes( $startId->getBinary() ) ),
+					$dbr->expr( 'workflow_id', '>', $startId->getBinary() ),
 					'workflow_wiki' => WikiMap::getCurrentWikiId(),
 					'workflow_type' => 'topic',
-					new RawSql( 'workflow_last_update_timestamp < ' . $dbr->addQuotes( $dbr->timestamp( $timestamp ) ) ),
+					$dbr->expr( 'workflow_last_update_timestamp', '<', $dbr->timestamp( $timestamp ) ),
 				],
 				[
 					'limit' => $batchSize,
@@ -207,7 +207,7 @@ class FlowRemoveOldTopics extends Maintenance {
 				]
 			);
 
-			if ( empty( $workflows ) ) {
+			if ( !$workflows ) {
 				break;
 			}
 
@@ -218,7 +218,7 @@ class FlowRemoveOldTopics extends Maintenance {
 			$this->output( 'Removing ' . count( $workflows ) .
 				' topic workflows (up to ' . $startId->getTimestamp() . ")\n" );
 			$this->removeWorkflows( $workflows );
-		} while ( !empty( $workflows ) );
+		} while ( $workflows );
 	}
 
 	/**
@@ -229,7 +229,9 @@ class FlowRemoveOldTopics extends Maintenance {
 	protected function removeTopicsWithFlowUpdates( $timestamp ) {
 		$dbr = $this->dbFactory->getDB( DB_REPLICA );
 		$batchSize = $this->getBatchSize();
-		$talkpageManager = Hooks::getOccupationController()->getTalkpageManager();
+		/** @var OccupationController $occupationController */
+		$occupationController = MediaWikiServices::getInstance()->getService( 'FlowTalkpageManager' );
+		$talkpageManager = $occupationController->getTalkpageManager();
 
 		// start from around unix epoch - there can be no Flow data before that
 		$batchStartId = UUID::getComparisonUUID( '1' );
@@ -238,36 +240,32 @@ class FlowRemoveOldTopics extends Maintenance {
 		$cutoffStartId = UUID::getComparisonUUID( $timestamp );
 
 		do {
-			$workflowIds = $dbr->selectFieldValues(
-				[ 'flow_workflow', 'flow_tree_node', 'flow_revision' ],
-				'workflow_id',
-				[
+			$workflowIds = $dbr->newSelectQueryBuilder()
+				->select( 'workflow_id' )
+				->from( 'flow_workflow' )
+				->join( 'flow_tree_node', null, 'tree_ancestor_id = workflow_id' )
+				->join( 'flow_revision', null, 'rev_type_id = tree_descendant_id' )
+				->where( [
 					// revisions more recent than cutoff time
-					'rev_id > ' . $dbr->addQuotes( $cutoffStartId->getBinary() ),
+					$dbr->expr( 'rev_id', '>', $cutoffStartId->getBinary() ),
 					// workflow_id condition is only used to batch, the exact
 					// $batchStartId otherwise doesn't matter (unlike rev_id)
-					'workflow_id > ' . $dbr->addQuotes( $batchStartId->getBinary() ),
+					$dbr->expr( 'workflow_id', '>', $batchStartId->getBinary() ),
 					'workflow_wiki' => WikiMap::getCurrentWikiId(),
 					'workflow_type' => 'topic',
-					'workflow_last_update_timestamp >= ' . $dbr->addQuotes( $dbr->timestamp( $timestamp ) ),
-				],
-				__METHOD__,
-				[
-					'LIMIT' => $batchSize,
-					'ORDER BY' => 'workflow_id ASC',
-					// we only want to find topics that were only altered by talk
-					// page manager: as long as anyone else edited any post, we're
-					// not interested in it
-					'GROUP BY' => 'workflow_id',
-					'HAVING' => [ 'GROUP_CONCAT(DISTINCT rev_user_id)' => $talkpageManager->getId() ],
-				],
-				[
-					'flow_tree_node' => [ 'INNER JOIN', [ 'tree_ancestor_id = workflow_id' ] ],
-					'flow_revision' => [ 'INNER JOIN', [ 'rev_type_id = tree_descendant_id' ] ],
-				]
-			);
+					$dbr->expr( 'workflow_last_update_timestamp', '>=', $dbr->timestamp( $timestamp ) ),
+				] )
+				->limit( $batchSize )
+				->orderBy( 'workflow_id' )
+				// we only want to find topics that were only altered by talk
+				// page manager: as long as anyone else edited any post, we're
+				// not interested in it
+				->groupBy( 'workflow_id' )
+				->having( 'GROUP_CONCAT(DISTINCT rev_user_id) = ' . $talkpageManager->getId() )
+				->caller( __METHOD__ )
+				->fetchResultSet();
 
-			if ( empty( $workflowIds ) ) {
+			if ( !$workflowIds ) {
 				break;
 			}
 
@@ -280,7 +278,7 @@ class FlowRemoveOldTopics extends Maintenance {
 			$this->output( 'Removing ' . count( $workflows ) . ' topic workflows with recent ' .
 				'Flow updates (up to ' . $batchStartId->getTimestamp() . ")\n" );
 			$this->removeWorkflows( $workflows );
-		} while ( !empty( $workflows ) );
+		} while ( $workflows );
 	}
 
 	/**

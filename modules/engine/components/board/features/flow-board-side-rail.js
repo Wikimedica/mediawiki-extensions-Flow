@@ -6,7 +6,6 @@
 	/**
 	 * Binds handlers for side rail in board header.
 	 *
-	 * @param {jQuery} $container
 	 * @this FlowComponent
 	 * @constructor
 	 */
@@ -31,8 +30,6 @@
 
 	/**
 	 * Sets side rail state based on user preferences.
-	 *
-	 * @param {Event} event
 	 */
 	function FlowBoardComponentSideRailFeatureMixinLoadCallback() {
 		if ( mw.user.options.get( 'flow-side-rail-state' ) === 'collapsed' ) {
@@ -48,12 +45,10 @@
 
 	/**
 	 * Toggles side rail state and sets user preferences.
-	 *
-	 * @param {Event} event
 	 */
 	function FlowBoardComponentSideRailFeatureMixinToggleCallback() {
 		// eslint-disable-next-line no-jquery/no-global-selector, no-jquery/no-class-state
-		var boardIsExpanded = $( '.flow-component' ).toggleClass( 'expanded' ).hasClass( 'expanded' ),
+		const boardIsExpanded = $( '.flow-component' ).toggleClass( 'expanded' ).hasClass( 'expanded' ),
 			sideRailState = boardIsExpanded ? 'collapsed' : 'expanded';
 
 		if ( !mw.user.isAnon() ) {

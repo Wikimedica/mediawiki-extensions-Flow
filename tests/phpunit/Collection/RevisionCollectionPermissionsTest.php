@@ -8,8 +8,7 @@ use Flow\Model\AbstractRevision;
 use Flow\Model\PostRevision;
 use Flow\RevisionActionPermissions;
 use Flow\Tests\PostRevisionTestCase;
-use MediaWiki\Block\DatabaseBlock;
-use User;
+use MediaWiki\User\User;
 
 /**
  * @covers \Flow\Model\AbstractRevision
@@ -65,11 +64,6 @@ class RevisionCollectionPermissionsTest extends PostRevisionTestCase {
 	 */
 	private $suppressUser;
 
-	/**
-	 * @var DatabaseBlock
-	 */
-	private $block;
-
 	protected function setUp(): void {
 		parent::setUp();
 
@@ -81,21 +75,21 @@ class RevisionCollectionPermissionsTest extends PostRevisionTestCase {
 
 		// When external store is used, data is written to "blobs" table, which
 		// by default doesn't exist - let's just not use externalstorage in test
-		$this->setMwGlobals( 'wgFlowExternalStore', false );
+		$this->overrideConfigValue( 'FlowExternalStore', false );
 
 		// load actions object
 		$this->actions = Container::get( 'flow_actions' );
 
 		// block a user
 		$blockedUser = $this->blockedUser();
-		$this->block = new DatabaseBlock( [
-			'address' => $blockedUser->getName(),
-			'by' => $this->getTestSysop()->getUser(),
-			'user' => $blockedUser->getId()
-		] );
-		$this->block->insert();
+		$this->getServiceContainer()->getDatabaseBlockStore()
+			->insertBlockWithParams( [
+				'targetUser' => $blockedUser,
+				'by' => $this->getTestSysop()->getUser(),
+				'user' => $blockedUser->getId()
+			] );
 		// ensure that block made it into the database
-		wfGetDB( DB_PRIMARY )->commit( __METHOD__, 'flush' );
+		$this->getDb()->commit( __METHOD__, 'flush' );
 	}
 
 	/**
@@ -108,7 +102,7 @@ class RevisionCollectionPermissionsTest extends PostRevisionTestCase {
 	 *
 	 * @return array
 	 */
-	public function permissionsProvider() {
+	public static function permissionsProvider() {
 		return [
 			// irregardless of current status, if a user has no permissions for
 			// a specific revision, he can't see it
@@ -271,7 +265,7 @@ class RevisionCollectionPermissionsTest extends PostRevisionTestCase {
 	 * @param array $overrides
 	 * @return PostRevision
 	 */
-	public function generateRevision( $action, AbstractRevision $parent = null, array $overrides = [] ) {
+	public function generateRevision( $action, ?AbstractRevision $parent = null, array $overrides = [] ) {
 		$overrides['rev_change_type'] = $action;
 
 		if ( $parent ) {

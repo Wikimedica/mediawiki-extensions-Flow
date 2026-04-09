@@ -4,8 +4,10 @@ namespace Flow\Tests;
 
 use Flow\Model\UUID;
 use Flow\WatchedTopicItems;
-use User;
-use Wikimedia\Rdbms\IDatabase;
+use MediaWiki\User\User;
+use Wikimedia\Rdbms\FakeResultWrapper;
+use Wikimedia\Rdbms\IReadableDatabase;
+use Wikimedia\Rdbms\SelectQueryBuilder;
 
 /**
  * @covers \Flow\WatchedTopicItems
@@ -14,7 +16,7 @@ use Wikimedia\Rdbms\IDatabase;
  */
 class WatchedTopicItemsTest extends FlowTestCase {
 
-	public function provideDataGetWatchStatus() {
+	public static function provideDataGetWatchStatus() {
 		// number of test cases
 		$testCount = 10;
 		$tests = [];
@@ -48,8 +50,7 @@ class WatchedTopicItemsTest extends FlowTestCase {
 			$uuid = UUID::create()->getAlphadecimal();
 			$dbResult[] = (object)[ 'wl_title' => $uuid ];
 		}
-		$dbResult = new \ArrayObject( $dbResult );
-		$tests[] = [ $uuids, $dbResult->getIterator(), $result ];
+		$tests[] = [ $uuids, $dbResult, $result ];
 		return $tests;
 	}
 
@@ -60,7 +61,7 @@ class WatchedTopicItemsTest extends FlowTestCase {
 		// give it a fake user id
 		$watchedTopicItems = new WatchedTopicItems( User::newFromId( 1 ), $this->mockDb( $dbResult ) );
 		$res = $watchedTopicItems->getWatchStatus( $uuids );
-		$this->assertCount( count( $res ), $result );
+		$this->assertSameSize( $res, $result );
 		foreach ( $res as $key => $value ) {
 			$this->assertArrayHasKey( $key, $result );
 			$this->assertEquals( $value, $result[$key] );
@@ -74,9 +75,13 @@ class WatchedTopicItemsTest extends FlowTestCase {
 	}
 
 	protected function mockDb( $dbResult ) {
-		$db = $this->createMock( IDatabase::class );
-		$db->method( 'select' )
-			->willReturn( $dbResult );
+		$queryBuilder = $this->createMock( SelectQueryBuilder::class );
+		$queryBuilder->method( $this->logicalOr( 'select', 'from', 'where', 'caller' ) )->willReturnSelf();
+		$queryBuilder->method( 'fetchResultSet' )
+			->willReturn( new FakeResultWrapper( $dbResult ) );
+		$db = $this->createMock( IReadableDatabase::class );
+		$db->method( 'newSelectQueryBuilder' )
+			->willReturn( $queryBuilder );
 		return $db;
 	}
 }

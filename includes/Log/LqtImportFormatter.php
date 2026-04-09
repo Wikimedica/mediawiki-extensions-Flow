@@ -2,10 +2,11 @@
 
 namespace Flow\Log;
 
-use Message;
-use Title;
+use MediaWiki\Logging\LogFormatter;
+use MediaWiki\Message\Message;
+use MediaWiki\Title\Title;
 
-class LqtImportFormatter extends \LogFormatter {
+class LqtImportFormatter extends LogFormatter {
 
 	public function getPreloadTitles() {
 		$titles = [ $this->entry->getTarget() ];

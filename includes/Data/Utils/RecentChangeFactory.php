@@ -2,7 +2,7 @@
 
 namespace Flow\Data\Utils;
 
-use RecentChange;
+use MediaWiki\RecentChanges\RecentChange;
 use stdClass;
 
 /**
@@ -10,10 +10,7 @@ use stdClass;
  * can be swapped out during tests
  */
 class RecentChangeFactory {
-	/**
-	 * @param stdClass $obj
-	 * @return RecentChange
-	 */
+
 	public function newFromRow( stdClass $obj ): RecentChange {
 		$rc = RecentChange::newFromRow( $obj );
 		// status key is always "changed" for now.

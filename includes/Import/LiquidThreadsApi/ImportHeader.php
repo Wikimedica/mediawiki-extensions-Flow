@@ -5,8 +5,8 @@ namespace Flow\Import\LiquidThreadsApi;
 use ArrayIterator;
 use Flow\Import\IImportHeader;
 use Flow\Import\IObjectRevision;
-use MWTimestamp;
-use Title;
+use MediaWiki\Title\Title;
+use MediaWiki\Utils\MWTimestamp;
 
 class ImportHeader extends PageRevisionedObject implements IImportHeader {
 	/** @var ApiBackend */
@@ -63,8 +63,7 @@ class ImportHeader extends PageRevisionedObject implements IImportHeader {
 		// nowiki, etc.  It also ignores case and spaces in places where it doesn't
 		// matter.
 		$newWikitext = ConversionStrategy::removeLqtMagicWord( $wikitextForLastRevision );
-		$templateName = wfMessage( 'flow-importer-lqt-converted-template' )->inContentLanguage(
-		)->plain();
+		$templateName = wfMessage( 'flow-importer-lqt-converted-template' )->inContentLanguage()->plain();
 		$arguments = implode(
 			'|',
 			[

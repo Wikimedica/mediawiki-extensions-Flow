@@ -2,14 +2,14 @@
 
 namespace Flow\Import\LiquidThreadsApi;
 
-use ApiErrorFormatter;
-use ApiMain;
-use ApiMessage;
-use ApiUsageException;
 use Exception;
-use FauxRequest;
-use RequestContext;
-use User;
+use MediaWiki\Api\ApiErrorFormatter;
+use MediaWiki\Api\ApiMain;
+use MediaWiki\Api\ApiMessage;
+use MediaWiki\Api\ApiUsageException;
+use MediaWiki\Context\RequestContext;
+use MediaWiki\Request\FauxRequest;
+use MediaWiki\User\User;
 
 class LocalApiBackend extends ApiBackend {
 	/**
@@ -17,7 +17,7 @@ class LocalApiBackend extends ApiBackend {
 	 */
 	protected $user;
 
-	public function __construct( User $user = null ) {
+	public function __construct( ?User $user = null ) {
 		parent::__construct();
 		$this->user = $user;
 	}

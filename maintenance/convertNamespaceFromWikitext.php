@@ -3,14 +3,14 @@
 namespace Flow\Maintenance;
 
 use Flow\Container;
-use Flow\Hooks;
 use Flow\Import\Converter;
 use Flow\Import\SourceStore\NullImportSourceStore;
 use Flow\Import\Wikitext\ConversionStrategy;
+use Flow\OccupationController;
 use Flow\Utils\NamespaceIterator;
-use Maintenance;
+use MediaWiki\Maintenance\Maintenance;
 use MediaWiki\MediaWikiServices;
-use Title;
+use MediaWiki\Title\Title;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -56,7 +56,7 @@ class ConvertNamespaceFromWikitext extends Maintenance {
 			return;
 		}
 		$namespaceName = $wgLang->getNsText( $namespace );
-		if ( !MediaWikiServices::getInstance()->getNamespaceInfo()->hasSubpages( $namespace ) ) {
+		if ( !$this->getServiceContainer()->getNamespaceInfo()->hasSubpages( $namespace ) ) {
 			$this->error( "Subpages are not enabled in the $namespaceName namespace." );
 			$this->error( "In order to convert this namespace to Flow, you must enable subpages using:" );
 			$this->error( "\$wgNamespacesWithSubpages[$namespace] = true;" );
@@ -65,7 +65,7 @@ class ConvertNamespaceFromWikitext extends Maintenance {
 
 		$noConvertTemplates = explode( ',', $this->getOption( 'no-convert-templates', '' ) );
 		if ( $noConvertTemplates === [ '' ] ) {
-			// explode( ',', '' ) returns array( '' )
+			// explode( ',', '' ) returns [ '' ]
 			$noConvertTemplates = [];
 		}
 		// Convert to Title objects
@@ -81,8 +81,10 @@ class ConvertNamespaceFromWikitext extends Maintenance {
 		// @todo send to prod logger?
 		$logger = new MaintenanceDebugLogger( $this );
 
-		$dbw = wfGetDB( DB_PRIMARY );
-		$talkpageManager = Hooks::getOccupationController()->getTalkpageManager();
+		$dbw = $this->getPrimaryDB();
+		/** @var OccupationController $occupationController */
+		$occupationController = MediaWikiServices::getInstance()->getService( 'FlowTalkpageManager' );
+		$talkpageManager = $occupationController->getTalkpageManager();
 		$converter = new Converter(
 			$dbw,
 			Container::get( 'importer' ),
@@ -90,7 +92,7 @@ class ConvertNamespaceFromWikitext extends Maintenance {
 			$talkpageManager,
 
 			new ConversionStrategy(
-				MediaWikiServices::getInstance()->getParser(),
+				$this->getServiceContainer()->getParser(),
 				new NullImportSourceStore(),
 				$logger,
 				$talkpageManager,

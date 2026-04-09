@@ -6,7 +6,8 @@ use DOMElement;
 use DOMNode;
 use Flow\Conversion\Utils;
 use Flow\Parsoid\Fixer;
-use Title;
+use MediaWiki\Title\Title;
+use RuntimeException;
 
 /**
  * Parsoid ignores bad_image_list. With good reason: bad images should only be
@@ -21,7 +22,6 @@ use Title;
  *	// Before outputting content
  *	$content = $badImageRemover->apply( $foo->getContent(), $title );
  */
-
 class BadImageRemover implements Fixer {
 	/**
 	 * @var callable
@@ -56,7 +56,6 @@ class BadImageRemover implements Fixer {
 	 *
 	 * @param DOMNode $node
 	 * @param Title $title
-	 * @throws \MWException
 	 */
 	public function apply( DOMNode $node, Title $title ) {
 		if ( !$node instanceof DOMElement ) {
@@ -90,7 +89,7 @@ class BadImageRemover implements Fixer {
 			$nodeToRemove = $nodeToRemove->parentNode;
 		}
 		if ( !$nodeToRemove ) {
-			throw new \MWException( 'Did not find parent mw:File to remove' );
+			throw new RuntimeException( 'Did not find parent mw:File to remove' );
 		}
 		$nodeToRemove->parentNode->removeChild( $nodeToRemove );
 	}

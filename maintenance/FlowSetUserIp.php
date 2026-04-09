@@ -4,7 +4,7 @@ namespace Flow\Maintenance;
 
 use Flow\Container;
 use Flow\DbFactory;
-use LoggedUpdateMaintenance;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
 use Wikimedia\Rdbms\IDatabase;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
@@ -77,28 +77,29 @@ class FlowSetUserIp extends LoggedUpdateMaintenance {
 	 * @return int|null Start id for the next batch
 	 */
 	public function updateWorkflow( IDatabase $dbw, $continue = null ) {
-		$rows = $dbw->select(
-			/* table */'flow_workflow',
-			/* select */[ 'workflow_id', 'workflow_user_text' ],
-			/* conds */[
-				'workflow_id > ' . $dbw->addQuotes( $continue ),
-				'workflow_user_ip IS NULL',
-				'workflow_user_id = 0'
-			],
-			__METHOD__,
-			/* options */[ 'LIMIT' => $this->getBatchSize(), 'ORDER BY' => 'workflow_id' ]
-		);
+		$rows = $dbw->newSelectQueryBuilder()
+			->select( [ 'workflow_id', 'workflow_user_text' ] )
+			->from( 'flow_workflow' )
+			->where( [
+				$dbw->expr( 'workflow_id', '>', $continue ),
+				'workflow_user_ip' => null,
+				'workflow_user_id' => 0,
+			] )
+			->limit( $this->getBatchSize() )
+			->orderBy( 'workflow_id' )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 
 		$continue = null;
 
 		foreach ( $rows as $row ) {
 			$continue = $row->workflow_id;
-			$dbw->update(
-				/* table */'flow_workflow',
-				/* update */[ 'workflow_user_ip' => $row->workflow_user_text ],
-				/* conditions */[ 'workflow_id' => $row->workflow_id ],
-				__METHOD__
-			);
+			$dbw->newUpdateQueryBuilder()
+				->update( 'flow_workflow' )
+				->set( [ 'workflow_user_ip' => $row->workflow_user_text ] )
+				->where( [ 'workflow_id' => $row->workflow_id ] )
+				->caller( __METHOD__ )
+				->execute();
 
 			$this->completeCount++;
 		}
@@ -107,27 +108,28 @@ class FlowSetUserIp extends LoggedUpdateMaintenance {
 	}
 
 	public function updateTreeRevision( IDatabase $dbw, $continue = null ) {
-		$rows = $dbw->select(
-			/* table */'flow_tree_revision',
-			/* select */[ 'tree_rev_id', 'tree_orig_user_text' ],
-			[
-				'tree_rev_id > ' . $dbw->addQuotes( $continue ),
-				'tree_orig_user_ip IS NULL',
-				'tree_orig_user_id = 0',
-			],
-			__METHOD__,
-			/* options */[ 'LIMIT' => $this->getBatchSize(), 'ORDER BY' => 'tree_rev_id' ]
-		);
+		$rows = $dbw->newSelectQueryBuilder()
+			->select( [ 'tree_rev_id', 'tree_orig_user_text' ] )
+			->from( 'flow_tree_revision' )
+			->where( [
+				$dbw->expr( 'tree_rev_id', '>', $continue ),
+				'tree_orig_user_ip' => null,
+				'tree_orig_user_id' => 0,
+			] )
+			->limit( $this->getBatchSize() )
+			->orderBy( 'tree_rev_id' )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 
 		$continue = null;
 		foreach ( $rows as $row ) {
 			$continue = $row->tree_rev_id;
-			$dbw->update(
-				/* table */'flow_tree_revision',
-				/* update */[ 'tree_orig_user_ip' => $row->tree_orig_user_text ],
-				/* conditions */[ 'tree_rev_id' => $row->tree_rev_id ],
-				__METHOD__
-			);
+			$dbw->newUpdateQueryBuilder()
+				->update( 'flow_tree_revision' )
+				->set( [ 'tree_orig_user_ip' => $row->tree_orig_user_text ] )
+				->where( [ 'tree_rev_id' => $row->tree_rev_id ] )
+				->caller( __METHOD__ )
+				->execute();
 
 			$this->completeCount++;
 		}
@@ -136,24 +138,20 @@ class FlowSetUserIp extends LoggedUpdateMaintenance {
 	}
 
 	public function updateRevision( IDatabase $dbw, $continue = null ) {
-		$rows = $dbw->select(
-			/* table */'flow_revision',
-			/* select */[ 'rev_id', 'rev_user_id', 'rev_user_text', 'rev_mod_user_id',
-				'rev_mod_user_text', 'rev_edit_user_id', 'rev_edit_user_text' ],
-			/* conditions */ [
-				'rev_id > ' . $dbw->addQuotes( $continue ),
-				$dbw->makeList(
-					[
-						'rev_user_id' => 0,
-						'rev_mod_user_id' => 0,
-						'rev_edit_user_id' => 0,
-					],
-					LIST_OR
-				),
-			],
-			__METHOD__,
-			/* options */[ 'LIMIT' => $this->getBatchSize(), 'ORDER BY' => 'rev_id' ]
-		);
+		$rows = $dbw->newSelectQueryBuilder()
+			->select( [ 'rev_id', 'rev_user_id', 'rev_user_text', 'rev_mod_user_id',
+				'rev_mod_user_text', 'rev_edit_user_id', 'rev_edit_user_text' ] )
+			->from( 'flow_revision' )
+			->where( [
+				$dbw->expr( 'rev_id', '>', $continue ),
+				$dbw->expr( 'rev_user_id', '=', 0 )
+					->or( 'rev_mod_user_id', '=', 0 )
+					->or( 'rev_edit_user_id', '=', 0 ),
+			] )
+			->limit( $this->getBatchSize() )
+			->orderBy( 'rev_id' )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 
 		$continue = null;
 		foreach ( $rows as $row ) {
@@ -170,12 +168,12 @@ class FlowSetUserIp extends LoggedUpdateMaintenance {
 				$updates['rev_edit_user_ip'] = $row->rev_edit_user_text;
 			}
 			if ( $updates ) {
-				$dbw->update(
-					/* table */ 'flow_revision',
-					/* update */ $updates,
-					/* conditions */ [ 'rev_id' => $row->rev_id ],
-					__METHOD__
-				);
+				$dbw->newUpdateQueryBuilder()
+					->update( 'flow_revision' )
+					->set( $updates )
+					->where( [ 'rev_id' => $row->rev_id ] )
+					->caller( __METHOD__ )
+					->execute();
 			}
 		}
 

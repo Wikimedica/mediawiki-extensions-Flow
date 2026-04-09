@@ -2,7 +2,6 @@
 
 namespace Flow;
 
-use DeferredUpdates;
 use Flow\Block\AbstractBlock;
 use Flow\Block\Block;
 use Flow\Data\ManagerGroup;
@@ -10,8 +9,9 @@ use Flow\Exception\FailCommitException;
 use Flow\Exception\InvalidActionException;
 use Flow\Exception\InvalidDataException;
 use Flow\Model\Workflow;
-use FormatJson;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Deferred\DeferredUpdates;
+use MediaWiki\Json\FormatJson;
 use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\MediaWikiServices;
 use SplQueue;
@@ -153,9 +153,10 @@ class SubmissionHandler {
 
 		try {
 			$dbw->startAtomic( __METHOD__ );
+			$services = MediaWikiServices::getInstance();
 			// Create the occupation page/revision if needed
 			$occupationController->ensureFlowRevision(
-				MediaWikiServices::getInstance()->getWikiPageFactory()->newFromTitle( $title ),
+				$services->getWikiPageFactory()->newFromTitle( $title ),
 				$workflow
 			);
 			// Create/modify each Flow block as requested
@@ -168,9 +169,10 @@ class SubmissionHandler {
 			while ( !$this->deferredQueue->isEmpty() ) {
 				DeferredUpdates::addCallableUpdate( $this->deferredQueue->dequeue() );
 			}
-			$workflow->getArticleTitle()->purgeSquid();
+			$htmlCache = $services->getHtmlCacheUpdater();
+			$htmlCache->purgeTitleUrls( $workflow->getArticleTitle(), $htmlCache::PURGE_INTENT_TXROUND_REFLECTED );
 
-		return $results;
+			return $results;
 		} finally {
 			while ( !$this->deferredQueue->isEmpty() ) {
 				$this->deferredQueue->dequeue();

@@ -14,8 +14,8 @@ use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\Parsoid\ReferenceExtractor;
 use Flow\Repository\TreeRepository;
+use MediaWiki\WikiMap\WikiMap;
 use SplQueue;
-use WikiMap;
 
 /**
  * Listens for new revisions to be inserted.  Calculates the difference in
@@ -63,10 +63,12 @@ class ReferenceRecorder extends AbstractListener {
 		$this->deferredQueue = $deferredQueue;
 	}
 
+	/** @inheritDoc */
 	public function onAfterLoad( $object, array $old ) {
 		// Nuthin
 	}
 
+	/** @inheritDoc */
 	public function onAfterInsert( $revision, array $new, array $metadata ) {
 		if ( !isset( $metadata['workflow'] ) ) {
 			return;
@@ -78,9 +80,9 @@ class ReferenceRecorder extends AbstractListener {
 		$workflow = $metadata['workflow'];
 
 		if ( $revision instanceof PostRevision && $revision->isTopicTitle() ) {
-			list( $added, $removed ) = $this->calculateChangesFromTopic( $workflow, $revision );
+			[ $added, $removed ] = $this->calculateChangesFromTopic( $workflow, $revision );
 		} else {
-			list( $added, $removed ) = $this->calculateChangesFromExisting( $workflow, $revision );
+			[ $added, $removed ] = $this->calculateChangesFromExisting( $workflow, $revision );
 		}
 
 		$this->storage->multiPut( $added );
@@ -107,7 +109,7 @@ class ReferenceRecorder extends AbstractListener {
 	protected function calculateChangesFromExisting(
 		Workflow $workflow,
 		AbstractRevision $revision,
-		PostRevision $root = null
+		?PostRevision $root = null
 	) {
 		$prevReferences = $this->getExistingReferences(
 			$revision->getRevisionType(),
@@ -153,7 +155,7 @@ class ReferenceRecorder extends AbstractListener {
 		$added = [];
 		$removed = [];
 		foreach ( $revisions as $revision ) {
-			list( $add, $remove ) = $this->calculateChangesFromExisting( $workflow, $revision, $current );
+			[ $add, $remove ] = $this->calculateChangesFromExisting( $workflow, $revision, $current );
 			$added = array_merge( $added, $add );
 			$removed = array_merge( $removed, $remove );
 		}
@@ -213,7 +215,7 @@ class ReferenceRecorder extends AbstractListener {
 	public function getReferencesFromRevisionContent(
 		Workflow $workflow,
 		AbstractRevision $revision,
-		PostRevision $root = null
+		?PostRevision $root = null
 	) {
 		// Locked is the only moderated state we still collect references for.
 		if ( self::isHidden( $revision ) ) {
@@ -233,7 +235,7 @@ class ReferenceRecorder extends AbstractListener {
 				} elseif ( $revision instanceof PostSummary ) {
 					$root = $revision->getCollection()->getPost()->getRoot()->getLastRevision();
 				}
-			} catch ( FlowException $e ) {
+			} catch ( FlowException ) {
 				// Do nothing - we're likely in a unit test where no root can
 				// be resolved because the revision is created on the fly
 			}

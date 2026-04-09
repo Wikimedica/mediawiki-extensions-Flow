@@ -11,19 +11,18 @@
 	 *
 	 * @param {jQuery} $container
 	 * @extends FlowBoardAndHistoryComponentBase
-	 * @mixins FlowComponentEventsMixin
-	 * @mixins FlowComponentEnginesMixin
-	 * @mixins FlowBoardComponentApiEventsMixin
-	 * @mixins FlowBoardComponentInteractiveEventsMixin
-	 * @mixins FlowBoardComponentLoadEventsMixin
-	 * @mixins FlowBoardComponentLoadMoreFeatureMixin
-	 * @mixins FlowBoardComponentVisualEditorFeatureMixin
+	 * @mixes FlowComponentEventsMixin
+	 * @mixes FlowComponentEnginesMixin
+	 * @mixes FlowBoardComponentApiEventsMixin
+	 * @mixes FlowBoardComponentInteractiveEventsMixin
+	 * @mixes FlowBoardComponentLoadEventsMixin
+	 * @mixes FlowBoardComponentLoadMoreFeatureMixin
+	 * @mixes FlowBoardComponentVisualEditorFeatureMixin
 	 *
 	 * @constructor
 	 */
 	function FlowBoardComponent( $container ) {
-		var uri = new mw.Uri( location.href ),
-			anchorUid = String( location.hash.match( /[0-9a-z]{16,19}$/i ) || '' ),
+		let anchorUid = String( location.hash.match( /[0-9a-z]{16,19}$/i ) || '' ),
 			highlightUid;
 
 		// Default API submodule for FlowBoard URLs is to fetch a topiclist
@@ -38,8 +37,8 @@
 		// Handle URL parameters.  If topic_showPostId is used, there should also be an
 		// anchor.
 		if ( anchorUid ) {
-			if ( uri.query.fromnotif ) {
-				highlightUid = uri.query.topic_showPostId;
+			if ( mw.util.getParamValue( 'fromnotif' ) ) {
+				highlightUid = mw.util.getParamValue( 'topic_showPostId' );
 				_flowHighlightPost( $container, highlightUid, 'newer' );
 			} else {
 				highlightUid = anchorUid;
@@ -71,7 +70,7 @@
 	 * @return {boolean|jQuery}
 	 */
 	function flowBoardComponentReinitializeContainer( $container ) {
-		var $retObj, $header, $boardNavigation, $board;
+		let $retObj, $header, $boardNavigation, $board;
 
 		if ( $container === false ) {
 			return false;
@@ -145,7 +144,7 @@
 	 * @return {jQuery}
 	 */
 	function _flowHighlightPost( $container, uid, option ) {
-		var $target = $container.find( '#flow-post-' + uid );
+		const $target = $container.find( '#flow-post-' + uid );
 
 		// reset existing highlights
 		$container.find( '.flow-post-highlighted' ).removeClass( 'flow-post-highlighted' );
@@ -153,8 +152,8 @@
 		if ( option === 'newer' ) {
 			$target.addClass( 'flow-post-highlight-newer' );
 			if ( uid ) {
-				$container.find( '.flow-post' ).each( function ( idx, el ) {
-					var $el = $( el ),
+				$container.find( '.flow-post' ).each( ( idx, el ) => {
+					const $el = $( el ),
 						id = $el.data( 'flow-id' );
 					if ( id && id > uid ) {
 						$el.addClass( 'flow-post-highlight-newer' );
@@ -177,7 +176,7 @@
 	 * want to show our own tooltip instead.
 	 */
 	function _overrideWatchlistNotification() {
-		var _notify = mw.notify;
+		const _notify = mw.notify;
 		mw.notify = function ( $message, options ) {
 			// override message when we've just watched the board
 			// eslint-disable-next-line no-jquery/no-global-selector

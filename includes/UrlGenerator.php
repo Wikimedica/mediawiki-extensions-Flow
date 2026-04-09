@@ -12,10 +12,10 @@ use Flow\Model\Header;
 use Flow\Model\PostRevision;
 use Flow\Model\PostSummary;
 use Flow\Model\UUID;
-use RecentChange;
-use RequestContext;
-use SpecialPage;
-use Title;
+use MediaWiki\Context\RequestContext;
+use MediaWiki\RecentChanges\RecentChange;
+use MediaWiki\SpecialPage\SpecialPage;
+use MediaWiki\Title\Title;
 
 /**
  * Provides url generation capabilities for Flow. Ties together an
@@ -41,7 +41,7 @@ class UrlGenerator {
 	 * @return Title
 	 * @throws FlowException
 	 */
-	protected function resolveTitle( Title $title = null, UUID $workflowId = null ) {
+	protected function resolveTitle( ?Title $title = null, ?UUID $workflowId = null ) {
 		if ( $title !== null ) {
 			return $title;
 		}
@@ -66,7 +66,7 @@ class UrlGenerator {
 	 * @param UUID|null $workflowId
 	 * @return Anchor
 	 */
-	public function newTopicLink( Title $title = null, UUID $workflowId = null ) {
+	public function newTopicLink( ?Title $title = null, ?UUID $workflowId = null ) {
 		return new Anchor(
 			wfMessage( 'flow-topic-action-new' ),
 			$this->resolveTitle( $title, $workflowId ),
@@ -364,7 +364,7 @@ class UrlGenerator {
 		AbstractRevision $revision,
 		?Title $title,
 		UUID $workflowId,
-		UUID $oldRevId = null
+		?UUID $oldRevId = null
 	) {
 		if ( $revision instanceof PostRevision ) {
 			return $this->diffPostLink( $title, $workflowId, $revision->getRevisionId(), $oldRevId );
@@ -394,7 +394,7 @@ class UrlGenerator {
 		?Title $title,
 		UUID $workflowId,
 		UUID $revId,
-		UUID $oldRevId = null
+		?UUID $oldRevId = null
 	) {
 		return new Anchor(
 			wfMessage( 'diff' ),
@@ -425,7 +425,7 @@ class UrlGenerator {
 		?Title $title,
 		UUID $workflowId,
 		UUID $revId,
-		UUID $oldRevId = null
+		?UUID $oldRevId = null
 	) {
 		return new Anchor(
 			wfMessage( 'diff' ),
@@ -456,7 +456,7 @@ class UrlGenerator {
 		?Title $title,
 		UUID $workflowId,
 		UUID $revId,
-		UUID $oldRevId = null
+		?UUID $oldRevId = null
 	) {
 		return new Anchor(
 			wfMessage( 'diff' ),
@@ -863,7 +863,7 @@ class UrlGenerator {
 	 * @param UUID|null $workflowId
 	 * @return Anchor
 	 */
-	public function newTopicAction( Title $title = null, UUID $workflowId = null ) {
+	public function newTopicAction( ?Title $title = null, ?UUID $workflowId = null ) {
 		return new Anchor(
 			wfMessage( 'flow-newtopic-start-placeholder' ),
 			// resolveTitle doesn't accept null uuid

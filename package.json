@@ -4,17 +4,18 @@
 	"private": true,
 	"description": "Build tools for Flow.",
 	"scripts": {
-		"test": "grunt test",
-		"doc": "jsduck"
+		"api-testing": "mocha --timeout 0 --recursive tests/api-testing",
+		"test": "grunt test"
 	},
 	"devDependencies": {
-		"eslint-config-wikimedia": "0.22.1",
-		"grunt": "1.5.3",
-		"grunt-banana-checker": "0.10.0",
+		"api-testing": "1.7.1",
+		"eslint-config-wikimedia": "0.31.0",
+		"grunt": "1.6.1",
+		"grunt-banana-checker": "0.13.0",
 		"grunt-contrib-watch": "1.1.0",
-		"grunt-eslint": "24.0.0",
-		"grunt-stylelint": "0.18.0",
-		"grunt-tyops": "0.1.0",
-		"stylelint-config-wikimedia": "0.13.1"
+		"grunt-eslint": "24.3.0",
+		"grunt-stylelint": "0.20.1",
+		"grunt-tyops": "0.1.1",
+		"stylelint-config-wikimedia": "0.18.0"
 	}
 }

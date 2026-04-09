@@ -2,13 +2,14 @@
 
 namespace Flow\Formatter;
 
-use ChangesList;
 use Flow\Model\Header;
 use Flow\Model\PostRevision;
 use Flow\Model\PostSummary;
 use Flow\Model\UUID;
 use Flow\UrlGenerator;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\RecentChanges\ChangesList;
+use MediaWiki\Utils\MWTimestamp;
 
 class RevisionViewFormatter {
 	/**
@@ -21,16 +22,12 @@ class RevisionViewFormatter {
 	 */
 	protected $serializer;
 
-	/**
-	 * @param UrlGenerator $urlGenerator
-	 * @param RevisionFormatter $serializer
-	 */
 	public function __construct( UrlGenerator $urlGenerator, RevisionFormatter $serializer ) {
 		$this->urlGenerator = $urlGenerator;
 		$this->serializer = $serializer;
 	}
 
-	public function setContentFormat( $format, UUID $revisionId = null ) {
+	public function setContentFormat( $format, ?UUID $revisionId = null ) {
 		$this->serializer->setContentFormat( $format, $revisionId );
 	}
 
@@ -43,7 +40,7 @@ class RevisionViewFormatter {
 		$res = $this->serializer->formatApi( $row, $ctx );
 		$res['rev_view_links'] = $this->buildLinks( $row, $ctx );
 		$res['human_timestamp'] = $ctx->getLanguage()->getHumanTimestamp(
-			new \MWTimestamp( $res['timestamp'] )
+			new MWTimestamp( $res['timestamp'] )
 		);
 		if ( $row->revision instanceof PostRevision ) {
 			$res['properties']['topic-of-post'] = $this->serializer->processParam(

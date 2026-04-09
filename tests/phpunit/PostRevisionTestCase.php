@@ -2,11 +2,11 @@
 
 namespace Flow\Tests;
 
-use DeferredUpdates;
 use Flow\Collection\PostCollection;
 use Flow\Container;
 use Flow\Data\ManagerGroup;
 use Flow\Exception\FlowException;
+use Flow\Hooks;
 use Flow\Model\AbstractRevision;
 use Flow\Model\PostRevision;
 use Flow\Model\TopicListEntry;
@@ -14,10 +14,10 @@ use Flow\Model\UserTuple;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\OccupationController;
-use MediaWiki\MediaWikiServices;
+use MediaWiki\Deferred\DeferredUpdates;
+use MediaWiki\WikiMap\WikiMap;
+use RuntimeException;
 use SplQueue;
-use User;
-use WikiMap;
 use Wikimedia\TestingAccessWrapper;
 
 /**
@@ -25,19 +25,6 @@ use Wikimedia\TestingAccessWrapper;
  * @group Database
  */
 class PostRevisionTestCase extends FlowTestCase {
-	/** @inheritDoc */
-	protected $tablesUsed = [
-		'flow_revision',
-		'flow_topic_list',
-		'flow_tree_node',
-		'flow_tree_revision',
-		'flow_workflow',
-		'page',
-		'revision',
-		'ip_changes',
-		'text',
-	];
-
 	/**
 	 * @var PostRevision[]
 	 */
@@ -50,6 +37,7 @@ class PostRevisionTestCase extends FlowTestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
+		Hooks::resetFlowExtension();
 
 		// Revisions must be blanked here otherwise phpunit run with --repeat will remember
 		// ths revision list between multiple invocations of the test causing issues.
@@ -63,13 +51,8 @@ class PostRevisionTestCase extends FlowTestCase {
 		parent::tearDown();
 
 		foreach ( $this->revisions as $revision ) {
-			try {
-				$workflow = $revision->getCollection()->getWorkflow();
-				$this->getStorage()->multiRemove( [ $revision ], [ 'workflow' => $workflow ] );
-			} catch ( \MWException $e ) {
-				// ignore - lifecyclehandlers may cause issues with tests, where
-				// not all related stuff is loaded
-			}
+			$workflow = $revision->getCollection()->getWorkflow();
+			$this->getStorage()->multiRemove( [ $revision ], [ 'workflow' => $workflow ] );
 		}
 
 		foreach ( $this->workflows as $workflow ) {
@@ -111,7 +94,7 @@ class PostRevisionTestCase extends FlowTestCase {
 		$workflow = $this->generateWorkflow( [ 'workflow_type' => 'topic' ] );
 		$uuidRevision = UUID::create();
 
-		$user = User::newFromName( 'UTSysop' );
+		$user = $this->getTestSysop()->getUser();
 		$tuple = UserTuple::newFromUser( $user );
 
 		return $row + [
@@ -204,10 +187,6 @@ class PostRevisionTestCase extends FlowTestCase {
 
 	/**
 	 * Saves a PostRevision to storage.
-	 * Be sure to add the required tables to $tablesUsed and add @group Database
-	 * to the class' phpDoc.
-	 *
-	 * @param PostRevision $revision
 	 */
 	protected function store( PostRevision $revision ) {
 		if ( $revision->isTopicTitle() ) {
@@ -233,20 +212,25 @@ class PostRevisionTestCase extends FlowTestCase {
 		$found = $this->getStorage()->find( 'TopicListEntry', [ 'topic_id' => $topicWorkflow->getId() ] );
 		if ( !$found ) {
 			$title = $boardWorkflow->getOwnerTitle();
-			$user = User::newFromName( '127.0.0.1', false );
+			$user = $this->getTestUser( [ 'autoconfirmed' ] )->getUser();
 
 			/** @var OccupationController $occupationController */
 			$occupationController = Container::get( 'occupation_controller' );
 			// make sure user has rights to create board
-			$permissionManager = MediaWikiServices::getInstance()->getPermissionManager();
+			$permissionManager = $this->getServiceContainer()->getPermissionManager();
 			$permissionManager->overrideUserRightsForTesting( $user,
 				array_merge( $permissionManager->getUserPermissions( $user ), [ 'flow-create-board' ] )
 			);
 			$occupationController->safeAllowCreation( $title, $user );
-			$occupationController->ensureFlowRevision(
-				MediaWikiServices::getInstance()->getWikiPageFactory()->newFromTitle( $title ),
+			$wikiPage = $this->getServiceContainer()->getWikiPageFactory()->newFromTitle( $title );
+			$ensureStatus = $occupationController->ensureFlowRevision(
+				$wikiPage,
 				$boardWorkflow
 			);
+			if ( !$ensureStatus->isOK() ) {
+				// This should help devs understand what's going on in the CI
+				throw new RuntimeException( $ensureStatus->__toString() );
+			}
 
 			$topicListEntry = TopicListEntry::create( $boardWorkflow, $topicWorkflow );
 
@@ -260,15 +244,11 @@ class PostRevisionTestCase extends FlowTestCase {
 		/** @var SplQueue $deferredQueue */
 		$deferredQueue = Container::get( 'deferred_queue' );
 		while ( !$deferredQueue->isEmpty() ) {
-			try {
-				DeferredUpdates::addCallableUpdate( $deferredQueue->dequeue() );
+			DeferredUpdates::addCallableUpdate( $deferredQueue->dequeue() );
 
-				// doing updates 1 by 1 so an exception doesn't break others in
-				// the queue
-				DeferredUpdates::doUpdates();
-			} catch ( \MWException $e ) {
-				// ignoring exceptions for now, not all are phpunit-proof yet
-			}
+			// doing updates 1 by 1 so an exception doesn't break others in
+			// the queue
+			DeferredUpdates::doUpdates();
 		}
 
 		// save for removal at end of tests

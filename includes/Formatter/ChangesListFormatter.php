@@ -2,15 +2,16 @@
 
 namespace Flow\Formatter;
 
-use ChangesList;
 use Flow\Conversion\Utils;
 use Flow\Data\Listener\RecentChangesListener;
 use Flow\Exception\FlowException;
 use Flow\Exception\PermissionException;
 use Flow\Model\Anchor;
 use Flow\Model\UUID;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\RecentChanges\ChangesList;
+use MediaWiki\RecentChanges\RCCacheEntry;
 
 class ChangesListFormatter extends AbstractFormatter {
 	protected function getHistoryType() {
@@ -92,9 +93,7 @@ class ChangesListFormatter extends AbstractFormatter {
 		$prefix = $ctx->msg( 'autocomment-prefix' )->inContentLanguage()->escaped();
 		$link = MediaWikiServices::getInstance()->getLinkRenderer()->makeLink(
 			$row->workflow->getOwnerTitle(),
-			$ctx->getLanguage()->getArrow( 'backwards' ),
-			[],
-			[]
+			$ctx->getLanguage()->getArrow( 'backwards' )
 		);
 		$summary = '<span class="autocomment">' . $msg->text() . '</span>';
 
@@ -175,7 +174,7 @@ class ChangesListFormatter extends AbstractFormatter {
 	/**
 	 * @param RecentChangesRow $row
 	 * @param IContextSource $ctx
-	 * @param \RCCacheEntry[] $block
+	 * @param RCCacheEntry[] $block
 	 * @param array $links
 	 * @return array|false Links array, or false on failure
 	 * @throws FlowException
@@ -190,9 +189,7 @@ class ChangesListFormatter extends AbstractFormatter {
 		// Find the last (oldest) row in $block that is a Flow row. Note that there can be non-Flow
 		// things in $block (T228290).
 		$flowRows = array_filter( $block, static function ( $blockRow ) {
-			$source = $blockRow->getAttribute( 'rc_source' );
-			return $source === RecentChangesListener::SRC_FLOW ||
-				( $source === null && $blockRow->getAttribute( 'rc_type' ) === RC_FLOW );
+			return $blockRow->getAttribute( 'rc_source' ) === RecentChangesListener::SRC_FLOW;
 		} );
 		$oldestRow = end( $flowRows ) ?? $row->recentChange;
 
@@ -244,7 +241,7 @@ class ChangesListFormatter extends AbstractFormatter {
 	protected function formatFlags( $flags ) {
 		$flagKeys = array_keys( array_filter( $flags ) );
 		if ( $flagKeys ) {
-			$formattedFlags = array_map( 'ChangesList::flag', $flagKeys );
+			$formattedFlags = array_map( [ ChangesList::class, 'flag' ], $flagKeys );
 			return implode( ' ', $formattedFlags ) . ' ';
 		}
 		return '';

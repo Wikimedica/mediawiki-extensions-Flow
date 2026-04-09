@@ -2,9 +2,9 @@
 
 namespace Flow\Api;
 
-use ApiBase;
 use Flow\Conversion\Utils;
 use Flow\Exception\WikitextException;
+use MediaWiki\Api\ApiBase;
 use Wikimedia\ParamValidator\ParamValidator;
 
 class ApiParsoidUtilsFlow extends ApiBase {
@@ -23,7 +23,7 @@ class ApiParsoidUtilsFlow extends ApiBase {
 		} catch ( WikitextException $e ) {
 			$code = $e->getErrorCode();
 			$this->dieWithError( $code, $code,
-				[ 'detail' => $e->getMessage() ], $e->getStatusCode()
+				[ 'detail' => $e->getMessage() ]
 			);
 		}
 

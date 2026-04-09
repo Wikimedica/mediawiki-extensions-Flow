@@ -3,6 +3,7 @@
 namespace Flow\Tests\Api;
 
 use Flow\Model\AbstractRevision;
+use MediaWiki\Api\ApiUsageException;
 
 /**
  * @covers \Flow\Api\ApiFlowBase
@@ -14,22 +15,6 @@ use Flow\Model\AbstractRevision;
  * @group Database
  */
 class ApiFlowModerateTopicTest extends ApiTestCase {
-	/** @inheritDoc */
-	protected $tablesUsed = [
-		'flow_ext_ref',
-		'flow_revision',
-		'flow_topic_list',
-		'flow_tree_node',
-		'flow_tree_revision',
-		'flow_wiki_ref',
-		'flow_workflow',
-		'page',
-		'revision',
-		'ip_changes',
-		'text',
-		'logging',
-	];
-
 	/**
 	 * @group Broken
 	 */
@@ -50,14 +35,12 @@ class ApiFlowModerateTopicTest extends ApiTestCase {
 
 		$revisionId = $data[0]['flow']['moderate-topic']['committed']['topic']['post-revision-id'];
 
-		// need to reset the container and set the current user here
-		$this->setCurrentUser( self::$users['sysop']->getUser() );
 		$data = $this->doApiRequest( [
 			'page' => $topic['topic-page'],
 			'action' => 'flow',
 			'submodule' => 'view-topic',
 			'vtformat' => 'html',
-		] );
+		], null, false, $this->getTestSysop()->getUser() );
 
 		$debug = json_encode( $data );
 		$revision = $data[0]['flow']['view-topic']['result']['topic']['revisions'][$revisionId];
@@ -89,7 +72,7 @@ class ApiFlowModerateTopicTest extends ApiTestCase {
 	}
 
 	/**
-	 * @throws \ApiUsageException
+	 * @throws ApiUsageException
 	 * @group Broken
 	 */
 	public function testModerateLockedTopic() {

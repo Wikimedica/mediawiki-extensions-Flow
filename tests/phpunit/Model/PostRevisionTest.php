@@ -6,8 +6,8 @@ use Flow\Model\PostRevision;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\Tests\PostRevisionTestCase;
-use Title;
-use User;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 /**
  * @covers \Flow\Model\AbstractRevision

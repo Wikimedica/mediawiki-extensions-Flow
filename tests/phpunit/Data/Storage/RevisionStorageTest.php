@@ -9,7 +9,11 @@ use Flow\DbFactory;
 use Flow\Model\UUID;
 use Flow\Repository\TreeRepository;
 use Flow\Tests\FlowTestCase;
+use MediaWiki\MainConfigNames;
+use Wikimedia\Rdbms\FakeResultWrapper;
 use Wikimedia\Rdbms\IDatabase;
+use Wikimedia\Rdbms\SelectQueryBuilder;
+use Wikimedia\Rdbms\UpdateQueryBuilder;
 
 /**
  * @covers \Flow\Data\Storage\DbStorage
@@ -62,9 +66,9 @@ class RevisionStorageTest extends FlowTestCase {
 	];
 
 	protected function setUp(): void {
-		$this->setMwGlobals( [
-			'wgExternalStores' => [ 'FlowMock' ],
-			'wgDefaultExternalStore' => [ 'FlowMock://location1' ]
+		$this->overrideConfigValues( [
+			MainConfigNames::ExternalStores => [ 'FlowMock' ],
+			MainConfigNames::DefaultExternalStore => [ 'FlowMock://location1' ]
 		] );
 
 		\ExternalStoreFlowMock::$isUsed = false;
@@ -170,14 +174,17 @@ class RevisionStorageTest extends FlowTestCase {
 		$old['rev_id'] = $id->getBinary();
 		$new['rev_id'] = $id->getBinary();
 
+		$uqb = $this->createMock( UpdateQueryBuilder::class );
+		$uqb->expects( $this->once() )->method( 'update' )
+			->with( 'flow_revision' )->willReturnSelf();
+		$uqb->expects( $this->once() )->method( 'set' )
+			->with( $expectedUpdateValues )->willReturnSelf();
+		$uqb->expects( $this->once() )->method( 'where' )
+			->with( [ 'rev_id' => $id->getBinary() ] )->willReturnSelf();
+		$uqb->expects( $this->once() )->method( 'caller' )->willReturnSelf();
 		$dbw->expects( $this->once() )
-			->method( 'update' )
-			->with(
-				'flow_revision',
-				$expectedUpdateValues,
-				[ 'rev_id' => $id->getBinary() ]
-			)
-			->willReturn( true );
+			->method( 'newUpdateQueryBuilder' )
+			->willReturn( $uqb );
 		$dbw->method( 'affectedRows' )
 			->willReturn( 1 );
 
@@ -195,7 +202,7 @@ class RevisionStorageTest extends FlowTestCase {
 		);
 	}
 
-	public function isUpdatingExistingRevisionContentAllowedProvider() {
+	public static function isUpdatingExistingRevisionContentAllowedProvider() {
 		return [
 			[ true ],
 			[ false ]
@@ -232,7 +239,6 @@ class RevisionStorageTest extends FlowTestCase {
 	private function setWhetherContentUpdatingAllowed( $revisionStorage, $allowContentUpdates ) {
 		$klass = new \ReflectionClass( HeaderRevisionStorage::class );
 		$allowedUpdateColumnsProp = $klass->getProperty( 'allowedUpdateColumns' );
-		$allowedUpdateColumnsProp->setAccessible( true );
 
 		$allowedUpdateColumns = $allowedUpdateColumnsProp->getValue( $revisionStorage );
 
@@ -340,9 +346,14 @@ class RevisionStorageTest extends FlowTestCase {
 
 		$factory = $this->mockDbFactory();
 		// this expect is the assertion for the test
+		$queryBuilder = $this->createMock( SelectQueryBuilder::class );
+		$queryBuilder->method( $this->logicalOr( 'select', 'from', 'join', 'where', 'andWhere', 'groupBy', 'caller' ) )
+			->willReturnSelf();
+		$queryBuilder->method( 'fetchResultSet' )
+			->willReturn( new FakeResultWrapper( $result ) );
 		$factory->getDB( null )->expects( $this->exactly( $count ) )
-			->method( 'select' )
-			->willReturn( $result );
+			->method( 'newSelectQueryBuilder' )
+			->willReturn( $queryBuilder );
 
 		$storage = new PostRevisionStorage(
 			$factory,
@@ -354,12 +365,16 @@ class RevisionStorageTest extends FlowTestCase {
 	}
 
 	public function testPartialResult() {
+		$queryBuilder = $this->createMock( SelectQueryBuilder::class );
+		$queryBuilder->method( $this->logicalOr( 'select', 'from', 'join', 'where', 'caller' ) )->willReturnSelf();
+		$queryBuilder->method( 'fetchResultSet' )
+			->willReturn( new FakeResultWrapper( [
+				(object)[ 'rev_id' => 42, 'rev_flags' => '' ]
+			] ) );
 		$factory = $this->mockDbFactory();
 		$factory->getDB( null )->expects( $this->once() )
-			->method( 'select' )
-			->willReturn( [
-				(object)[ 'rev_id' => 42, 'rev_flags' => '' ]
-			] );
+			->method( 'newSelectQueryBuilder' )
+			->willReturn( $queryBuilder );
 
 		$storage = new PostRevisionStorage(
 			$factory,

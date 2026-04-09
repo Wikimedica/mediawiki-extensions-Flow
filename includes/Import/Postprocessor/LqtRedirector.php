@@ -12,10 +12,10 @@ use Flow\Import\TopicImportState;
 use Flow\Model\PostRevision;
 use Flow\Model\UUID;
 use Flow\UrlGenerator;
+use MediaWiki\Content\WikitextContent;
 use MediaWiki\MediaWikiServices;
-use Title;
-use User;
-use WikitextContent;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 class LqtRedirector implements Postprocessor {
 	/** @var UrlGenerator */
@@ -68,7 +68,7 @@ class LqtRedirector implements Postprocessor {
 		$this->redirectsToDo = [];
 	}
 
-	protected function doRedirect( Title $fromTitle, UUID $toTopic, UUID $toPost = null ) {
+	protected function doRedirect( Title $fromTitle, UUID $toTopic, ?UUID $toPost = null ) {
 		if ( $toPost ) {
 			$redirectAnchor = $this->urlGenerator->postLink( null, $toTopic, $toPost );
 		} else {

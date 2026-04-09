@@ -4,13 +4,13 @@ namespace Flow\Repository;
 
 use Flow\Data\FlowObjectCache;
 use Flow\Data\ObjectManager;
+use Flow\Data\Storage\DbStorage;
 use Flow\DbFactory;
 use Flow\Exception\DataModelException;
 use Flow\Model\UUID;
-use Wikimedia\Rdbms\DatabaseMysqlBase;
 use Wikimedia\Rdbms\DBQueryError;
 
-/*
+/**
  * In SQL
  *
  * CREATE TABLE flow_tree_node (
@@ -30,7 +30,7 @@ use Wikimedia\Rdbms\DBQueryError;
  * Not sure how to handle topic splits with caching yet, i can imagine
  * a number of potential race conditions for writing root paths and sub trees
  * during a topic split
-*/
+ */
 class TreeRepository {
 
 	/**
@@ -76,7 +76,7 @@ class TreeRepository {
 	 * @return true
 	 * @throws DataModelException
 	 */
-	public function insert( UUID $descendant, UUID $ancestor = null ) {
+	public function insert( UUID $descendant, ?UUID $ancestor = null ) {
 		$this->cache->delete( $this->cacheKey( 'subtree', $descendant ) );
 		$this->cache->delete( $this->cacheKey( 'parent', $descendant ) );
 		$this->cache->delete( $this->cacheKey( 'rootpath', $descendant ) );
@@ -90,20 +90,21 @@ class TreeRepository {
 		$this->deleteSubtreeCache( $descendant, $path );
 
 		$dbw = $this->dbFactory->getDB( DB_PRIMARY );
-		$dbw->insert(
-			$this->tableName,
-			[
+		$queryBuilder = $dbw->newInsertQueryBuilder()
+			->insertInto( $this->tableName )
+			->row( [
 				'tree_descendant_id' => $descendant->getBinary(),
 				'tree_ancestor_id' => $descendant->getBinary(),
 				'tree_depth' => 0,
-			],
-			__METHOD__
-		);
+			] )
+			->caller( __METHOD__ );
+		DbStorage::maybeSetInsertIgnore( $queryBuilder );
+		$queryBuilder->execute();
 
 		$ok = true;
 		if ( $ancestor !== null ) {
 			try {
-				if ( defined( 'MW_PHPUNIT_TEST' ) && $dbw instanceof DatabaseMysqlBase ) {
+				if ( defined( 'MW_PHPUNIT_TEST' ) && $dbw->getType() == 'mysql' ) {
 					/*
 					 * Combination of MW unit tests + MySQL DB is known to cause
 					 * query failures of code 1137, so instead of executing a
@@ -112,6 +113,8 @@ class TreeRepository {
 					 */
 					throw new DBQueryError( $dbw, 'Prevented execution of known bad query', 1137, '', __METHOD__ );
 				}
+
+				$insertOptions = DbStorage::useInsertIgnore() ? [ 'IGNORE' ] : [];
 
 				$dbw->insertSelect(
 					$this->tableName,
@@ -124,7 +127,8 @@ class TreeRepository {
 					[
 						'tree_descendant_id' => $ancestor->getBinary(),
 					],
-					__METHOD__
+					__METHOD__,
+					$insertOptions
 				);
 			} catch ( DBQueryError $e ) {
 				/*
@@ -139,25 +143,24 @@ class TreeRepository {
 				 * @see http://dba.stackexchange.com/questions/45270/mysql-error-1137-hy000-at-line-9-cant-reopen-table-temp-table
 				 */
 				if ( $e->errno === 1137 ) {
-					$rows = $dbw->select(
-						$this->tableName,
-						[ 'tree_depth', 'tree_ancestor_id' ],
-						[ 'tree_descendant_id' => $ancestor->getBinary() ],
-						__METHOD__
-					);
+					$rows = $dbw->newSelectQueryBuilder()
+						->select( [ 'tree_depth', 'tree_ancestor_id' ] )
+						->from( $this->tableName )
+						->where( [ 'tree_descendant_id' => $ancestor->getBinary() ] )
+						->caller( __METHOD__ )
+						->fetchResultSet();
 
-					if ( $rows ) {
-						foreach ( $rows as $row ) {
-							$dbw->insert(
-								$this->tableName,
-								[
-									'tree_descendant_id' => $descendant->getBinary(),
-									'tree_ancestor_id' => $row->tree_ancestor_id,
-									'tree_depth' => $row->tree_depth + 1,
-								],
-								__METHOD__
-							);
-						}
+					foreach ( $rows as $row ) {
+						$queryBuilder = $dbw->newInsertQueryBuilder()
+							->insertInto( $this->tableName )
+							->row( [
+								'tree_descendant_id' => $descendant->getBinary(),
+								'tree_ancestor_id' => $row->tree_ancestor_id,
+								'tree_depth' => $row->tree_depth + 1,
+							] )
+							->caller( __METHOD__ );
+						DbStorage::maybeSetInsertIgnore( $queryBuilder );
+						$queryBuilder->execute();
 					}
 				} else {
 					$ok = false;
@@ -181,31 +184,24 @@ class TreeRepository {
 
 	/**
 	 * Deletes a descendant from the tree repo.
-	 *
-	 * @param UUID $descendant
-	 * @return bool
 	 */
 	public function delete( UUID $descendant ) {
 		$dbw = $this->dbFactory->getDB( DB_PRIMARY );
-		$res = $dbw->delete(
-			$this->tableName,
-			[
+		$dbw->newDeleteQueryBuilder()
+			->deleteFrom( $this->tableName )
+			->where( [
 				'tree_descendant_id' => $descendant->getBinary(),
-			],
-			__METHOD__
-		);
+			] )
+			->caller( __METHOD__ )
+			->execute();
 
-		if ( $res ) {
-			$subtreeKey = $this->cacheKey( 'subtree', $descendant );
-			$parentKey = $this->cacheKey( 'parent', $descendant );
-			$pathKey = $this->cacheKey( 'rootpath', $descendant );
+		$subtreeKey = $this->cacheKey( 'subtree', $descendant );
+		$parentKey = $this->cacheKey( 'parent', $descendant );
+		$pathKey = $this->cacheKey( 'rootpath', $descendant );
 
-			$this->cache->delete( $subtreeKey );
-			$this->cache->delete( $parentKey );
-			$this->cache->delete( $pathKey );
-		}
-
-		return $res;
+		$this->cache->delete( $subtreeKey );
+		$this->cache->delete( $parentKey );
+		$this->cache->delete( $pathKey );
 	}
 
 	public function findParent( UUID $descendant ) {
@@ -249,16 +245,16 @@ class TreeRepository {
 		}
 
 		$dbr = $this->dbFactory->getDB( DB_REPLICA );
-		$res = $dbr->select(
-			$this->tableName,
-			[ 'tree_descendant_id', 'tree_ancestor_id', 'tree_depth' ],
-			[
+		$res = $dbr->newSelectQueryBuilder()
+			->select( [ 'tree_descendant_id', 'tree_ancestor_id', 'tree_depth' ] )
+			->from( $this->tableName )
+			->where( [
 				'tree_descendant_id' => $missingValues,
-			],
-			__METHOD__
-		);
+			] )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 
-		if ( !$res || $res->numRows() === 0 ) {
+		if ( $res->numRows() === 0 ) {
 			return $cacheValues;
 		}
 
@@ -326,12 +322,13 @@ class TreeRepository {
 		// of caching our own value
 		$path = $this->findRootPath( $descendant );
 		if ( !$path ) {
-			throw new DataModelException( $descendant->getAlphadecimal() . ' has no root post. Probably is a root post.', 'process-data' );
+			throw new DataModelException(
+				$descendant->getAlphadecimal() . ' has no root post. Probably is a root post.',
+				'process-data'
+			);
 		}
 
-		$root = array_shift( $path );
-
-		return $root;
+		return array_shift( $path );
 	}
 
 	/**
@@ -415,21 +412,14 @@ class TreeRepository {
 	}
 
 	public function fetchSubtreeNodeListFromDb( array $roots ) {
-		$res = $this->dbFactory->getDB( DB_REPLICA )->select(
-			$this->tableName,
-			[ 'tree_ancestor_id', 'tree_descendant_id' ],
-			[
+		$res = $this->dbFactory->getDB( DB_REPLICA )->newSelectQueryBuilder()
+			->select( [ 'tree_ancestor_id', 'tree_descendant_id' ] )
+			->from( $this->tableName )
+			->where( [
 				'tree_ancestor_id' => UUID::convertUUIDs( $roots ),
-			],
-			__METHOD__
-		);
-		if ( $res === false ) {
-			wfDebugLog( 'Flow', __METHOD__ . ': Failure fetching node list from database' );
-			return false;
-		}
-		if ( !$res ) {
-			return [];
-		}
+			] )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 		$nodes = [];
 		foreach ( $res as $node ) {
 			$ancestor = UUID::create( $node->tree_ancestor_id );
@@ -463,18 +453,15 @@ class TreeRepository {
 	public function fetchParentMapFromDb( array $nodes ) {
 		// Find out who the parent is for those nodes
 		$dbr = $this->dbFactory->getDB( DB_REPLICA );
-		$res = $dbr->select(
-			$this->tableName,
-			[ 'tree_ancestor_id', 'tree_descendant_id' ],
-			[
+		$res = $dbr->newSelectQueryBuilder()
+			->select( [ 'tree_ancestor_id', 'tree_descendant_id' ] )
+			->from( $this->tableName )
+			->where( [
 				'tree_descendant_id' => UUID::convertUUIDs( $nodes ),
 				'tree_depth' => 1,
-			],
-			__METHOD__
-		);
-		if ( !$res ) {
-			return [];
-		}
+			] )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 		$result = [];
 		foreach ( $res as $node ) {
 			if ( isset( $result[$node->tree_descendant_id] ) ) {

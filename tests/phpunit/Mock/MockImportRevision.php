@@ -3,7 +3,7 @@
 namespace Flow\Tests\Mock;
 
 use Flow\Import\IObjectRevision;
-use User;
+use MediaWiki\User\User;
 
 class MockImportRevision implements IObjectRevision {
 	/**
@@ -11,9 +11,6 @@ class MockImportRevision implements IObjectRevision {
 	 */
 	private $attribs;
 
-	/**
-	 * @param array $attribs
-	 */
 	public function __construct( array $attribs = [] ) {
 		$this->attribs = $attribs + [
 			'text' => 'dvorak',

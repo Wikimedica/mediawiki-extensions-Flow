@@ -9,15 +9,15 @@
 	 * @constructor
 	 * @param {mw.flow.dm.APIHandler} api API handler
 	 * @param {Object} [config] Configuration options
-	 * @cfg {Array} [userGroups=[]] Current user's groups
-	 * @cfg {Array} [restrictionEdit] List of groups that are allowed to edit, or empty
+	 * @param {Array} [config.userGroups=[]] Current user's groups
+	 * @param {Array} [config.restrictionEdit] List of groups that are allowed to edit, or empty
 	 *   array for no restrictions.
-	 * @cfg {boolean} [isProbablyEditable=true] Whether the user probably has the right to
+	 * @param {boolean} [config.isProbablyEditable=true] Whether the user probably has the right to
 	 *   edit this page.  If true, they may be able to post.  If false, they can not.
 	 *   For performance reasons to avoid pre-computing with 100% accuracy.
 	 */
 	mw.flow.ui.CanNotEditWidget = function mwFlowUiCanNotEditWidget( api, config ) {
-		var widget = this;
+		const widget = this;
 
 		this.api = api;
 
@@ -54,11 +54,11 @@
 			// Initial generic message, which the real one loads
 			this.label.setLabel( this.getGenericMessage().parseDom() );
 
-			this.getMessage().done( function ( message ) {
+			this.getMessage().done( ( message ) => {
 				// 'blocked' is never triggered by the quick check, so that is not
 				// mentioned in the message.  So it could be 'protected' (which is specially
 				// handled), but could also be lack of 'createtalk', etc.
-				var labelHtml = message.parseDom();
+				const labelHtml = message.parseDom();
 				widget.label.setLabel( labelHtml );
 			} );
 		}
@@ -83,7 +83,7 @@
 	 * @return {mw.Message} return.done.message
 	 */
 	mw.flow.ui.CanNotEditWidget.prototype.getMessage = function () {
-		var message, messageKey, isStandardProtection, dfd;
+		let message, messageKey, isStandardProtection, dfd;
 
 		if ( mw.flow.ui.CanNotEditWidget.static.getMessagePromise !== null ) {
 			return mw.flow.ui.CanNotEditWidget.static.getMessagePromise;
@@ -110,7 +110,7 @@
 			}
 
 			if ( isStandardProtection ) {
-				this.api.getProtectionReason().done( function ( reason ) {
+				this.api.getProtectionReason().done( ( reason ) => {
 					// Includes empty string
 					if ( !reason ) {
 						reason = mw.message( 'flow-error-protected-unknown-reason' ).escaped();
@@ -121,7 +121,7 @@
 					message = mw.message( messageKey, $( $.parseHTML( reason ) ) );
 
 					dfd.resolve( message );
-				} ).fail( function () {
+				} ).fail( () => {
 					// Message keys are documented above
 					// eslint-disable-next-line mediawiki/msg-doc
 					message = mw.message( messageKey, mw.message( 'flow-error-protected-unknown-reason' ).text() );
@@ -157,7 +157,7 @@
 	 * @return {boolean} The group is both required to edit and missing
 	 */
 	mw.flow.ui.CanNotEditWidget.prototype.isMissingRequiredGroup = function ( groupName ) {
-		var isGroupRequired = this.restrictionEdit.indexOf( groupName ) !== -1,
+		let isGroupRequired = this.restrictionEdit.includes( groupName ),
 			userGroups = this.userGroups,
 			acceptableGroups;
 
@@ -170,9 +170,7 @@
 				acceptableGroups.push( 'confirmed' );
 			}
 
-			return acceptableGroups.every( function ( group ) {
-				return userGroups.indexOf( group ) === -1;
-			} );
+			return acceptableGroups.every( ( group ) => !userGroups.includes( group ) );
 		} else {
 			return false;
 		}

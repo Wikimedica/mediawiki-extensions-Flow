@@ -3,7 +3,7 @@
 namespace Flow\Import\LiquidThreadsApi;
 
 use Flow\Import\IImportSource;
-use User;
+use MediaWiki\User\User;
 
 class ImportSource implements IImportSource {
 	// Thread types defined by LQT which are returned via api
@@ -99,7 +99,13 @@ class ImportSource implements IImportSource {
 		switch ( $data['type'] ) {
 			// Standard thread
 			case self::THREAD_TYPE_NORMAL:
-				return new ImportTopic( $this, $data );
+				$topic = new ImportTopic( $this, $data );
+				if ( $topic->isRedirectToFlow() ) {
+					// This topic is was already imported in a previous run
+					// so don't try to import it again
+					return null;
+				}
+				return $topic;
 
 			// The topic no longer exists at the queried location, but
 			// a stub was left behind pointing to it. This modified
@@ -173,14 +179,10 @@ class ImportSource implements IImportSource {
 	 * Parameters: Zero or more strings that uniquely represent the object
 	 * for this ImportSource
 	 *
+	 * @param mixed ...$args
 	 * @return string Unique key
 	 */
-	public function getObjectKey( /* $args */ ) {
-		$components = array_merge(
-			[ 'lqt-api', $this->getApiKey() ],
-			func_get_args()
-		);
-
-		return implode( ':', $components );
+	public function getObjectKey( ...$args ): string {
+		return implode( ':', [ 'lqt-api', $this->getApiKey(), ...$args ] );
 	}
 }

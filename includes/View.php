@@ -2,23 +2,24 @@
 
 namespace Flow;
 
-use Article;
-use ContextSource;
 use Flow\Block\AbstractBlock;
 use Flow\Block\Block;
 use Flow\Block\TopicBlock;
 use Flow\Exception\InvalidActionException;
+use Flow\Hooks\HookRunner;
 use Flow\Model\Anchor;
 use Flow\Model\HtmlRenderingInformation;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
-use Hooks;
-use Html;
-use IContextSource;
+use MediaWiki\Context\ContextSource;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Html\Html;
 use MediaWiki\MediaWikiServices;
-use Message;
-use OutputPage;
-use Title;
+use MediaWiki\Message\Message;
+use MediaWiki\Output\OutputPage;
+use MediaWiki\Page\Article;
+use MediaWiki\SpecialPage\SpecialPage;
+use MediaWiki\Title\Title;
 
 class View extends ContextSource {
 	/**
@@ -133,14 +134,13 @@ class View extends ContextSource {
 		} else {
 			$out->addModuleStyles( [
 				'mediawiki.ui',
-				'mediawiki.ui.anchor',
 				'mediawiki.ui.button',
 				'mediawiki.ui.input',
 				'mediawiki.ui.icon',
 				'mediawiki.special.changeslist',
 				'mediawiki.interface.helpers.styles',
 				'mediawiki.editfont.styles',
-				'ext.flow.styles.base' ,
+				'ext.flow.styles.base',
 				'ext.flow.mediawiki.ui.form',
 				'oojs-ui.styles.icons-alerts',
 				'oojs-ui.styles.icons-content',
@@ -156,7 +156,7 @@ class View extends ContextSource {
 		// Add Parsoid modules if necessary
 		Conversion\Utils::onFlowAddModules( $out );
 		// Allow other extensions to add modules
-		Hooks::run( 'FlowAddModules', [ $out ] );
+		( new HookRunner( MediaWikiServices::getInstance()->getHookContainer() ) )->onFlowAddModules( $out );
 	}
 
 	protected function handleSubmit( WorkflowLoader $loader, $action, array $parameters ) {
@@ -207,7 +207,7 @@ class View extends ContextSource {
 			// We need to store the link to the Special:Categories page from the
 			// back end php script, because there is no way in JS front end to
 			// get the localized link of a special page
-			'specialCategoryLink' => \SpecialPage::getTitleFor( 'Categories' )->getLocalURL(),
+			'specialCategoryLink' => SpecialPage::getTitleFor( 'Categories' )->getLocalURL(),
 			'workflow' => $workflow->isNew() ? '' : $workflow->getId()->getAlphadecimal(),
 			'blocks' => [],
 			// see https://phabricator.wikimedia.org/T223165
@@ -247,22 +247,21 @@ class View extends ContextSource {
 		if ( count( $linkedCategories ) > 0 && isset( $apiResponse['blocks']['header'] ) ) {
 			$apiResponse['blocks']['header']['categories'] = [
 				'link' => MediaWikiServices::getInstance()->getLinkRenderer()->makeLink(
-						\SpecialPage::getTitleFor( 'Categories' ),
+						SpecialPage::getTitleFor( 'Categories' ),
 						$this->msg( 'pagecategories' )->params( count( $linkedCategories ) )->text()
 					) . $this->msg( 'colon-separator' )->escaped(),
 				'items' => $linkedCategories
 			];
 		}
 
-		if ( isset( $topicListBlock ) && isset( $parameters['topiclist'] ) ) {
+		if ( $topicListBlock !== null && isset( $parameters['topiclist'] ) ) {
 			$apiResponse['toc'] = $topicListBlock->renderTocApi(
-				// @phan-suppress-next-line PhanTypeArraySuspiciousNullable,PhanTypePossiblyInvalidDimOffset
+				// @phan-suppress-next-line PhanTypeArraySuspiciousNullable
 				$apiResponse['blocks']['topiclist'],
 				$parameters['topiclist']
 			);
 		}
 
-		// @phan-suppress-next-line PhanTypePossiblyInvalidDimOffset
 		if ( count( $apiResponse['blocks'] ) === 0 ) {
 			throw new InvalidActionException( "No blocks accepted action: $action", 'invalid-action' );
 		}
@@ -360,7 +359,7 @@ class View extends ContextSource {
 
 			// Always add mw-content-{ltr,rtl} class
 			$title = Title::newFromText( $apiResponse['title'] );
-			$classes[] = 'mw-content-' . $title->getPageViewLanguage()->getDir();
+			$classes[] = 'mw-content-' . $title->getPageLanguage()->getDir();
 
 			$action = $this->getRequest()->getVal( 'action', 'view' );
 			$classes[] = "flow-action-$action";
@@ -412,7 +411,7 @@ class View extends ContextSource {
 			// between urls only allowing [-_.] as unencoded special chars and
 			// php mangling all of those into '_', we have to split on '_'
 			if ( strpos( $name, '_' ) !== false ) {
-				list( $block, $var ) = explode( '_', $name, 2 );
+				[ $block, $var ] = explode( '_', $name, 2 );
 				// flow_xxx is global data for all blocks
 				if ( $block === 'flow' ) {
 					$globalData[$var] = $value;

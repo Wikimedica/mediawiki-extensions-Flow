@@ -9,6 +9,7 @@ use Flow\Data\Storage\PostRevisionTopicHistoryStorage;
 use Flow\Exception\DataModelException;
 use Flow\Model\PostRevision;
 use Flow\Model\UUID;
+use InvalidArgumentException;
 
 /**
  * TopKIndex that calculates the topic_root_id
@@ -23,7 +24,7 @@ class PostRevisionTopicHistoryIndex extends TopKIndex {
 		array $options = []
 	) {
 		if ( $indexed !== [ 'topic_root_id' ] ) {
-			throw new \MWException( __CLASS__ . ' is hardcoded to only index topic_root_id: ' .
+			throw new InvalidArgumentException( __CLASS__ . ' is hardcoded to only index topic_root_id: ' .
 				print_r( $indexed, true ) );
 		}
 		parent::__construct( $cache, $storage, $mapper, $prefix, $indexed, $options );
@@ -79,7 +80,7 @@ class PostRevisionTopicHistoryIndex extends TopKIndex {
 	protected function findTopicId( PostRevision $post ) {
 		try {
 			$root = $post->getCollection()->getRoot();
-		} catch ( DataModelException $e ) {
+		} catch ( DataModelException ) {
 			// in some cases, we may fail to find root post from the current
 			// object (e.g. data has already been removed)
 			// try to find if via parent, in that case

@@ -3,17 +3,19 @@
 namespace Flow\Import;
 
 use Flow\Exception\FlowException;
+use MediaWiki\Content\WikitextContent;
+use MediaWiki\Exception\MWExceptionHandler;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Page\Article;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Revision\SlotRecord;
-use MWExceptionHandler;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 use Psr\Log\LoggerInterface;
-use Title;
 use Traversable;
-use User;
-use Wikimedia\Rdbms\IDatabase;
-use WikiPage;
-use WikitextContent;
+use Wikimedia\Rdbms\IDBAccessObject;
+use Wikimedia\Rdbms\IReadableDatabase;
+use Wikimedia\Rdbms\SelectQueryBuilder;
 
 /**
  * Converts provided titles to Flow. This converter is idempotent when
@@ -33,10 +35,10 @@ use WikitextContent;
  */
 class Converter {
 	/**
-	 * @var IDatabase Primary database of the current wiki. Required
+	 * @var IReadableDatabase Primary database of the current wiki. Required
 	 *  to lookup past page moves.
 	 */
-	protected $dbw;
+	protected $db;
 
 	/**
 	 * @var Importer Service capable of turning an IImportSource into
@@ -63,15 +65,16 @@ class Converter {
 	protected $strategy;
 
 	/**
-	 * @param IDatabase $dbw Primary wiki database to read from
+	 * @param IReadableDatabase $db Primary wiki database to read from
 	 * @param Importer $importer
 	 * @param LoggerInterface $logger
 	 * @param User $user User for moves and edits related to the conversion process
 	 * @param IConversionStrategy $strategy
+	 *
 	 * @throws ImportException When $user does not have an Id
 	 */
 	public function __construct(
-		IDatabase $dbw,
+		IReadableDatabase $db,
 		Importer $importer,
 		LoggerInterface $logger,
 		User $user,
@@ -80,7 +83,7 @@ class Converter {
 		if ( !$user->getId() ) {
 			throw new ImportException( 'User must have id' );
 		}
-		$this->dbw = $dbw;
+		$this->db = $db;
 		$this->importer = $importer;
 		$this->logger = $logger;
 		$this->user = $user;
@@ -100,12 +103,14 @@ class Converter {
 	 * Converts multiple pages into Flow boards
 	 *
 	 * @param Traversable<Title>|array $titles
+	 * @param bool $dryRun If true, will not make any changes
+	 * @param bool $convertEmpty Convert pages with no threads
 	 */
-	public function convertAll( $titles ) {
+	public function convertAll( $titles, $dryRun = false, $convertEmpty = false ) {
 		/** @var Title $title */
 		foreach ( $titles as $title ) {
 			try {
-				$this->convert( $title );
+				$this->convert( $title, $dryRun, $convertEmpty );
 			} catch ( \Exception $e ) {
 				MWExceptionHandler::logException( $e );
 				$this->logger->error( "Exception while importing: {$title}" );
@@ -118,9 +123,11 @@ class Converter {
 	 * Converts a page into a Flow board
 	 *
 	 * @param Title $title
+	 * @param bool $dryRun If true, will not make any changes
+	 * @param bool $convertEmpty Convert pages with no threads
 	 * @throws FlowException
 	 */
-	public function convert( Title $title ) {
+	public function convert( Title $title, $dryRun = false, $convertEmpty = false ) {
 		/*
 		 * $title is the title we're currently considering to import.
 		 * It could be a page we need to import, but could also e.g.
@@ -136,7 +143,21 @@ class Converter {
 			throw new FlowException( "Not allowed to convert: {$title}" );
 		}
 
-		$this->doConversion( $title, $movedFrom );
+		if ( !$convertEmpty ) {
+			$article = new Article( $title );
+			$pager = new \LqtDiscussionPager( $article, \TalkpageView::LQT_NEWEST_CHANGES );
+			$pager->setLimit( 1 );
+			if ( !$pager->getNumRows() ) {
+				$this->logger->info( "Skipping {$title} as it has no LiquidThreads content" );
+				return;
+			}
+		}
+
+		if ( !$dryRun ) {
+			$this->doConversion( $title, $movedFrom );
+		} else {
+			$this->logger->info( "Dry run: Would convert $title" );
+		}
 	}
 
 	/**
@@ -171,7 +192,7 @@ class Converter {
 		return $this->strategy->shouldConvert( $title );
 	}
 
-	protected function doConversion( Title $title, Title $movedFrom = null ) {
+	protected function doConversion( Title $title, ?Title $movedFrom = null ) {
 		if ( $movedFrom ) {
 			// If the page is moved but has not completed conversion that
 			// means the previous import failed to complete. Try again.
@@ -213,22 +234,19 @@ class Converter {
 	 * @return Title|null
 	 */
 	protected function getPageMovedFrom( Title $title ) {
-		$row = $this->dbw->selectRow(
-			[ 'logging', 'page' ],
-			[ 'log_namespace', 'log_title' ],
-			[
+		$row = $this->db->newSelectQueryBuilder()
+			->select( [ 'log_namespace', 'log_title' ] )
+			->from( 'logging' )
+			->join( 'page', null, 'log_page = page_id' )
+			->where( [
 				'page_namespace' => $title->getNamespace(),
 				'page_title' => $title->getDBkey(),
 				'log_type' => 'move',
 				'log_actor' => $this->user->getActorId()
-			],
-			__METHOD__,
-			[
-				'LIMIT' => 1,
-				'ORDER BY' => 'log_timestamp DESC'
-			],
-			[ 'page' => [ 'JOIN', 'log_page = page_id' ] ]
-		);
+			] )
+			->caller( __METHOD__ )
+			->orderBy( 'log_timestamp', SelectQueryBuilder::SORT_DESC )
+			->fetchRow();
 
 		// The page has never been moved or the most recent move was not by our user
 		if ( !$row ) {
@@ -281,7 +299,7 @@ class Converter {
 	protected function createArchiveCleanupRevision( Title $title, Title $archiveTitle ) {
 		$page = MediaWikiServices::getInstance()->getWikiPageFactory()->newFromTitle( $archiveTitle );
 		// doUserEditContent will do this anyway, but we need to now for the revision.
-		$page->loadPageData( WikiPage::READ_LATEST );
+		$page->loadPageData( IDBAccessObject::READ_LATEST );
 		$revision = $page->getRevisionRecord();
 		if ( $revision === null ) {
 			throw new ImportException( "Expected a revision at {$archiveTitle}" );

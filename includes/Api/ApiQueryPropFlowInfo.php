@@ -2,12 +2,13 @@
 
 namespace Flow\Api;
 
-use ApiQueryBase;
-use Title;
+use ApiQuery;
+use MediaWiki\Api\ApiQueryBase;
+use MediaWiki\Title\Title;
 
 class ApiQueryPropFlowInfo extends ApiQueryBase {
 
-	public function __construct( $query, $moduleName ) {
+	public function __construct( ApiQuery $query, string $moduleName ) {
 		parent::__construct( $query, $moduleName, 'fli' );
 	}
 
@@ -21,25 +22,13 @@ class ApiQueryPropFlowInfo extends ApiQueryBase {
 
 	public function execute() {
 		$pageSet = $this->getPageSet();
-		/** @var Title $title */
-		foreach ( $pageSet->getGoodTitles() as $pageid => $title ) {
-			$pageInfo = $this->getPageInfo( $title );
-			$this->addPageSubItems( $pageid, $pageInfo );
+		foreach ( $pageSet->getGoodPages() as $pageId => $page ) {
+			$pageInfo = [ 'flow' => [] ];
+			if ( Title::newFromPageIdentity( $page )->hasContentModel( CONTENT_MODEL_FLOW_BOARD ) ) {
+				$pageInfo['flow']['enabled'] = '';
+			}
+			$this->addPageSubItems( $pageId, $pageInfo );
 		}
-	}
-
-	/**
-	 * In the future we can add more Flow related info here
-	 * @param Title $title
-	 * @return array
-	 */
-	protected function getPageInfo( Title $title ) {
-		$result = [ 'flow' => [] ];
-		if ( $title->getContentModel() === CONTENT_MODEL_FLOW_BOARD ) {
-			$result['flow']['enabled'] = '';
-		}
-
-		return $result;
 	}
 
 	/**

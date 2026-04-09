@@ -4,7 +4,7 @@ namespace Flow\Import\LiquidThreadsApi;
 
 use Flow\Import\ImportException;
 use MediaWiki\MediaWikiServices;
-use MWTimestamp;
+use MediaWiki\Utils\MWTimestamp;
 
 class MovedImportRevision extends ImportRevision {
 	/**
@@ -29,8 +29,7 @@ class MovedImportRevision extends ImportRevision {
 
 		// To get the new talk page that this belongs to we would need to query the api
 		// for the new topic, for now not bothering.
-		$template = wfMessage( 'flow-importer-lqt-moved-thread-template' )->inContentLanguage(
-		)->plain();
+		$template = wfMessage( 'flow-importer-lqt-moved-thread-template' )->inContentLanguage()->plain();
 		$arguments = implode(
 			'|',
 			[

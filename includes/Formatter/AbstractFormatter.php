@@ -7,10 +7,10 @@ use Flow\FlowActions;
 use Flow\Model\Anchor;
 use Flow\Model\PostRevision;
 use Flow\RevisionActionPermissions;
-use Html;
-use IContextSource;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Html\Html;
 use MediaWiki\MediaWikiServices;
-use Message;
+use MediaWiki\Message\Message;
 
 /**
  * This is a "utility" class that might come in useful to generate
@@ -114,7 +114,7 @@ abstract class AbstractFormatter {
 	protected function formatAnchorsAsPipeList(
 		array $links,
 		IContextSource $ctx,
-		array $request = null
+		?array $request = null
 	) {
 		if ( $request === null ) {
 			$request = array_keys( $links );
@@ -248,7 +248,7 @@ abstract class AbstractFormatter {
 			$msg = $ctx->msg( $key );
 		}
 
-		return $msg->params( $this->getDescriptionParams( $data, $actions, $changeType ) );
+		return $msg->params( ...$this->getDescriptionParams( $data, $actions, $changeType ) );
 	}
 
 	/**

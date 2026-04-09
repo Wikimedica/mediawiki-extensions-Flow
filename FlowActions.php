@@ -794,7 +794,7 @@ return [
 							$previousCollectionId = null;
 							return '';
 						}
-					} catch ( Exception $e ) {
+					} catch ( Exception ) {
 						// nothing to do here; if fetching last revision failed,
 						// we're just not testing any stored revision; that's ok
 					}
@@ -808,7 +808,7 @@ return [
 				 * is the same as the moderation (e.g. if user can't see
 				 * suppress actions, he can't see restores from suppress.
 				 */
-				if ( strpos( $revision->getChangeType(), 'restore-' ) === 0 ) {
+				if ( str_starts_with( $revision->getChangeType(), 'restore-' ) ) {
 					$previous = $collection->getPrevRevision( $revision );
 
 					if ( $previous === null ||

@@ -5,39 +5,24 @@ namespace Flow\Conversion;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
-use FauxResponse;
-use Flow\Container;
-use Flow\Exception\FlowException;
 use Flow\Exception\NoParserException;
 use Flow\Exception\WikitextException;
 use Flow\Parsoid\ContentFixer;
 use Flow\Parsoid\Fixer\EmptyNodeFixer;
-use Html;
-use ILanguageConverter;
-use Language;
+use MediaWiki\Content\TextContent;
+use MediaWiki\Content\WikitextContent;
+use MediaWiki\Html\Html;
+use MediaWiki\Language\ILanguageConverter;
+use MediaWiki\Language\Language;
 use MediaWiki\MediaWikiServices;
-use OutputPage;
-use ParserOptions;
-use ParsoidVirtualRESTService;
-use RequestContext;
-use RestbaseVirtualRESTService;
-use Sanitizer;
-use Title;
-use VirtualRESTServiceClient;
+use MediaWiki\Output\OutputPage;
+use MediaWiki\Parser\ParserOptions;
+use MediaWiki\Parser\Sanitizer;
+use MediaWiki\Title\Title;
 
 abstract class Utils {
 
 	public const PARSOID_VERSION = '2.0.0';
-
-	/**
-	 * @var VirtualRESTServiceClient
-	 */
-	protected static $serviceClient = null;
-
-	/**
-	 * @var \VirtualRESTService
-	 */
-	protected static $vrsObject = null;
 
 	/**
 	 * Convert from/to wikitext <=> html or topic-title-wikitext => topic-title-html.
@@ -61,27 +46,64 @@ abstract class Utils {
 		if ( $from === 'wt' ) {
 			$from = 'wikitext';
 		}
-		
-		if ( $from === 'wikitext' || $from === 'html' ) {
-			if ( $to === 'wikitext' || $to === 'html' ) {
-				if ( self::isParsoidConfigured() ) {
-					try {
-						return self::parsoid( $from, $to, $content, $title );
-					} catch ( NoParserException $e ) {
-						/* fall through, try legacy parser */
-					}
-				}
-				return self::parser( $from, $to, $content, $title );
-			} else {
-				throw new WikitextException( "Conversion from '$from' to '$to' was requested, " .
-					"but this is not supported." );
-			}
-		} elseif ( $from === 'topic-title-wikitext' && ( $to === 'topic-title-html' || $to === 'topic-title-plaintext' ) ) {
+
+		if ( $from == 'wikitext' && $to == 'html' ) {
+			return self::wikitextToHTML( $content, $title );
+		} elseif ( $from == 'html' && $to == 'wikitext' ) {
+			return self::htmlToWikitext( $content, $title );
+		} elseif ( $from === 'topic-title-wikitext' &&
+			( $to === 'topic-title-html' || $to === 'topic-title-plaintext' ) ) {
 			// FIXME: links need to be proceed by findVariantLinks or equivant function
 			return self::getLanguageConverter()->convert( self::commentParser( $from, $to, $content ) );
 		} else {
 			return self::commentParser( $from, $to, $content );
 		}
+	}
+
+	/**
+	 * @param string $wikitext
+	 * @param Title $title
+	 *
+	 * @return string The converted wikitext to HTML
+	 */
+	private static function wikitextToHTML( string $wikitext, Title $title ) {
+		$parserOptions = ParserOptions::newFromAnon();
+		$parserOptions->setRenderReason( __METHOD__ );
+
+		$parserFactory = MediaWikiServices::getInstance()->getParsoidParserFactory()->create();
+		$parserOutput = $parserFactory->parse( $wikitext, $title, $parserOptions );
+
+		// $parserOutput->getText() will strip off the body tag, but we want to retain here.
+		// So we'll call ->getRawText() here and modify the HTML by ourselves.
+		preg_match( "#<body[^>]*>(.*?)</body>#s", $parserOutput->getRawText(), $html );
+
+		return $html[0];
+	}
+
+	/**
+	 * @param string $html
+	 * @param Title $title
+	 *
+	 * @return string The converted HTML to Wikitext
+	 * @throws WikitextException When the conversion is unsupported
+	 */
+	private static function htmlToWikitext( string $html, Title $title ) {
+		$transform = MediaWikiServices::getInstance()->getHtmlTransformFactory()
+			->getHtmlToContentTransform( $html, $title );
+
+		$transform->setOptions( [
+			'contentmodel' => CONTENT_MODEL_WIKITEXT,
+			'offsetType' => 'byte'
+		] );
+
+		/** @var TextContent $content */
+		$content = $transform->htmlToContent();
+
+		if ( !$content instanceof WikitextContent ) {
+			throw new WikitextException( 'Conversion to Wikitext failed' );
+		}
+
+		return trim( $content->getTextForSearchIndex() );
 	}
 
 	/**
@@ -93,105 +115,19 @@ abstract class Utils {
 	 * @param Language|null $lang Language to use for truncation.  Defaults to $wgLang
 	 * @return string plaintext
 	 */
-	public static function htmlToPlaintext( $html, $truncateLength = null, Language $lang = null ) {
+	public static function htmlToPlaintext( $html, ?int $truncateLength = null, ?Language $lang = null ) {
 		/** @var Language $wgLang */
 		global $wgLang;
 
 		$plain = trim( Sanitizer::stripAllTags( $html ) );
 
+		// Fallback to some large-ish value for truncation.
 		if ( $truncateLength === null ) {
-			return $plain;
-		} else {
-			$lang = $lang ?: $wgLang;
-			return $lang->truncateForVisual( $plain, $truncateLength );
-		}
-	}
-
-	/**
-	 * Convert from/to wikitext/html via Parsoid/RESTBase.
-	 *
-	 * This will assume Parsoid/RESTBase is installed and configured.
-	 *
-	 * @param string $from Format of content to convert: html|wikitext
-	 * @param string $to Format to convert to: html|wikitext
-	 * @param string $content
-	 * @param Title $title
-	 * @return string
-	 * @throws NoParserException When Parsoid/RESTBase operation fails
-	 * @throws WikitextException When conversion is unsupported
-	 */
-	protected static function parsoid( $from, $to, $content, Title $title ) {
-		$serviceClient = self::getServiceClient();
-
-		if ( $from !== 'html' && $from !== 'wikitext' ) {
-			throw new WikitextException( 'Unknown source format: ' . $from, 'process-wikitext' );
+			$truncateLength = 10000;
 		}
 
-		$prefixedDbTitle = $title->getPrefixedDBkey();
-		$params = [
-			$from => $content
-		];
-		if ( $from === 'html' ) {
-			$params['scrub_wikitext'] = 'true';
-		}
-		$url = '/restbase/local/v1/transform/' . $from . '/to/' . $to . '/' .
-			urlencode( $prefixedDbTitle );
-		
-		$request = [
-			'method' => 'POST',
-			'url' => $url,
-			'body' => $params,
-			'headers' => [
-				'Accept' =>
-					sprintf(
-						'text/html; charset=utf-8; profile="https://www.mediawiki.org/wiki/Specs/HTML/%s"',
-						self::PARSOID_VERSION
-					),
-				'User-Agent' => 'Flow-MediaWiki/' . MW_VERSION,
-			],
-		];
-		$response = $serviceClient->run( $request );
-		
-		if ( $response['code'] !== 200 ) {
-			if ( $response['error'] !== '' ) {
-				$statusMsg = $response['error'];
-			} else {
-				$statusMsg = $response['code'];
-			}
-			$vrsInfo = $serviceClient->getMountAndService( '/restbase/' );
-			$serviceName = $vrsInfo[1] ? $vrsInfo[1]->getName() : 'VRS service';
-			$msg = "Request to " . $serviceName . " for \"$from\" to \"$to\" conversion of " .
-				"content connected to title \"$prefixedDbTitle\" failed: $statusMsg";
-			Container::get( 'default_logger' )->error(
-				'Request to {service} for "{sourceFormat}" to "{targetFormat}" conversion of " .
-					"content connected to title "{title}" failed.  Code: {code}, " .
-					"Reason: "{reason}", Body: "{body}", Error: "{error}"',
-				[
-					'service' => $serviceName,
-					'sourceFormat' => $from,
-					'targetFormat' => $to,
-					'title' => $prefixedDbTitle,
-					'code' => $response['code'],
-					'reason' => $response['reason'],
-					'error' => $response['error'], // This is sometimes/always empty string
-					'headers' => $response['headers'],
-					'body' => $response['body'],
-					'response' => $response,
-				]
-			);
-			throw new NoParserException( $msg, 'process-wikitext' );
-		}
-
-		// Add attributes for parsoid version and base url if converting to HTML.
-		$content = $response['body'];
-		if ( $to === 'html' ) {
-			$content = self::encodeHeadInfo( $content );
-		}
-		// HACK remove trailing newline inserted by Parsoid (T106925)
-		if ( $to === 'wikitext' ) {
-			$content = preg_replace( '/\\n$/', '', $content );
-		}
-		return $content;
+		$lang = $lang ?: $wgLang;
+		return $lang->truncateForVisual( $plain, $truncateLength );
 	}
 
 	/**
@@ -220,152 +156,6 @@ abstract class Utils {
 		} else {
 			return $html;
 		}
-	}
-
-	/**
-	 * Convert from/to wikitext/html using Parser.
-	 *
-	 * This only supports wikitext to HTML.
-	 *
-	 * @param string $from Format of content to convert: wikitext
-	 * @param string $to Format to convert to: html
-	 * @param string $content
-	 * @param Title $title
-	 * @return string
-	 * @throws WikitextException When the conversion is unsupported
-	 */
-	protected static function parser( $from, $to, $content, Title $title ) {
-		if ( $from !== 'wikitext' || $to !== 'html' ) {
-			throw new WikitextException( "Conversion from '$from' to '$to' was requested, but " .
-				"core's Parser only supports 'wikitext' to 'html' conversion", 'process-wikitext' );
-		}
-
-		$options = ParserOptions::newFromAnon();
-
-		$output = MediaWikiServices::getInstance()->getParser()
-			->parse( $content, $title, $options );
-		return $output->getText( [ 'enableSectionEditLinks' => false ] );
-	}
-
-	/**
-	 * Check to see whether a Parsoid or RESTBase service is configured.
-	 *
-	 * @return bool
-	 */
-	public static function isParsoidConfigured() {
-		try {
-			self::getVRSObject();
-			return true;
-		} catch ( NoParserException $e ) {
-			return false;
-		}
-	}
-
-	/**
-	 * Returns Flow's Virtual REST Service for Parsoid/RESTBase.
-	 * The Parsoid/RESTBase service will be mounted at /restbase/
-	 * and will answer RESTBase v1 API requests.
-	 *
-	 * @return VirtualRESTServiceClient
-	 * @throws NoParserException When Parsoid/RESTBase is unconfigured
-	 */
-	protected static function getServiceClient() {
-		if ( self::$serviceClient === null ) {
-			$sc = new VirtualRESTServiceClient(
-				MediaWikiServices::getInstance()->getHttpRequestFactory()->createMultiClient()
-			);
-			$sc->mount( '/restbase/', self::getVRSObject() );
-			self::$serviceClient = $sc;
-		}
-		return self::$serviceClient;
-	}
-
-	/**
-	 * @return \VirtualRESTService
-	 * @throws NoParserException
-	 */
-	private static function getVRSObject() {
-		if ( !self::$vrsObject ) {
-			self::$vrsObject = self::makeVRSObject();
-		}
-		return self::$vrsObject;
-	}
-
-	/**
-	 * Creates the Virtual REST Service object to be used in Flow's
-	 * API calls.  The method determines whether to instantiate a
-	 * ParsoidVirtualRESTService or a RestbaseVirtualRESTService
-	 * object based on configuration directives: if
-	 * `$wgVirtualRestConfig['modules']['restbase']` is defined,
-	 * RESTBase is chosen; otherwise Parsoid is used.
-	 * For backwards compatibility, $wgFlowParsoid* variables are used
-	 * to specify a Parsoid configuration as a fall back.
-	 *
-	 * See ApiParsoidTrait::getVRSObject() in VisualEditor (which should
-	 * eventually be upstreamed to core, T261310).
-	 *
-	 * @return \VirtualRESTService the VirtualRESTService object to use
-	 * @throws NoParserException When Parsoid/RESTBase is not configured
-	 */
-	private static function makeVRSObject() {
-		global $wgFlowParsoidURL, $wgFlowParsoidPrefix,
-			$wgFlowParsoidTimeout, $wgFlowParsoidForwardCookies,
-			$wgFlowParsoidHTTPProxy, $wgVisualEditorParsoidAutoConfig;
-		$context = RequestContext::getMain();
-
-		// the params array to create the service object with
-		$params = [];
-		// the VRS class to use, defaults to Parsoid
-		$class = ParsoidVirtualRESTService::class;
-		// The global virtual rest service config object, if any
-		$vrs = $context->getConfig()->get( 'VirtualRestConfig' );
-		// HACK: don't use RESTbase because it'll drop data-parsoid, see T115236
-		// @phan-suppress-next-line PhanImpossibleCondition
-		if ( false && isset( $vrs['modules'] ) && isset( $vrs['modules']['restbase'] ) ) {
-			// if restbase is available, use it
-			$params = $vrs['modules']['restbase'];
-			// backward compatibility
-			$params['parsoidCompat'] = false;
-			$class = RestbaseVirtualRESTService::class;
-		} elseif ( isset( $vrs['modules'] ) && isset( $vrs['modules']['parsoid'] ) ) {
-			// there's a global parsoid config, use it next
-			$params = $vrs['modules']['parsoid'];
-			$params['restbaseCompat'] = true;
-		} elseif ( $wgFlowParsoidURL ) {
-			$params = [
-				'URL' => $wgFlowParsoidURL,
-				'prefix' => $wgFlowParsoidPrefix,
-				'timeout' => $wgFlowParsoidTimeout,
-				'HTTPProxy' => $wgFlowParsoidHTTPProxy,
-				'forwardCookies' => $wgFlowParsoidForwardCookies
-			];
-		} elseif ( isset( $wgVisualEditorParsoidAutoConfig ) ) {
-			$params = $vrs['modules']['parsoid'] ?? [];
-			$params['restbaseCompat'] = true;
-			// forward cookies on private wikis
-			$params['forwardCookies'] = !MediaWikiServices::getInstance()
-				->getPermissionManager()->isEveryoneAllowed( 'read' );
-		} else {
-			throw new NoParserException( 'Flow Parsoid configuration is unavailable', 'process-wikitext' );
-		}
-		// merge the global and service-specific params
-		if ( isset( $vrs['global'] ) ) {
-			$params = array_merge( $vrs['global'], $params );
-		}
-		// set up cookie forwarding
-		// @phan-suppress-next-line PhanTypePossiblyInvalidDimOffset
-		if ( $params['forwardCookies'] ) {
-			if ( PHP_SAPI === 'cli' ) {
-				// From the command line we need to generate a cookie
-				$params['forwardCookies'] = self::generateForwardedCookieForCli();
-			} else {
-				$params['forwardCookies'] = $context->getRequest()->getHeader( 'Cookie' );
-			}
-		} else {
-			$params['forwardCookies'] = false;
-		}
-		// create the VRS object and return it
-		return new $class( $params );
 	}
 
 	/**
@@ -460,15 +250,13 @@ abstract class Utils {
 	 * @return bool
 	 */
 	public static function onFlowAddModules( OutputPage $out ) {
-		if ( self::isParsoidConfigured() ) {
-			// The module is only necessary when we are using parsoid.
-			// XXX We only need the Parsoid CSS if some content being
-			// rendered has getContentFormat() === 'html'.
-			$out->addModuleStyles( [
-				'mediawiki.skinning.content.parsoid',
-				'ext.cite.style',
-			] );
-		}
+		// The module is only necessary when we are using parsoid.
+		// XXX We only need the Parsoid CSS if some content being
+		// rendered has getContentFormat() === 'html'.
+		$out->addModuleStyles( [
+			'mediawiki.skinning.content.parsoid',
+			'ext.cite.parsoid.styles',
+		] );
 
 		return true;
 	}
@@ -481,7 +269,7 @@ abstract class Utils {
 	 * @param DOMNode|null $node the specific node to save
 	 * @return string HTML
 	 */
-	public static function saferSaveXML( DOMDocument $doc, DOMNode $node = null ) {
+	public static function saferSaveXML( DOMDocument $doc, ?DOMNode $node = null ) {
 		$html = $doc->saveXML( $node );
 		// This regex is only safe as long as attribute values get escaped > chars
 		// This is checked by the testcases
@@ -495,7 +283,7 @@ abstract class Utils {
 	 * @param DOMNode|null $node
 	 * @return string html of the nodes children
 	 */
-	public static function getInnerHtml( DOMNode $node = null ) {
+	public static function getInnerHtml( ?DOMNode $node = null ) {
 		$html = '';
 		if ( $node ) {
 			$dom = $node instanceof DOMDocument ? $node : $node->ownerDocument;
@@ -612,33 +400,6 @@ abstract class Utils {
 	}
 
 	/**
-	 * @todo move into FauxRequest
-	 * @return string
-	 */
-	public static function generateForwardedCookieForCli() {
-		global $wgCookiePrefix;
-
-		$user = Container::get( 'occupation_controller' )->getTalkpageManager();
-		// This takes a request object, but doesnt set the cookies against it.
-		// patch at https://gerrit.wikimedia.org/r/177403
-		$user->setCookies( null, null, /* rememberMe */ true );
-		$response = RequestContext::getMain()->getRequest()->response();
-		if ( !$response instanceof FauxResponse ) {
-			throw new FlowException( 'Expected a FauxResponse in CLI environment' );
-		}
-		$cookies = $response->getCookies();
-
-		// now we need to convert the array into the cookie format of
-		// foo=bar; baz=bang
-		$output = [];
-		foreach ( $cookies as $key => $value ) {
-			$output[] = "$wgCookiePrefix$key={$value['value']}";
-		}
-
-		return implode( '; ', $output );
-	}
-
-	/**
 	 * @since 1.35
 	 * @return ILanguageConverter
 	 */
@@ -659,9 +420,9 @@ abstract class Utils {
 		$titleText = $title->getText();
 		$langConv = self::getLanguageConverter();
 		$variant = $langConv->getPreferredVariant();
-		if ( $langConv->convertNamespace( $ns, $variant ) ) {
-			return $langConv->convertNamespace( $ns, $variant ) .
-				':' . $langConv->translate( $titleText, $variant );
+		$convertedNamespace = $langConv->convertNamespace( $ns, $variant );
+		if ( $convertedNamespace ) {
+			return $convertedNamespace . ':' . $langConv->translate( $titleText, $variant );
 		} else {
 			return $langConv->translate( $titleText, $variant );
 		}

@@ -53,12 +53,15 @@ class PostRevisionStorage extends RevisionStorage {
 			$trees[$key] = $this->splitUpdate( $row, 'tree' );
 		}
 
-		$dbw = $this->dbFactory->getDB( DB_PRIMARY );
-		$dbw->insert(
-			$this->joinTable(),
-			$this->preprocessNestedSqlArray( $trees ),
-			__METHOD__
-		);
+		if ( $trees ) {
+			$dbw = $this->dbFactory->getDB( DB_PRIMARY );
+			$queryBuilder = $dbw->newInsertQueryBuilder()
+				->insertInto( $this->joinTable() )
+				->rows( $this->preprocessNestedSqlArray( $trees ) )
+				->caller( __METHOD__ );
+			DbStorage::maybeSetInsertIgnore( $queryBuilder );
+			$queryBuilder->execute();
+		}
 
 		// If this is a brand new root revision it needs to be added to the tree
 		// If it has a rev_parent_id then its already a part of the tree
@@ -91,12 +94,12 @@ class PostRevisionStorage extends RevisionStorage {
 		}
 
 		$dbw = $this->dbFactory->getDB( DB_PRIMARY );
-		$dbw->update(
-			$this->joinTable(),
-			$this->preprocessSqlArray( $treeChanges ),
-			[ 'tree_rev_id' => $old['tree_rev_id'] ],
-			__METHOD__
-		);
+		$dbw->newUpdateQueryBuilder()
+			->update( $this->joinTable() )
+			->set( $this->preprocessSqlArray( $treeChanges ) )
+			->where( [ 'tree_rev_id' => $old['tree_rev_id'] ] )
+			->caller( __METHOD__ )
+			->execute();
 
 		return $changes;
 	}
@@ -105,14 +108,12 @@ class PostRevisionStorage extends RevisionStorage {
 	 * this doesn't delete the whole post, it just deletes the revision.
 	 * The post will *always* exist in the tree structure, its just a tree
 	 * and we aren't going to re-parent its children;
-	 * @param array $row
-	 * @return bool|\Wikimedia\Rdbms\IResultWrapper
 	 */
 	protected function removeRelated( array $row ) {
-		return $this->dbFactory->getDB( DB_PRIMARY )->delete(
-			$this->joinTable(),
-			$this->preprocessSqlArray( [ $this->joinField() => $row['rev_id'] ] ),
-			__METHOD__
-		);
+		$this->dbFactory->getDB( DB_PRIMARY )->newDeleteQueryBuilder()
+			->deleteFrom( $this->joinTable() )
+			->where( $this->preprocessSqlArray( [ $this->joinField() => $row['rev_id'] ] ) )
+			->caller( __METHOD__ )
+			->execute();
 	}
 }

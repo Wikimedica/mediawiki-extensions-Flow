@@ -9,8 +9,8 @@ use Flow\Model\AbstractRevision;
 use Flow\Model\PostRevision;
 use Flow\Parsoid\ContentFixer;
 use Flow\Repository\UserNameBatch;
-use Linker;
-use WikiMap;
+use MediaWiki\Linker\Linker;
+use MediaWiki\WikiMap\WikiMap;
 
 /**
  * This class is slowly being deprecated. It used to house a minimalist
@@ -69,7 +69,7 @@ class Templating {
 		// displayed, since it will be the moderator user
 		static $cache = [];
 		$userid = $revision->getUserId();
-		$userip = $revision->getUserIp();
+		$userip = $revision->getUserIp() ?? '';
 		if ( isset( $cache[$userid][$userip] ) ) {
 			return $cache[$userid][$userip];
 		}

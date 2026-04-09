@@ -2,22 +2,27 @@
 
 namespace Flow\Model;
 
-use ApiSerializable;
 use Flow\Data\ObjectManager;
 use Flow\Exception\FlowException;
 use Flow\Exception\InvalidInputException;
 use Flow\Exception\InvalidParameterException;
-use MWTimestamp;
+use MediaWiki\Api\ApiSerializable;
+use MediaWiki\MediaWikiServices;
+use MediaWiki\Utils\MWTimestamp;
+use Wikimedia\JsonCodec\JsonCodecable;
+use Wikimedia\JsonCodec\JsonCodecableTrait;
 use Wikimedia\Rdbms\Blob;
 use Wikimedia\Timestamp\TimestampException;
 
 /**
  * Immutable class modeling timestamped UUID's from
- * the core UIDGenerator.
+ * the core GlobalIdGenerator.
  *
  * @todo probably should be UID since these dont match the UUID standard
  */
-class UUID implements ApiSerializable {
+class UUID implements ApiSerializable, JsonCodecable {
+	use JsonCodecableTrait;
+
 	/**
 	 * @var UUID[][]
 	 */
@@ -155,7 +160,8 @@ class UUID implements ApiSerializable {
 		if ( is_string( $input ) || is_int( $input ) || $input === false ) {
 			if ( $input === false ) {
 				// new uuid in base 16 and pad to HEX_LEN with 0's
-				$hexValue = str_pad( \UIDGenerator::newTimestampedUID88( 16 ),
+				$gen = MediaWikiServices::getInstance()->getGlobalIdGenerator();
+				$hexValue = str_pad( $gen->newTimestampedUID88( 16 ),
 					self::HEX_LEN, '0', STR_PAD_LEFT );
 				return new static( $hexValue, static::INPUT_HEX );
 			} else {
@@ -201,7 +207,7 @@ class UUID implements ApiSerializable {
 		} elseif ( $input === null ) {
 			return null;
 		} else {
-			throw new InvalidParameterException( 'Unknown input type to UUID class: ' . gettype( $input ) );
+			throw new InvalidParameterException( 'Unknown input type to UUID class: ' . get_debug_type( $input ) );
 		}
 	}
 
@@ -214,8 +220,18 @@ class UUID implements ApiSerializable {
 		return $this->getAlphadecimal();
 	}
 
+	public function toJsonArray(): array {
+		return [
+			'alnum' => $this->getAlphadecimal()
+		];
+	}
+
+	public static function newFromJsonArray( array $json ) {
+		return new UUID( $json['alnum'], self::INPUT_ALNUM );
+	}
+
 	/**
-	 * @return mixed
+	 * @return string
 	 */
 	public function serializeForApiResult() {
 		return $this->getAlphadecimal();
@@ -363,7 +379,7 @@ class UUID implements ApiSerializable {
 	 * @param UUID|null $other
 	 * @return bool
 	 */
-	public function equals( UUID $other = null ) {
+	public function equals( ?UUID $other = null ) {
 		return $other && $other->getAlphadecimal() === $this->getAlphadecimal();
 	}
 
@@ -430,7 +446,7 @@ class UUID implements ApiSerializable {
 
 	/**
 	 * Converts a binary uuid into a MWTimestamp. This UUID must have
-	 * been generated with \UIDGenerator::newTimestampedUID88.
+	 * been generated with GlobalIdGenerator::newTimestampedUID88.
 	 *
 	 * @param string $hex
 	 * @return int Number of seconds since epoch

@@ -1,8 +1,8 @@
 {
 	"@metadata": {
 		"authors": [
-			"Sveinn í Felli",
-			"Stefán Örvar Sigmundsson"
+			"Stefán Örvar Sigmundsson",
+			"Sveinn í Felli"
 		]
 	},
 	"nstab-topic": "Umfjöllunarefni",
@@ -83,7 +83,6 @@
 	"flow-special-type": "Tegund",
 	"flow-special-type-post": "Framlag",
 	"flow-special-type-workflow": "Vinnuferli",
-	"flow-special-uuid": "UUID",
 	"flow-edited": "Breytt",
 	"flow-edited-by": "Breytt af $1",
 	"flow-previous-diff": "← Eldri breyting",

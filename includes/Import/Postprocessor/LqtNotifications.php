@@ -3,8 +3,6 @@
 namespace Flow\Import\Postprocessor;
 
 use BatchRowIterator;
-use EchoCallbackIterator;
-use EchoEvent;
 use Flow\Import\IImportHeader;
 use Flow\Import\IImportPost;
 use Flow\Import\IImportTopic;
@@ -14,9 +12,11 @@ use Flow\Import\PageImportState;
 use Flow\Import\TopicImportState;
 use Flow\Model\PostRevision;
 use Flow\Notifications\Controller;
+use MediaWiki\Extension\Notifications\Iterator\CallbackIterator;
+use MediaWiki\Extension\Notifications\Model\Event;
+use MediaWiki\User\User;
 use RecursiveIteratorIterator;
-use User;
-use Wikimedia\Rdbms\IDatabase;
+use Wikimedia\Rdbms\IReadableDatabase;
 
 /**
  * Converts LQT unread notifications into Echo notifications after a topic is imported
@@ -28,19 +28,16 @@ class LqtNotifications implements Postprocessor {
 	 */
 	protected $controller;
 
-	/**
-	 * @var IDatabase
-	 */
-	protected $dbw;
+	protected IReadableDatabase $dbr;
 
 	/**
 	 * @var PostRevision[] Array of imported replies
 	 */
 	protected $postsImported = [];
 
-	public function __construct( Controller $controller, IDatabase $dbw ) {
+	public function __construct( Controller $controller, IReadableDatabase $dbr ) {
 		$this->controller = $controller;
-		$this->dbw = $dbw;
+		$this->dbr = $dbr;
 		$this->overrideUsersToNotify();
 	}
 
@@ -68,26 +65,26 @@ class LqtNotifications implements Postprocessor {
 		// Overrides existing user-locators, because we don't want unintended
 		// notifications to go out here.
 		$wgEchoNotifications['flow-post-reply']['user-locators'] = [
-			function ( EchoEvent $event ) {
+			function ( Event $event ) {
 				return $this->locateUsersWithPendingLqtNotifications( $event );
 			}
 		];
 	}
 
 	/**
-	 * @param EchoEvent $event
+	 * @param Event $event
 	 * @param int $batchSize
 	 * @throws ImportException
-	 * @return EchoCallbackIterator
+	 * @return CallbackIterator
 	 */
-	public function locateUsersWithPendingLqtNotifications( EchoEvent $event, $batchSize = 500 ) {
+	public function locateUsersWithPendingLqtNotifications( Event $event, $batchSize = 500 ) {
 		$activeThreadId = $event->getExtraParam( 'lqtThreadId' );
 		if ( $activeThreadId === null ) {
 			throw new ImportException( 'No active thread!' );
 		}
 
 		$it = new BatchRowIterator(
-			$this->dbw,
+			$this->dbr,
 			/* table = */ 'user_message_state',
 			/* primary keys */ [ 'ums_user' ],
 			$batchSize
@@ -102,7 +99,7 @@ class LqtNotifications implements Postprocessor {
 		$it = new RecursiveIteratorIterator( $it );
 
 		// add callback to convert user id to user objects
-		$it = new EchoCallbackIterator( $it, static function ( $row ) {
+		$it = new CallbackIterator( $it, static function ( $row ) {
 			return User::newFromId( $row->ums_user );
 		} );
 
@@ -113,7 +110,7 @@ class LqtNotifications implements Postprocessor {
 		if ( !$topic instanceof ImportTopic ) {
 			return;
 		}
-		if ( empty( $this->postsImported ) ) {
+		if ( !$this->postsImported ) {
 			// nothing was imported in this topic
 			return;
 		}

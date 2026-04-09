@@ -2,21 +2,20 @@
 
 namespace Flow\Actions;
 
-use Action;
-use Article;
-use ErrorPageError;
 use Flow\Container;
 use Flow\Data\ManagerGroup;
 use Flow\Exception\FlowException;
-use Flow\Exception\InvalidDataException;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\View;
 use Flow\WorkflowLoaderFactory;
-use IContextSource;
-use OutputPage;
-use Title;
-use WebRequest;
+use MediaWiki\Actions\Action;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Exception\ErrorPageError;
+use MediaWiki\Output\OutputPage;
+use MediaWiki\Page\Article;
+use MediaWiki\Request\WebRequest;
+use MediaWiki\Title\Title;
 
 class FlowAction extends Action {
 	/**
@@ -55,7 +54,7 @@ class FlowAction extends Action {
 	 * @throws ErrorPageError
 	 * @throws FlowException
 	 */
-	public function showForAction( $action, OutputPage $output = null ) {
+	public function showForAction( $action, ?OutputPage $output = null ) {
 		$container = Container::getContainer();
 		$output ??= $this->context->getOutput();
 		$title = $this->getTitle();
@@ -89,30 +88,16 @@ class FlowAction extends Action {
 		}
 
 		$action = $request->getVal( 'action', 'view' );
-		try {
-			/** @var WorkflowLoaderFactory $factory */
-			$factory = $container['factory.loader.workflow'];
-			$loader = $factory->createWorkflowLoader( $title );
+		/** @var WorkflowLoaderFactory $factory */
+		$factory = $container['factory.loader.workflow'];
+		$loader = $factory->createWorkflowLoader( $title );
 
-			if ( $title->getNamespace() === NS_TOPIC && $loader->getWorkflow()->getType() !== 'topic' ) {
-				// @todo better error handling
-				throw new FlowException( 'Invalid title: uuid is not a topic' );
-			}
-
-			$view->show( $loader, $action );
-		} catch ( InvalidDataException $e ) {
-			// FIXME: This isn't a real solution to the problem.
-			// Pretend that we aren't generating 500 errors here by swallowing the
-			// error, removing some log spam and avoiding pings to SRE and others
-			// looking at the production logs.
-			// The actual fix would be to prevent users from getting in a stuck
-			// position with their user talk pages.
-			$output->setPageTitle( $e->getPageTitle() );
-			$output->addHTML( $e->getHTML() );
-		} catch ( FlowException $e ) {
-			$e->setOutput( $output );
-			throw $e;
+		if ( $title->getNamespace() === NS_TOPIC && $loader->getWorkflow()->getType() !== 'topic' ) {
+			// @todo better error handling
+			throw new FlowException( 'Invalid title: uuid is not a topic' );
 		}
+
+		$view->show( $loader, $action );
 	}
 
 	/**

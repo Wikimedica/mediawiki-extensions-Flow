@@ -10,10 +10,11 @@ use Flow\Model\PostSummary;
 use Flow\Model\TopicListEntry;
 use Flow\Model\Workflow;
 use Flow\OccupationController;
+use MediaWiki\Exception\MWExceptionHandler;
 use MediaWiki\MediaWikiServices;
-use MWTimestamp;
-use Title;
-use User;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
+use MediaWiki\Utils\MWTimestamp;
 
 class TalkpageImportOperation {
 	/**
@@ -116,7 +117,7 @@ class TalkpageImportOperation {
 			throw $e;
 		} catch ( \Exception $e ) {
 			$state->rollback();
-			\MWExceptionHandler::logException( $e );
+			MWExceptionHandler::logException( $e );
 			$state->logger->error( 'Failed importing header: ' . $header->getObjectKey() );
 			$state->logger->error( (string)$e );
 			$failed++;
@@ -141,7 +142,7 @@ class TalkpageImportOperation {
 				throw $e;
 			} catch ( \Exception $e ) {
 				$state->rollback();
-				\MWExceptionHandler::logException( $e );
+				MWExceptionHandler::logException( $e );
 				$state->logger->error( 'Failed importing topic: ' . $topic->getObjectKey() );
 				$state->logger->error( (string)$e );
 				$failed++;
@@ -152,10 +153,6 @@ class TalkpageImportOperation {
 		return $failed === 0;
 	}
 
-	/**
-	 * @param PageImportState $pageState
-	 * @param IImportHeader $importHeader
-	 */
 	public function importHeader( PageImportState $pageState, IImportHeader $importHeader ) {
 		$pageState->logger->info( 'Importing header' );
 		if ( !$importHeader->getRevisions()->valid() ) {
@@ -210,10 +207,6 @@ class TalkpageImportOperation {
 		$pageState->logger->info( 'Imported ' . count( $revisions ) . ' revisions for header' );
 	}
 
-	/**
-	 * @param TopicImportState $topicState
-	 * @param IImportTopic $importTopic
-	 */
 	public function importTopic( TopicImportState $topicState, IImportTopic $importTopic ) {
 		$summary = $importTopic->getTopicSummary();
 		if ( $summary ) {
@@ -238,8 +231,7 @@ class TalkpageImportOperation {
 		$topicState = $this->getExistingTopicState( $state, $importTopic );
 		if ( $topicState ) {
 			$state->logger->info(
-				'Continuing import to ' . $topicState->topicWorkflow->getArticleTitle(
-				)->getPrefixedText()
+				'Continuing import to ' . $topicState->topicWorkflow->getArticleTitle()->getPrefixedText()
 			);
 
 			return $topicState;
@@ -331,10 +323,6 @@ class TalkpageImportOperation {
 		return null;
 	}
 
-	/**
-	 * @param TopicImportState $state
-	 * @param IImportSummary $importSummary
-	 */
 	public function importSummary( TopicImportState $state, IImportSummary $importSummary ) {
 		$state->parent->logger->info( "Importing summary" );
 		$existingId = $state->parent->getImportedId( $importSummary );

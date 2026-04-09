@@ -2,16 +2,12 @@
 
 namespace Flow\Actions;
 
-use Article;
-use IContextSource;
-use Title;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Page\Article;
+use MediaWiki\Title\Title;
 
 class EditAction extends FlowAction {
 
-	/**
-	 * @param Article $article
-	 * @param IContextSource $context
-	 */
 	public function __construct( Article $article, IContextSource $context ) {
 		parent::__construct( $article, $context, 'edit' );
 	}

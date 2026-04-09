@@ -5,17 +5,19 @@ namespace Flow\Tests\SpamFilter;
 use Flow\Model\PostRevision;
 use Flow\Model\Workflow;
 use Flow\SpamFilter\ContentLengthFilter;
-use Title;
-use User;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 /**
  * @covers \Flow\SpamFilter\ContentLengthFilter
  *
  * @group Flow
+ * @group Database
  */
 class ContentLengthFilterTest extends \MediaWikiIntegrationTestCase {
 
-	public function filterValidationProvider() {
+	public static function filterValidationProvider() {
 		yield 'With content shorter than max length allow through filter' => [
 			'expected' => true,
 			'content' => 'blah',
@@ -32,7 +34,7 @@ class ContentLengthFilterTest extends \MediaWikiIntegrationTestCase {
 	 * @dataProvider filterValidationProvider
 	 */
 	public function testFilterValidation( $expected, $content, $maxLength ) {
-		$ownerTitle = Title::newFromText( 'UTPage' );
+		$ownerTitle = Title::makeTitle( NS_MAIN, 'TestFilterValidation' );
 		$title = Title::newFromText( 'Topic:Tnprd6ksfu1v1nme' );
 		$user = User::newFromName( '127.0.0.1', false );
 		$workflow = Workflow::create( 'topic', $title );
@@ -40,7 +42,7 @@ class ContentLengthFilterTest extends \MediaWikiIntegrationTestCase {
 		$reply = $topic->reply( $workflow, $user, $content, 'wikitext' );
 
 		$filter = new ContentLengthFilter( $maxLength );
-		$status = $filter->validate( $this->createMock( \IContextSource::class ), $reply, null, $title, $ownerTitle );
+		$status = $filter->validate( $this->createMock( IContextSource::class ), $reply, null, $title, $ownerTitle );
 		$this->assertSame( $expected, $status->isOK() );
 	}
 }

@@ -1,6 +1,6 @@
-@import 'mediawiki.mixins';
-@import '../flow.variables';
-@import '../flow.colors';
+@import '../flow.colors.less';
+@import '../flow.variables.less';
+@import 'mediawiki.mixins.less';
 
 // @todo document flow-menu
 .flow-menu {
@@ -82,7 +82,7 @@ div > .flow-menu {
 		}
 	}
 
-	&.flow-menu-hoverable:hover,
+	&.flow-menu-hoverable:has( .flow-menu-js-drop:hover ),
 	&.focus {
 		z-index: 2;
 
@@ -116,7 +116,7 @@ div > .flow-menu {
 
 		> section:not( :first-of-type ) > li:first-of-type,
 		li.flow-menu-section:not( :first-of-type ) {
-			border-top: 1px solid @colorGray12;
+			border-top: @border-subtle;
 		}
 	}
 
@@ -141,7 +141,7 @@ div > .flow-menu {
 			padding: 0 0.5em;
 			border-radius: @border-radius-base;
 			border-width: 0;
-			color: @colorTextLight;
+			color: @color-subtle;
 		}
 	}
 

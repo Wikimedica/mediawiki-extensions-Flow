@@ -20,10 +20,10 @@ use Flow\Tests\Mock\MockImportRevision;
 use Flow\Tests\Mock\MockImportSource;
 use Flow\Tests\Mock\MockImportSummary;
 use Flow\Tests\Mock\MockImportTopic;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 use Psr\Log\NullLogger;
 use SplQueue;
-use Title;
-use User;
 
 /**
  * @covers \Flow\Import\TalkpageImportOperation
@@ -32,15 +32,6 @@ use User;
  * @group Database
  */
 class TalkpageImportOperationTest extends \MediaWikiIntegrationTestCase {
-	/** @inheritDoc */
-	protected $tablesUsed = [
-		// importer will ensureFlowRevision(), which will insert into these core tables
-		'page',
-		'revision',
-		'ip_changes',
-		'text',
-	];
-
 	protected function setUp(): void {
 		parent::setUp();
 
@@ -101,7 +92,7 @@ class TalkpageImportOperationTest extends \MediaWikiIntegrationTestCase {
 										// revisions
 										new MockImportRevision( [
 											'createdTimestmap' => $now - 500,
-											'user' => User::newFromName( '10.0.0.2', false ),
+											'user' => $this->getTestUser()->getUser()
 										] ),
 									],
 									[

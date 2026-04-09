@@ -7,9 +7,14 @@ use Flow\Container;
 use Flow\Data\ObjectManager;
 use Flow\LinksTableUpdater;
 use Flow\Model\Workflow;
-use LoggedUpdateMaintenance;
-use MediaWiki\MediaWikiServices;
-use WikiMap;
+use MediaWiki\Deferred\LinksUpdate\CategoryLinksTable;
+use MediaWiki\Deferred\LinksUpdate\ExternalLinksTable;
+use MediaWiki\Deferred\LinksUpdate\ImageLinksTable;
+use MediaWiki\Deferred\LinksUpdate\InterwikiLinksTable;
+use MediaWiki\Deferred\LinksUpdate\PageLinksTable;
+use MediaWiki\Deferred\LinksUpdate\TemplateLinksTable;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
+use MediaWiki\WikiMap\WikiMap;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -67,7 +72,7 @@ class FlowFixLinks extends LoggedUpdateMaintenance {
 	}
 
 	protected function rebuildCoreTables() {
-		$dbw = wfGetDB( DB_PRIMARY );
+		$dbw = $this->getPrimaryDB();
 		$dbr = Container::get( 'db.factory' )->getDB( DB_REPLICA );
 		/** @var LinksTableUpdater $linksTableUpdater */
 		$linksTableUpdater = Container::get( 'reference.updater.links-tables' );
@@ -77,8 +82,6 @@ class FlowFixLinks extends LoggedUpdateMaintenance {
 		$iterator->addConditions( [ 'workflow_wiki' => WikiMap::getCurrentWikiId() ] );
 		$iterator->setCaller( __METHOD__ );
 
-		$lbFactory = MediaWikiServices::getInstance()->getDBLoadBalancerFactory();
-
 		$count = 0;
 		foreach ( $iterator as $rows ) {
 			$this->beginTransaction( $dbw, __METHOD__ );
@@ -86,15 +89,44 @@ class FlowFixLinks extends LoggedUpdateMaintenance {
 			foreach ( $rows as $row ) {
 				$workflow = Workflow::fromStorageRow( (array)$row );
 				$id = $workflow->getArticleTitle()->getArticleID();
+				$dbProvider = $this->getServiceContainer()->getConnectionProvider();
 
 				// delete existing links from DB
-				$dbw->delete( 'pagelinks', [ 'pl_from' => $id ], __METHOD__ );
-				$dbw->delete( 'imagelinks', [ 'il_from' => $id ], __METHOD__ );
-				$dbw->delete( 'categorylinks', [ 'cl_from' => $id ], __METHOD__ );
-				$dbw->delete( 'templatelinks', [ 'tl_from' => $id ], __METHOD__ );
-				$dbw->delete( 'externallinks', [ 'el_from' => $id ], __METHOD__ );
-				$dbw->delete( 'langlinks', [ 'll_from' => $id ], __METHOD__ );
-				$dbw->delete( 'iwlinks', [ 'iwl_from' => $id ], __METHOD__ );
+				$dbProvider->getPrimaryDatabase( PageLinksTable::VIRTUAL_DOMAIN )->newDeleteQueryBuilder()
+					->deleteFrom( 'pagelinks' )
+					->where( [ 'pl_from' => $id ] )
+					->caller( __METHOD__ )
+					->execute();
+				$dbProvider->getPrimaryDatabase( ImageLinksTable::VIRTUAL_DOMAIN )->newDeleteQueryBuilder()
+					->deleteFrom( 'imagelinks' )
+					->where( [ 'il_from' => $id ] )
+					->caller( __METHOD__ )
+					->execute();
+				$dbProvider->getPrimaryDatabase( CategoryLinksTable::VIRTUAL_DOMAIN )->newDeleteQueryBuilder()
+					->deleteFrom( 'categorylinks' )
+					->where( [ 'cl_from' => $id ] )
+					->caller( __METHOD__ )
+					->execute();
+				$dbProvider->getPrimaryDatabase( TemplateLinksTable::VIRTUAL_DOMAIN )->newDeleteQueryBuilder()
+					->deleteFrom( 'templatelinks' )
+					->where( [ 'tl_from' => $id ] )
+					->caller( __METHOD__ )
+					->execute();
+				$dbProvider->getPrimaryDatabase( ExternalLinksTable::VIRTUAL_DOMAIN )->newDeleteQueryBuilder()
+					->deleteFrom( 'externallinks' )
+					->where( [ 'el_from' => $id ] )
+					->caller( __METHOD__ )
+					->execute();
+				$dbw->newDeleteQueryBuilder()
+					->deleteFrom( 'langlinks' )
+					->where( [ 'll_from' => $id ] )
+					->caller( __METHOD__ )
+					->execute();
+				$dbProvider->getPrimaryDatabase( InterwikiLinksTable::VIRTUAL_DOMAIN )->newDeleteQueryBuilder()
+					->deleteFrom( 'iwlinks' )
+					->where( [ 'iwl_from' => $id ] )
+					->caller( __METHOD__ )
+					->execute();
 
 				// regenerate & store those links
 				$linksTableUpdater->doUpdate( $workflow );
@@ -104,7 +136,7 @@ class FlowFixLinks extends LoggedUpdateMaintenance {
 
 			$count += count( $rows );
 			$this->output( "Rebuilt links for " . $count . " workflows...\n" );
-			$lbFactory->waitForReplication();
+			$this->waitForReplication();
 		}
 	}
 }

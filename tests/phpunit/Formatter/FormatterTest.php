@@ -2,9 +2,9 @@
 
 namespace Flow\Tests\Formatter;
 
-use ExtensionRegistry;
 use Flow\Container;
 use Flow\Data\Mapper\CachingObjectMapper;
+use Flow\Formatter\CheckUserFormatter;
 use Flow\Formatter\FormatterRow;
 use Flow\Formatter\RevisionFormatter;
 use Flow\Model\UUID;
@@ -13,7 +13,8 @@ use Flow\RevisionActionPermissions;
 use Flow\Templating;
 use Flow\Tests\FlowTestCase;
 use Flow\UrlGenerator;
-use Title;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Title\Title;
 use Wikimedia\AtEase\AtEase;
 
 /**
@@ -54,21 +55,18 @@ class FormatterTest extends FlowTestCase {
 	 * @dataProvider checkUserProvider
 	 * @group Broken
 	 */
-	public function testCheckUserFormatter( $message, $test, $action, UUID $workflowId, UUID $revId, UUID $postId = null ) {
+	public function testCheckUserFormatter( $message, $test, $action, UUID $workflowId, UUID $revId, ?UUID $postId = null ) {
 		global $wgLang;
 
-		if ( !ExtensionRegistry::getInstance()->isLoaded( 'CheckUser' ) ) {
-			$this->markTestSkipped( 'CheckUser is not available' );
-			return;
-		}
+		$this->markTestSkippedIfExtensionNotLoaded( 'CheckUser' );
 
-		$title = Title::newFromText( 'Test', NS_USER_TALK );
+		$title = Title::makeTitle( NS_USER_TALK, 'TestCheckUserFormatter' );
 		$row = new FormatterRow;
 		$row->workflow = $this->mockWorkflow( $workflowId, $title );
 		$row->revision = $this->mockRevision( $action, $revId, $postId );
 		$row->currentRevision = $row->revision;
 
-		$ctx = $this->createMock( \IContextSource::class );
+		$ctx = $this->createMock( IContextSource::class );
 		$ctx->method( 'getLanguage' )
 			->willReturn( $wgLang );
 		$ctx->method( 'msg' )
@@ -77,7 +75,7 @@ class FormatterTest extends FlowTestCase {
 		// Code uses wfWarn as a louder wfDebugLog in error conditions.
 		// but phpunit considers a warning a fail.
 		AtEase::suppressWarnings();
-		$links = $this->createFormatter( \Flow\Formatter\CheckUserFormatter::class )->format( $row, $ctx );
+		$links = $this->createFormatter()->format( $row, $ctx );
 		AtEase::restoreWarnings();
 		$test( $this, $message, $links );
 	}
@@ -91,7 +89,7 @@ class FormatterTest extends FlowTestCase {
 		return $workflow;
 	}
 
-	private function mockRevision( $changeType, UUID $revId, UUID $postId = null ) {
+	private function mockRevision( $changeType, UUID $revId, ?UUID $postId = null ) {
 		$revision = $this->createMock( $postId ? \Flow\Model\PostRevision::class : \Flow\Model\Header::class );
 		$revision->method( 'getChangeType' )
 			->willReturn( $changeType );
@@ -104,7 +102,7 @@ class FormatterTest extends FlowTestCase {
 		return $revision;
 	}
 
-	private function createFormatter( $class ) {
+	private function createFormatter() {
 		$permissions = $this->createMock( RevisionActionPermissions::class );
 		$permissions->method( 'isAllowed' )
 			->willReturn( true );
@@ -121,7 +119,7 @@ class FormatterTest extends FlowTestCase {
 			$wgFlowMaxThreadingDepth
 		);
 
-		return new $class( $permissions, $serializer );
+		return new CheckUserFormatter( $permissions, $serializer );
 	}
 
 	protected function dataToString( $data ) {

@@ -4,15 +4,18 @@
 
 namespace Flow\Tests\Conversion;
 
+use DOMDocument;
 use Flow\Conversion\Utils;
 use Flow\Exception\WikitextException;
 use Flow\Tests\FlowTestCase;
-use Title;
+use MediaWiki\MainConfigNames;
+use MediaWiki\Title\Title;
 
 /**
  * @covers \Flow\Conversion\Utils
  *
  * @group Flow
+ * @group Database
  */
 class ConversionUtilsTest extends FlowTestCase {
 
@@ -33,29 +36,28 @@ class ConversionUtilsTest extends FlowTestCase {
 	 * @dataProvider createDomProvider
 	 */
 	public function testCreateDomErrorModes( $message, $content ) {
-		$this->assertInstanceOf( \DOMDocument::class, Utils::createDOM( $content ), $message );
+		$this->assertInstanceOf( DOMDocument::class, Utils::createDOM( $content ), $message );
 	}
 
 	public static function createRelativeTitleProvider() {
 		return [
 			[
-				'strips leading ./ and treats as non-relative',
-				// expect
-				Title::newFromText( 'File:Foo.jpg' ),
-				// input text
-				'./File:Foo.jpg',
-				// relative to title
-				Title::newMainPage()
+				'message' => 'strips leading ./ and treats as non-relative',
+				'expectedTitleText' => 'Foo.jpg',
+				'inputText' => './File:Foo.jpg',
+				'inputTitleText' => 'Main_Page',
 			],
-
 			[
-				'two level upwards traversal',
-				// expect
-				Title::newFromText( 'File:Bar.jpg' ),
-				// input text
-				'../../File:Bar.jpg',
-				// relative to title
-				Title::newFromText( 'Main_Page/And/Subpage' ),
+				'message' => 'two level upwards traversal',
+				'expectedTitleText' => 'Bar.jpg',
+				'inputText' => '../../File:Bar.jpg',
+				'inputTitleText' => 'Main_Page/And/Subpage',
+			],
+			[
+				'message' => 'appends non-relative text to the title',
+				'expectedTitleText' => 'Main_Page/Image.jpg',
+				'inputText' => '/Image.jpg',
+				'inputTitleText' => 'File:Main_Page',
 			],
 		];
 	}
@@ -63,16 +65,19 @@ class ConversionUtilsTest extends FlowTestCase {
 	/**
 	 * @dataProvider createRelativeTitleProvider
 	 */
-	public function testResolveSubpageTraversal( $message, $expect, $text, Title $title ) {
-		$result = Utils::createRelativeTitle( $text, $title );
+	public function testResolveSubpageTraversal( $message, $expectedTitleText, $inputText, $inputTitleText ) {
+		$expectTitle = Title::makeTitle( NS_FILE, $expectedTitleText );
+		$title = Title::newFromText( $inputTitleText );
 
-		if ( $expect === null ) {
-			$this->assertNull( $expect, $message );
-		} elseif ( $expect instanceof Title ) {
+		$result = Utils::createRelativeTitle( $inputText, $title );
+
+		if ( $expectTitle === null ) {
+			$this->assertNull( $expectTitle, $message );
+		} elseif ( $expectTitle instanceof Title ) {
 			$this->assertInstanceOf( Title::class, $result, $message );
-			$this->assertEquals( $expect->getPrefixedText(), $result->getPrefixedText(), $message );
+			$this->assertEquals( $expectTitle->getPrefixedText(), $result->getPrefixedText(), $message );
 		} else {
-			$this->assertEquals( $expect, $result, $message );
+			$this->assertEquals( $expectTitle, $result, $message );
 		}
 	}
 
@@ -122,7 +127,7 @@ class ConversionUtilsTest extends FlowTestCase {
 	 * @dataProvider topicTitleProvider
 	 */
 	public function testTopicTitle( $message, $wikitext, $expectedHtml, $expectedPlaintext ) {
-		$this->setMwGlobals( 'wgScript', '/w/index.php' );
+		$this->overrideConfigValue( MainConfigNames::Script, '/w/index.php' );
 
 		$html = Utils::convert( 'topic-title-wikitext', 'topic-title-html', $wikitext, Title::newMainPage() );
 		$this->assertEquals( $expectedHtml, $html, "$message: html" );
@@ -209,7 +214,9 @@ class ConversionUtilsTest extends FlowTestCase {
 	 * @dataProvider provideDecodeHeadInfo
 	 */
 	public function testDecodeHeadInfo( $message, $input, $expectedOutput ) {
-		$this->assertEquals( $expectedOutput, Utils::decodeHeadInfo( $input ), $message );
+		$actual = Utils::decodeHeadInfo( $input );
+		$actual = str_replace( '/>', '>', $actual );
+		$this->assertSame( $expectedOutput, $actual, $message );
 	}
 
 	public static function provideDecodeHeadInfo() {
@@ -217,7 +224,7 @@ class ConversionUtilsTest extends FlowTestCase {
 			[
 				'Body tag with base-url',
 				'<body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><p>Hello</p></body>',
-				'<html><head><base href="//en.wikipedia.org/wiki/"/></head><body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><p>Hello</p></body></html>'
+				'<html><head><base href="//en.wikipedia.org/wiki/"></head><body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><p>Hello</p></body></html>'
 			],
 			[
 				'Body tag without base-url',
@@ -237,23 +244,81 @@ class ConversionUtilsTest extends FlowTestCase {
 			[
 				'Body tag with style tag',
 				'<body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style>.mw-parser-output { background-color: gray; }</style><p>Hello</p></body>',
-				'<html><head><base href="//en.wikipedia.org/wiki/"/></head><body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style>.mw-parser-output { background-color: gray; }</style><p>Hello</p></body></html>'
+				'<html><head><base href="//en.wikipedia.org/wiki/"></head><body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style>.mw-parser-output { background-color: gray; }</style><p>Hello</p></body></html>'
 			],
 			[
 				'Body tag with style tag and attributes',
 				'<body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style typeof="mw:Extension/templatestyles mw:Transclusion">.mw-parser-output { background-color: gray; }</style><p>Hello</p></body>',
-				'<html><head><base href="//en.wikipedia.org/wiki/"/></head><body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style typeof="mw:Extension/templatestyles mw:Transclusion">.mw-parser-output { background-color: gray; }</style><p>Hello</p></body></html>'
+				'<html><head><base href="//en.wikipedia.org/wiki/"></head><body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style typeof="mw:Extension/templatestyles mw:Transclusion">.mw-parser-output { background-color: gray; }</style><p>Hello</p></body></html>'
 			],
 			[
 				'Body tag with multiple style tags',
 				'<body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style>.mw-parser-output { background-color: gray; }</style><p>Hello</p><style>.mw-parser-output { background-color: gray; }</style></body>',
-				'<html><head><base href="//en.wikipedia.org/wiki/"/></head><body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style>.mw-parser-output { background-color: gray; }</style><p>Hello</p><style>.mw-parser-output { background-color: gray; }</style></body></html>'
+				'<html><head><base href="//en.wikipedia.org/wiki/"></head><body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style>.mw-parser-output { background-color: gray; }</style><p>Hello</p><style>.mw-parser-output { background-color: gray; }</style></body></html>'
 			],
 			[
 				'Body tag with style tag',
 				'<body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style test=">">.mw-parser-output { background-color: gray; }</style><p>Hello</p></body>',
-				'<html><head><base href="//en.wikipedia.org/wiki/"/></head><body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style test="&gt;">.mw-parser-output { background-color: gray; }</style><p>Hello</p></body></html>'
+				'<html><head><base href="//en.wikipedia.org/wiki/"></head><body base-url="//en.wikipedia.org/wiki/" parsoid-version="0.1.2"><style test="&gt;">.mw-parser-output { background-color: gray; }</style><p>Hello</p></body></html>'
 			],
 		];
+	}
+
+	public static function provideTransformationFormats() {
+		return [
+			[
+				'from' => 'topic-title-wikitext',
+				'to' => 'topic-title-plaintext',
+				'content' => 'Foobar',
+				'expected' => 'Foobar'
+			],
+			[
+				'from' => 'wikitext',
+				'to' => 'wikitext',
+				'content' => '== Foobar ==',
+				'expected' => '== Foobar =='
+			],
+			[
+				'from' => 'wikitext',
+				'to' => 'html',
+				'content' => '',
+				'expected' => ''
+			],
+			[
+				'from' => 'html',
+				'to' => 'html',
+				'content' => '<h2>Foobar</h2>',
+				'expected' => '<h2>Foobar</h2>'
+			],
+		];
+	}
+
+	/**
+	 * @dataProvider provideTransformationFormats
+	 */
+	public function testConvert( $from, $to, $content, $expected ) {
+		$title = $this->createNoOpMock( Title::class );
+		$actual = Utils::convert( $from, $to, $content, $title );
+		$this->assertSame( $expected, $actual );
+	}
+
+	public function testGetInnerHtml() {
+		$dom = new DOMDocument();
+		$dom->loadHTML( '<div><p>Test content "Foobar" </p></div>' );
+
+		$divNode = $dom->getElementsByTagName( 'div' )->item( 0 );
+
+		$innerHtml = Utils::getInnerHtml( $divNode );
+
+		$expectedInnerHtml = '<p>Test content "Foobar" </p>';
+		$this->assertEquals( $expectedInnerHtml, $innerHtml );
+	}
+
+	public function testGetParsoidVersion() {
+		$html = '<body parsoid-version="1.2.3">Test content "Foobar" </body>';
+
+		$version = Utils::getParsoidVersion( $html );
+		$expectedVersion = '1.2.3';
+		$this->assertEquals( $expectedVersion, $version );
 	}
 }

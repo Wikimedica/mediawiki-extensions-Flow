@@ -4,32 +4,16 @@ namespace Flow\Tests\Api;
 
 use Flow\Container;
 use Flow\Hooks;
-use HashConfig;
-use MediaWiki\MediaWikiServices;
+use MediaWiki\MainConfigNames;
 use MediaWiki\Permissions\Authority;
-use User;
 
 /**
  * @group Flow
  * @group medium
  */
-abstract class ApiTestCase extends \ApiTestCase {
-	/** @inheritDoc */
-	protected $tablesUsed = [
-		'flow_ext_ref',
-		'flow_revision',
-		'flow_topic_list',
-		'flow_tree_node',
-		'flow_tree_revision',
-		'flow_wiki_ref',
-		'flow_workflow',
-		'page',
-		'revision',
-		'ip_changes',
-		'text',
-	];
-
+abstract class ApiTestCase extends \MediaWiki\Tests\Api\ApiTestCase {
 	protected function setUp(): void {
+		Container::reset();
 		parent::setUp();
 
 		$namespaceContentModels = [
@@ -37,33 +21,18 @@ abstract class ApiTestCase extends \ApiTestCase {
 			NS_TOPIC => CONTENT_MODEL_FLOW_BOARD,
 		];
 
-		// TODO: remove this once core no longer accesses wgNamespaceContentModels directly.
-		$this->setMwGlobals( 'wgNamespaceContentModels', $namespaceContentModels );
+		$this->overrideConfigValues( [
+			MainConfigNames::NamespaceContentModels => $namespaceContentModels
+		] );
 
-		$this->overrideMwServices( new HashConfig( [
-			'NamespaceContentModels' => $namespaceContentModels
-		] ) );
-
-		$this->setCurrentUser( self::$users['sysop']->getUser() );
-	}
-
-	/**
-	 * Set $user in the Flow container
-	 * WARNING: This resets your container and
-	 *          gets rid of anything you may have mocked.
-	 * @param User $user
-	 */
-	protected function setCurrentUser( User $user ) {
-		Container::reset();
-		$container = Container::getContainer();
-		$container['user'] = $user;
+		$this->clearHooks();
 	}
 
 	protected function doApiRequest(
 		array $params,
-		array $session = null,
+		?array $session = null,
 		$appendModule = false,
-		Authority $performer = null,
+		?Authority $performer = null,
 		$tokenType = null,
 		$paramPrefix = null
 	) {
@@ -104,7 +73,7 @@ abstract class ApiTestCase extends \ApiTestCase {
 		global $wgFlowCacheTime;
 		Container::reset();
 		$container = Container::getContainer();
-		$wanCache = MediaWikiServices::getInstance()->getMainWANObjectCache();
+		$wanCache = $this->getServiceContainer()->getMainWANObjectCache();
 
 		$mock = $this->getMockBuilder( \Flow\Data\FlowObjectCache::class )
 			->setConstructorArgs( [ $wanCache, $container['db.factory'], $wgFlowCacheTime ] )

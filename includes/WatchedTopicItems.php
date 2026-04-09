@@ -2,10 +2,9 @@
 
 namespace Flow;
 
-use Flow\Exception\DataModelException;
-use Title;
-use User;
-use Wikimedia\Rdbms\IDatabase;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
+use Wikimedia\Rdbms\IReadableDatabase;
 
 /**
  * Is there a core object for retrieving multiple watchlist items?
@@ -14,12 +13,12 @@ class WatchedTopicItems {
 
 	/** @var User */
 	protected $user;
-	/** @var IDatabase */
+	/** @var IReadableDatabase */
 	protected $watchListDb;
 	/** @var true[][] */
 	protected $overrides = [];
 
-	public function __construct( User $user, IDatabase $watchListDb ) {
+	public function __construct( User $user, IReadableDatabase $watchListDb ) {
 		$this->user = $user;
 		$this->watchListDb = $watchListDb;
 	}
@@ -28,7 +27,6 @@ class WatchedTopicItems {
 	 * Helps prevent reading our own writes.  If we have explicitly
 	 * watched this title in this request set it here instead of
 	 * querying a replica and possibly not noticing due to replica lag.
-	 * @param Title $title
 	 */
 	public function addOverrideWatched( Title $title ) {
 		$this->overrides[$title->getNamespace()][$title->getDBkey()] = true;
@@ -37,7 +35,6 @@ class WatchedTopicItems {
 	/**
 	 * @param string[] $titles Array of UUID strings
 	 * @return array
-	 * @throws \Flow\Exception\DataModelException
 	 */
 	public function getWatchStatus( array $titles ) {
 		$titles = array_unique( $titles );
@@ -55,7 +52,7 @@ class WatchedTopicItems {
 				if ( isset( $this->overrides[$obj->getNamespace()][$key] ) ) {
 					$result[strtolower( $key )] = true;
 				} else {
-					$queryTitles[$key] = $obj->getDBkey();
+					$queryTitles[] = $obj->getDBkey();
 				}
 			}
 		}
@@ -64,19 +61,16 @@ class WatchedTopicItems {
 			return $result;
 		}
 
-		$res = $this->watchListDb->select(
-			[ 'watchlist' ],
-			[ 'wl_title' ],
-			[
+		$res = $this->watchListDb->newSelectQueryBuilder()
+			->select( 'wl_title' )
+			->from( 'watchlist' )
+			->where( [
 				'wl_user' => $this->user->getId(),
 				'wl_namespace' => NS_TOPIC,
 				'wl_title' => $queryTitles
-			],
-			__METHOD__
-		);
-		if ( !$res ) {
-			throw new DataModelException( 'query failure', 'process-data' );
-		}
+			] )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 		foreach ( $res as $row ) {
 			$result[strtolower( $row->wl_title )] = true;
 		}
@@ -91,7 +85,7 @@ class WatchedTopicItems {
 	}
 
 	/**
-	 * @return IDatabase
+	 * @return IReadableDatabase
 	 */
 	public function getWatchlistDb() {
 		return $this->watchListDb;

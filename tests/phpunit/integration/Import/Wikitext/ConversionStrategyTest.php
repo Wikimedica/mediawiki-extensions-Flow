@@ -4,7 +4,6 @@ namespace Flow\Tests\Import\Wikitext;
 
 use DateTime;
 use DateTimeZone;
-use ExtensionRegistry;
 use Flow\Container;
 use Flow\Hooks;
 use Flow\Import\IImportSource;
@@ -12,16 +11,16 @@ use Flow\Import\SourceStore\NullImportSourceStore;
 use Flow\Import\SourceStore\SourceStoreInterface;
 use Flow\Import\Wikitext\ConversionStrategy;
 use LinkCacheTestTrait;
-use MediaWiki\MediaWikiServices;
+use MediaWiki\Content\WikitextContent;
+use MediaWiki\Parser\Parser;
+use MediaWiki\Title\Title;
 use MediaWikiIntegrationTestCase;
-use Parser;
-use Title;
-use WikitextContent;
 
 /**
  * @covers \Flow\Import\Wikitext\ConversionStrategy
  *
  * @group Flow
+ * @group Database
  */
 class ConversionStrategyTest extends MediaWikiIntegrationTestCase {
 	use LinkCacheTestTrait;
@@ -103,16 +102,14 @@ class ConversionStrategyTest extends MediaWikiIntegrationTestCase {
 	 * @group Broken
 	 */
 	public function testShouldConvertLqt() {
-		if ( !ExtensionRegistry::getInstance()->isLoaded( 'Liquid Threads' ) ) {
-			$this->markTestSkipped( 'LiquidThreads not enabled' );
-		}
+		$this->markTestSkippedIfExtensionNotLoaded( 'Liquid Threads' );
 
 		$strategy = $this->createStrategy();
 
 		$lqtPagesName = 'Talk:Some ConversionStrategyTest LQT page';
-		$this->setMwGlobals( [
-			'wgLqtNamespaces' => [ NS_HELP_TALK ],
-			'wgLqtPages' => [ $lqtPagesName ],
+		$this->overrideConfigValues( [
+			'LqtNamespaces' => [ NS_HELP_TALK ],
+			'LqtPages' => [ $lqtPagesName ],
 		] );
 
 		// Not subpage, not LQT
@@ -164,7 +161,7 @@ class ConversionStrategyTest extends MediaWikiIntegrationTestCase {
 		);
 	}
 
-	public function provideMeetsSubpageRequirements() {
+	public static function provideMeetsSubpageRequirements() {
 		return [
 			[
 				'Talk:Some ConversionStrategyTest page',
@@ -194,11 +191,11 @@ class ConversionStrategyTest extends MediaWikiIntegrationTestCase {
 	}
 
 	protected function createStrategy(
-		Parser $parser = null,
-		SourceStoreInterface $sourceStore = null
+		?Parser $parser = null,
+		?SourceStoreInterface $sourceStore = null
 	) {
 		return new ConversionStrategy(
-			$parser ?: MediaWikiServices::getInstance()->getParser(),
+			$parser ?: $this->getServiceContainer()->getParser(),
 			$sourceStore ?: new NullImportSourceStore,
 			Container::get( 'default_logger' ),
 			Container::get( 'occupation_controller' )->getTalkpageManager()

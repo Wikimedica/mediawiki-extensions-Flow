@@ -8,8 +8,8 @@ use Flow\FlowActions;
 use Flow\Model\PostRevision;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
-use ManualLogEntry;
-use Title;
+use MediaWiki\Logging\ManualLogEntry;
+use MediaWiki\Title\Title;
 
 class ModerationLogger {
 	/**
@@ -17,9 +17,6 @@ class ModerationLogger {
 	 */
 	protected $actions;
 
-	/**
-	 * @param FlowActions $actions
-	 */
 	public function __construct( FlowActions $actions ) {
 		$this->actions = $actions;
 	}

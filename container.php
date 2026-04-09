@@ -5,7 +5,6 @@ use Flow\Data\Index\PostRevisionTopicHistoryIndex;
 use Flow\Data\Index\PostSummaryRevisionBoardHistoryIndex;
 use Flow\Data\Index\TopKIndex;
 use Flow\Data\Index\UniqueFeatureIndex;
-use Flow\Data\Mapper\BasicObjectMapper;
 use Flow\Data\Mapper\CachingObjectMapper;
 use Flow\Data\ObjectLocator;
 use Flow\Data\ObjectManager;
@@ -14,7 +13,6 @@ use Flow\Data\Storage\HeaderRevisionStorage;
 use Flow\Data\Storage\PostRevisionBoardHistoryStorage;
 use Flow\Data\Storage\PostSummaryRevisionBoardHistoryStorage;
 use Flow\Data\Storage\PostSummaryRevisionStorage;
-use Flow\Data\Storage\TopicListStorage;
 use MediaWiki\MediaWikiServices;
 
 // This lets the index handle the initial query from HistoryPager,
@@ -54,16 +52,11 @@ $c['repository.tree'] = static function ( $c ) {
 };
 
 $c['url_generator'] = static function ( $c ) {
-	return new Flow\UrlGenerator(
-		$c['storage.workflow.mapper']
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowUrlGenerator' );
 };
 
 $c['watched_items'] = static function ( $c ) {
-	return new Flow\WatchedTopicItems(
-		$c['user'],
-		wfGetDB( DB_REPLICA, 'watchlist' )
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowWatchedTopicItems' );
 };
 
 $c['permissions'] = static function ( $c ) {
@@ -75,28 +68,7 @@ $c['lightncandy'] = static function ( $c ) {
 };
 
 $c['templating'] = static function ( $c ) {
-	global $wgArticlePath;
-
-	$wikiLinkFixer = new Flow\Parsoid\Fixer\WikiLinkFixer(
-		MediaWikiServices::getInstance()->getLinkBatchFactory()->newLinkBatch()
-	);
-	$badImageRemover = new Flow\Parsoid\Fixer\BadImageRemover(
-		[ MediaWikiServices::getInstance()->getBadFileLookup(), 'isBadFile' ]
-	);
-	$baseHrefFixer = new Flow\Parsoid\Fixer\BaseHrefFixer( $wgArticlePath );
-	$extLinkFixer = new Flow\Parsoid\Fixer\ExtLinkFixer();
-	$contextFixer = new Flow\Parsoid\ContentFixer(
-		$wikiLinkFixer,
-		$badImageRemover,
-		$baseHrefFixer,
-		$extLinkFixer
-	);
-
-	return new Flow\Templating(
-		$c['repository.username'],
-		$contextFixer,
-		$c['permissions']
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowTemplating' );
 };
 
 // New Storage Impl
@@ -104,23 +76,20 @@ $c['flowcache'] = static function ( $c ) {
 	return MediaWikiServices::getInstance()->getService( 'FlowCache' );
 };
 
+$c['flowtalkpagemanager'] = static function ( $c ) {
+	return MediaWikiServices::getInstance()->getService( 'FlowTalkpageManager' );
+};
+
 // Batched username loader
 $c['repository.username'] = static function ( $c ) {
-	return new Flow\Repository\UserNameBatch(
-		new Flow\Repository\UserName\TwoStepUserNameQuery(
-			$c['db.factory']
-		)
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowUserNameRepository' );
 };
 $c['collection.cache'] = static function ( $c ) {
 	return new Flow\Collection\CollectionCache();
 };
 // Individual workflow instances
 $c['storage.workflow.mapper'] = static function ( $c ) {
-	return CachingObjectMapper::model(
-		\Flow\Model\Workflow::class,
-		[ 'workflow_id' ]
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowStorage.WorkflowMapper' );
 };
 $c['storage.workflow'] = static function ( $c ) {
 	$workflowBackend = new BasicDbStorage(
@@ -327,16 +296,6 @@ $c['storage.post_summary.mapper'] = static function ( $c ) {
 		[ 'rev_id' ]
 	);
 };
-$c['storage.post_summary.listeners.username'] = static function ( $c ) {
-	return new Flow\Data\Listener\UserNameListener(
-		$c['repository.username'],
-		[
-			'rev_user_id' => 'rev_user_wiki',
-			'rev_mod_user_id' => 'rev_mod_user_wiki',
-			'rev_edit_user_id' => 'rev_edit_user_wiki'
-		]
-	);
-};
 $c['storage.post_summary'] = static function ( $c ) {
 	global $wgFlowExternalStore;
 	$postSummaryBackend = new PostSummaryRevisionStorage(
@@ -370,9 +329,17 @@ $c['storage.post_summary'] = static function ( $c ) {
 		$postSummaryPrimaryIndex,
 		$postSummaryTopicLookupIndex,
 	];
+	$userNameListener = new Flow\Data\Listener\UserNameListener(
+		$c['repository.username'],
+		[
+			'rev_user_id' => 'rev_user_wiki',
+			'rev_mod_user_id' => 'rev_mod_user_wiki',
+			'rev_edit_user_id' => 'rev_edit_user_wiki'
+		]
+	);
 	$listeners = [
 		'listener.recentchanges' => $c['listener.recentchanges'],
-		'storage.post_summary.listeners.username' => $c['storage.post_summary.listeners.username'],
+		'storage.post_summary.listeners.username' => $userNameListener,
 		'listeners.notification' => $c['listeners.notification'],
 		'storage.post_summary_board_history.indexes.primary' => $c['storage.post_summary_board_history.indexes.primary'],
 		'listener.editcount' => $c['listener.editcount'],
@@ -388,64 +355,17 @@ $c['storage.post_summary'] = static function ( $c ) {
 };
 
 $c['storage.topic_list.mapper'] = static function ( $c ) {
-	// Must be BasicObjectMapper, due to variance in when
-	// we have workflow_last_update_timestamp
-	return BasicObjectMapper::model(
-		\Flow\Model\TopicListEntry::class
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowStorage.TopicList.Mapper' );
 };
 $c['storage.topic_list.backend'] = static function ( $c ) {
-	return new TopicListStorage(
-		// factory and table
-		$c['db.factory'],
-		'flow_topic_list',
-		[ 'topic_list_id', 'topic_id' ]
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowStorage.TopicList.Backend' );
 };
 /// In reverse order by topic last_updated
 $c['storage.topic_list.indexes.last_updated'] = static function ( $c ) {
-	return new TopKIndex(
-		$c['flowcache'],
-		$c['storage.topic_list.backend'],
-		$c['storage.topic_list.mapper'],
-		'flow_topic_list_last_updated:list',
-		[ 'topic_list_id' ],
-		[
-			'sort' => 'workflow_last_update_timestamp',
-			'order' => 'desc'
-		]
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowStorage.TopicList.LastUpdatedIndex' );
 };
 $c['storage.topic_list'] = static function ( $c ) {
-	// Lookup from topic_id to its owning board id
-	$topicListPrimaryIndex = new UniqueFeatureIndex(
-		$c['flowcache'],
-		$c['storage.topic_list.backend'],
-		$c['storage.topic_list.mapper'],
-		'flow_topic_list:topic',
-		[ 'topic_id' ]
-	);
-	// Lookup from board to contained topics
-	// In reverse order by topic_id
-	$topicListReverseLookupIndex = new TopKIndex(
-		$c['flowcache'],
-		$c['storage.topic_list.backend'],
-		$c['storage.topic_list.mapper'],
-		'flow_topic_list:list',
-		[ 'topic_list_id' ],
-		[ 'sort' => 'topic_id' ]
-	);
-	$indexes = [
-		$topicListPrimaryIndex,
-		$topicListReverseLookupIndex,
-		$c['storage.topic_list.indexes.last_updated'],
-	];
-	return new ObjectManager(
-		$c['storage.topic_list.mapper'],
-		$c['storage.topic_list.backend'],
-		$c['db.factory'],
-		$indexes
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowStorage.TopicList' );
 };
 $c['storage.post.mapper'] = static function ( $c ) {
 	return CachingObjectMapper::model(
@@ -571,8 +491,8 @@ $c['storage.post_topic_history'] = static function ( $c ) {
 	);
 };
 
-$c['storage.manager_list'] = static function ( $c ) {
-	return [
+$c['storage'] = static function ( $c ) {
+	$managerList = [
 		\Flow\Model\Workflow::class => 'storage.workflow',
 		'Workflow' => 'storage.workflow',
 
@@ -603,11 +523,10 @@ $c['storage.manager_list'] = static function ( $c ) {
 		\Flow\Model\URLReference::class => 'storage.url_reference',
 		'URLReference' => 'storage.url_reference',
 	];
-};
-$c['storage'] = static function ( $c ) {
+
 	return new \Flow\Data\ManagerGroup(
 		$c,
-		$c['storage.manager_list']
+		$managerList
 	);
 };
 $c['loader.root_post'] = static function ( $c ) {
@@ -620,7 +539,7 @@ $c['loader.root_post'] = static function ( $c ) {
 // Queue of callbacks to run by DeferredUpdates, but only
 // on successful commit
 $c['deferred_queue'] = static function ( $c ) {
-	return new SplQueue;
+	return MediaWikiServices::getInstance()->getService( 'FlowDeferredQueue' );
 };
 
 $c['factory.loader.workflow'] = static function ( $c ) {
@@ -639,32 +558,18 @@ $c['factory.loader.workflow'] = static function ( $c ) {
 		$submissionHandler
 	);
 };
-// Initialized in Flow\Hooks to facilitate only loading the flow container
-// when flow is specifically requested to run. Extension initialization
-// must always happen before calling flow code.
-$c['occupation_controller'] = Flow\Hooks::getOccupationController();
+
+$c['occupation_controller'] = static function ( $c ) {
+	return MediaWikiServices::getInstance()->getService( 'FlowTalkpageManager' );
+};
 
 $c['controller.opt_in'] = static function ( $c ) {
-	$archiveNameHelper = new Flow\Import\ArchiveNameHelper();
-	return new Flow\Import\OptInController(
-		$c['occupation_controller'],
-		$c['controller.notification'],
-		$archiveNameHelper,
-		$c['db.factory'],
-		$c['default_logger'],
-		$c['occupation_controller']->getTalkpageManager()
-
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowOptInController' );
 };
 
 $c['controller.notification'] = static function ( $c ) {
 	return MediaWikiServices::getInstance()->getService( 'FlowNotificationsController' );
 };
-
-// Initialized in Flow\Hooks to faciliate only loading the flow container
-// when flow is specifically requested to run. Extension initialization
-// must always happen before calling flow code.
-$c['controller.abusefilter'] = Flow\Hooks::getAbuseFilter();
 
 $c['controller.spamfilter'] = static function ( $c ) {
 	global $wgMaxArticleSize;
@@ -676,12 +581,15 @@ $c['controller.spamfilter'] = static function ( $c ) {
 
 	$contentLengthFilter = new Flow\SpamFilter\ContentLengthFilter( $maxCharCount );
 
+	// Abuse filter control is initialized in Flow\Hooks to faciliate only loading the
+	// flow container when flow is specifically requested to run. Extension initialization
+	// must always happen before calling flow code.
 	return new Flow\SpamFilter\Controller(
 		$contentLengthFilter,
 		new Flow\SpamFilter\SpamRegex,
 		new Flow\SpamFilter\RateLimits,
 		new Flow\SpamFilter\SpamBlacklist,
-		$c['controller.abusefilter'],
+		Flow\Hooks::getAbuseFilter(),
 		new Flow\SpamFilter\ConfirmEdit
 	);
 };
@@ -692,9 +600,7 @@ $c['query.categoryviewer'] = static function ( $c ) {
 	);
 };
 $c['formatter.categoryviewer'] = static function ( $c ) {
-	return new Flow\Formatter\CategoryViewerFormatter(
-		$c['permissions']
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowCategoryViewerFormatter' );
 };
 $c['query.singlepost'] = static function ( $c ) {
 	return new Flow\Formatter\SinglePostQuery(
@@ -710,29 +616,17 @@ $c['query.checkuser'] = static function ( $c ) {
 };
 
 $c['formatter.irclineurl'] = static function ( $c ) {
-	return new Flow\Formatter\IRCLineUrlFormatter(
-		$c['permissions'],
-		$c['formatter.revision.factory']->create()
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowIRCLineUrlFormatter' );
 };
 
 $c['formatter.checkuser'] = static function ( $c ) {
-	return new Flow\Formatter\CheckUserFormatter(
-		$c['permissions'],
-		$c['formatter.revision.factory']->create()
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowCheckUserFormatter' );
 };
 $c['formatter.revisionview'] = static function ( $c ) {
-	return new Flow\Formatter\RevisionViewFormatter(
-		$c['url_generator'],
-		$c['formatter.revision.factory']->create()
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowRevisionViewFormatter' );
 };
 $c['formatter.revision.diff.view'] = static function ( $c ) {
-	return new Flow\Formatter\RevisionDiffViewFormatter(
-		$c['formatter.revisionview'],
-		$c['url_generator']
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowRevisionDiffViewFormatter' );
 };
 $c['query.topiclist'] = static function ( $c ) {
 	return new Flow\Formatter\TopicListQuery(
@@ -795,10 +689,7 @@ $c['query.postsummary.view'] = static function ( $c ) {
 	);
 };
 $c['formatter.changeslist'] = static function ( $c ) {
-	return new Flow\Formatter\ChangesListFormatter(
-		$c['permissions'],
-		$c['formatter.revision.factory']->create()
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowChangesListFormatter' );
 };
 
 $c['query.contributions'] = static function ( $c ) {
@@ -811,16 +702,10 @@ $c['query.contributions'] = static function ( $c ) {
 	);
 };
 $c['formatter.contributions'] = static function ( $c ) {
-	return new Flow\Formatter\ContributionsFormatter(
-		$c['permissions'],
-		$c['formatter.revision.factory']->create()
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowContributionsFormatter' );
 };
 $c['formatter.contributions.feeditem'] = static function ( $c ) {
-	return new Flow\Formatter\FeedItemFormatter(
-		$c['permissions'],
-		$c['formatter.revision.factory']->create()
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowFeedItemFormatter' );
 };
 $c['query.board.history'] = static function ( $c ) {
 	return new Flow\Formatter\BoardHistoryQuery(
@@ -831,32 +716,16 @@ $c['query.board.history'] = static function ( $c ) {
 };
 
 $c['formatter.revision.factory'] = static function ( $c ) {
-	global $wgFlowMaxThreadingDepth;
-
-	return new Flow\Formatter\RevisionFormatterFactory(
-		$c['permissions'],
-		$c['templating'],
-		$c['url_generator'],
-		$c['repository.username'],
-		$wgFlowMaxThreadingDepth
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowRevisionFormatterFactory' );
 };
 $c['formatter.topiclist'] = static function ( $c ) {
-	return new Flow\Formatter\TopicListFormatter(
-		$c['url_generator'],
-		$c['formatter.revision.factory']->create()
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowTopicListFormatter' );
 };
 $c['formatter.topiclist.toc'] = static function ( $c ) {
-	return new Flow\Formatter\TocTopicListFormatter(
-		$c['templating']
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowTocTopicListFormatter' );
 };
 $c['formatter.topic'] = static function ( $c ) {
-	return new Flow\Formatter\TopicFormatter(
-		$c['url_generator'],
-		$c['formatter.revision.factory']->create()
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowTopicFormatter' );
 };
 
 $c['search.index.iterators.header'] = static function ( $c ) {
@@ -867,131 +736,15 @@ $c['search.index.iterators.topic'] = static function ( $c ) {
 };
 
 $c['storage.wiki_reference'] = static function ( $c ) {
-	$wikiReferenceMapper = BasicObjectMapper::model(
-		\Flow\Model\WikiReference::class
-	);
-	$wikiReferenceBackend = new BasicDbStorage(
-		$c['db.factory'],
-		'flow_wiki_ref',
-		[
-			'ref_src_wiki',
-			'ref_src_namespace',
-			'ref_src_title',
-			'ref_src_object_id',
-			'ref_type',
-			'ref_target_namespace',
-			'ref_target_title'
-		]
-	);
-	$wikiReferenceSourceLookupIndex = new TopKIndex(
-		$c['flowcache'],
-		$wikiReferenceBackend,
-		$wikiReferenceMapper,
-		'flow_ref:wiki:by-source:v3',
-		[
-			'ref_src_wiki',
-			'ref_src_namespace',
-			'ref_src_title',
-		],
-		[
-			'order' => 'ASC',
-			'sort' => 'ref_src_object_id',
-		]
-	);
-	$wikiReferenceRevisionLookupIndex = new TopKIndex(
-		$c['flowcache'],
-		$wikiReferenceBackend,
-		$wikiReferenceMapper,
-		'flow_ref:wiki:by-revision:v3',
-		[
-			'ref_src_wiki',
-			'ref_src_object_type',
-			'ref_src_object_id',
-		],
-		[
-			'order' => 'ASC',
-			'sort' => [ 'ref_target_namespace', 'ref_target_title' ],
-		]
-	);
-	$indexes = [
-		$wikiReferenceSourceLookupIndex,
-		$wikiReferenceRevisionLookupIndex,
-	];
-	return new ObjectManager(
-		$wikiReferenceMapper,
-		$wikiReferenceBackend,
-		$c['db.factory'],
-		$indexes,
-		[]
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowStorage.WikiReference' );
 };
 
 $c['storage.url_reference'] = static function ( $c ) {
-	$urlReferenceMapper = BasicObjectMapper::model(
-		\Flow\Model\URLReference::class
-	);
-	$urlReferenceBackend = new BasicDbStorage(
-		// factory and table
-		$c['db.factory'],
-		'flow_ext_ref',
-		[
-			'ref_src_wiki',
-			'ref_src_namespace',
-			'ref_src_title',
-			'ref_src_object_id',
-			'ref_type',
-			'ref_target',
-		]
-	);
-	$urlReferenceSourceLookupIndex = new TopKIndex(
-		$c['flowcache'],
-		$urlReferenceBackend,
-		$urlReferenceMapper,
-		'flow_ref:url:by-source:v3',
-		[
-			'ref_src_wiki',
-			'ref_src_namespace',
-			'ref_src_title',
-		],
-		[
-			'order' => 'ASC',
-			'sort' => 'ref_src_object_id',
-		]
-	);
-	$urlReferenceRevisionLookupIndex = new TopKIndex(
-		$c['flowcache'],
-		$urlReferenceBackend,
-		$urlReferenceMapper,
-		'flow_ref:url:by-revision:v3',
-		[
-			'ref_src_wiki',
-			'ref_src_object_type',
-			'ref_src_object_id',
-		],
-		[
-			'order' => 'ASC',
-			'sort' => [ 'ref_target' ],
-		]
-	);
-	$indexes = [
-		$urlReferenceSourceLookupIndex,
-		$urlReferenceRevisionLookupIndex,
-	];
-	return new ObjectManager(
-		$urlReferenceMapper,
-		$urlReferenceBackend,
-		$c['db.factory'],
-		$indexes,
-		[]
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowStorage.UrlReference' );
 };
 
 $c['reference.updater.links-tables'] = static function ( $c ) {
 	return new Flow\LinksTableUpdater( $c['storage'] );
-};
-
-$c['reference.clarifier'] = static function ( $c ) {
-	return new Flow\ReferenceClarifier( $c['storage'], $c['url_generator'] );
 };
 
 $c['reference.extractor'] = static function ( $c ) {
@@ -1048,13 +801,11 @@ $c['importer'] = static function ( $c ) {
 };
 
 $c['listener.editcount'] = static function ( $c ) {
-	return new \Flow\Data\Listener\EditCountListener( $c['flow_actions'] );
+	return MediaWikiServices::getInstance()->getService( 'FlowEditCountListener' );
 };
 
 $c['formatter.undoedit'] = static function ( $c ) {
-	return new Flow\Formatter\RevisionUndoViewFormatter(
-		$c['formatter.revisionview']
-	);
+	return MediaWikiServices::getInstance()->getService( 'FlowRevisionUndoViewFormatter' );
 };
 
 $c['board_mover'] = static function ( $c ) {

@@ -6,13 +6,12 @@ use Flow\Import\LiquidThreadsApi\ApiBackend;
 use Flow\Import\LiquidThreadsApi\LocalApiBackend;
 use Flow\Import\LiquidThreadsApi\RemoteApiBackend;
 use Flow\Model\AbstractRevision;
-use Maintenance;
-use MediaWiki\MediaWikiServices;
-use MWTimestamp;
-use Parser;
-use ParserOptions;
-use Title;
-use User;
+use MediaWiki\Maintenance\Maintenance;
+use MediaWiki\Parser\Parser;
+use MediaWiki\Parser\ParserOptions;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
+use MediaWiki\Utils\MWTimestamp;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -37,8 +36,8 @@ class ConvertToText extends Maintenance {
 		parent::__construct();
 		$this->addDescription( "Converts a specific Flow page to text" );
 
-		$this->addOption( 'page', 'The page to convert', true /*required*/ );
-		$this->addOption( 'remoteapi', 'The api of the wiki to convert the page from (or nothing, for local wiki)', false /*required*/ );
+		$this->addOption( 'page', 'The page to convert', true, true );
+		$this->addOption( 'remoteapi', 'URL to api.php (leave unset for local wiki)', false, true );
 
 		$this->requireExtension( 'Flow' );
 	}
@@ -83,7 +82,7 @@ class ConvertToText extends Maintenance {
 			if ( isset( $topicListBlock['links']['pagination'] ) ) {
 				$paginationLinks = $topicListBlock['links']['pagination'];
 				if ( isset( $paginationLinks['fwd'] ) ) {
-					list( $junk, $query ) = explode( '?', $paginationLinks['fwd']['url'] );
+					[ , $query ] = explode( '?', $paginationLinks['fwd']['url'] );
 					$queryParams = wfCgiToArray( $query );
 
 					$pagerParams = [
@@ -112,6 +111,9 @@ class ConvertToText extends Maintenance {
 			'page' => $title->getPrefixedText(),
 		] );
 
+		if ( isset( $result['error'] ) ) {
+			$this->fatalError( $result['error']['info'] );
+		}
 		return $result['flow'][$submodule]['result'];
 	}
 
@@ -122,7 +124,7 @@ class ConvertToText extends Maintenance {
 	 */
 	private function processTopic( array $context, array $revision ) {
 		$topicOutput = $this->processTopicTitle( $revision );
-		$summaryOutput = isset( $revision['summary'] ) ? $this->processSummary( $context, $revision['summary'] ) : '';
+		$summaryOutput = isset( $revision['summary'] ) ? $this->processSummary( $revision['summary'] ) : '';
 		$postsOutput = $this->processPostCollection( $context, $revision['replies'] ) . "\n\n";
 		$resolved = isset( $revision['moderateState'] ) && $revision['moderateState'] === AbstractRevision::MODERATED_LOCKED;
 
@@ -152,11 +154,10 @@ class ConvertToText extends Maintenance {
 	}
 
 	/**
-	 * @param array $context
 	 * @param array $summary
 	 * @return string
 	 */
-	private function processSummary( array $context, array $summary ) {
+	private function processSummary( array $summary ) {
 		$topicTitle = Title::newFromText( $summary['revision']['articleTitle'] );
 		return $this->processMultiRevisions(
 			$this->getAllRevisions( $topicTitle, 'view-topic-summary', 'vts', 'topicsummary' )
@@ -224,20 +225,18 @@ class ConvertToText extends Maintenance {
 		$nickname = $this->getOption( 'remoteapi' ) ? null : false;
 		$fancysig = $this->getOption( 'remoteapi' ) ? false : null;
 
-		$parser = MediaWikiServices::getInstance()->getParser();
+		$parser = $this->getServiceContainer()->getParserFactory()->create();
 		// Parser::getUserSig can end calling `getCleanSignatures` on
 		// mOptions, which may not be set. Set a dummy options object so it
 		// doesn't fail (it'll initialise the requested value from a global
 		// anyway)
 		$options = ParserOptions::newFromAnon();
-		$old = $parser->getOptions();
 		$parser->startExternalParse( $this->pageTitle, $options, Parser::OT_WIKI );
 		$signature = $parser->getUserSig( $user, $nickname, $fancysig );
 		$signature = $parser->getStripState()->unstripBoth( $signature );
 		if ( $timestamp ) {
 			$signature .= ' ' . $this->formatTimestamp( $timestamp );
 		}
-		$parser->setOptions( $old );
 		return $signature;
 	}
 
@@ -259,7 +258,7 @@ class ConvertToText extends Maintenance {
 			$tzMsg = $msg->text();
 		}
 
-		return MediaWikiServices::getInstance()->getContentLanguage()
+		return $this->getServiceContainer()->getContentLanguage()
 			->timeanddate( $ts, false, false ) . " ($tzMsg)";
 	}
 
@@ -362,7 +361,7 @@ class ConvertToText extends Maintenance {
 			$signatures = array_map( [ $this, 'getSignature' ], $otherContributors );
 			$formattedAuthors .= ( $sigForFirstAuthor ? ' ' : '' ) . '(' .
 				wfMessage( $msg )->inContentLanguage()->params(
-					MediaWikiServices::getInstance()->getContentLanguage()->commaList( $signatures )
+					$this->getServiceContainer()->getContentLanguage()->commaList( $signatures )
 				)->text() . ')';
 		}
 
@@ -375,7 +374,9 @@ class ConvertToText extends Maintenance {
 	 */
 	private function getAllPostRevisions( array $revision ) {
 		$topicTitle = Title::newFromText( $revision['articleTitle'] );
-		$response = $this->flowApi( $topicTitle, 'view-post-history', [ 'vphpostId' => $revision['postId'], 'vphformat' => 'wikitext' ] );
+		$response = $this->flowApi( $topicTitle, 'view-post-history',
+			[ 'vphpostId' => $revision['postId'], 'vphformat' => 'wikitext' ]
+		);
 		return $response['topic']['revisions'];
 	}
 

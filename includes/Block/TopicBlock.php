@@ -23,8 +23,13 @@ use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\Notifications\Controller;
 use Flow\Repository\RootPostLoader;
+use MediaWiki\Context\RequestContext;
+use MediaWiki\Language\RawMessage;
+use MediaWiki\Logging\LogEventsList;
+use MediaWiki\Logging\LogPage;
 use MediaWiki\MediaWikiServices;
-use Message;
+use MediaWiki\Message\Message;
+use MediaWiki\Output\OutputPage;
 
 class TopicBlock extends AbstractBlock {
 
@@ -107,7 +112,7 @@ class TopicBlock extends AbstractBlock {
 		} else {
 			throw new DataModelException(
 				'Expected PostRevision or RootPostLoader, received: ' .
-					( is_object( $root ) ? get_class( $root ) : gettype( $root ) ),
+					get_debug_type( $root ),
 				'invalid-input'
 			);
 		}
@@ -458,7 +463,7 @@ class TopicBlock extends AbstractBlock {
 					$this->workflow->updateLastUpdated( $this->newRevision->getRevisionId() );
 					$this->storage->put( $this->workflow, $metadata );
 
-					if ( strpos( $this->action, 'moderate-' ) === 0 ) {
+					if ( str_starts_with( $this->action, 'moderate-' ) ) {
 						$topicId = $this->newRevision->getCollection()->getRoot()->getId();
 
 						$moderate = $this->newRevision->isModerated()
@@ -482,7 +487,7 @@ class TopicBlock extends AbstractBlock {
 				// @todo make more explicit
 				try {
 					$newRevision->getChildren();
-				} catch ( \MWException $e ) {
+				} catch ( DataModelException ) {
 					$newRevision->setChildren( [] );
 				}
 
@@ -618,7 +623,7 @@ class TopicBlock extends AbstractBlock {
 		if ( isset( $options['oldRevision'] ) ) {
 			$oldRevision = $options['oldRevision'];
 		}
-		list( $new, $old ) = Container::get( 'query.post.view' )
+		[ $new, $old ] = Container::get( 'query.post.view' )
 			->getDiffViewResult( UUID::create( $options['newRevision'] ), UUID::create( $oldRevision ) );
 
 		return [
@@ -738,7 +743,7 @@ class TopicBlock extends AbstractBlock {
 			throw new InvalidInputException( 'Both startId and endId must be provided' );
 		}
 
-		/** @var RevisionViewQuery */
+		/** @var RevisionViewQuery $query */
 		$query = Container::get( 'query.post.view' );
 		$rows = $query->getUndoDiffResult( $options['startId'], $options['endId'] );
 		if ( !$rows ) {
@@ -797,7 +802,7 @@ class TopicBlock extends AbstractBlock {
 		$serializer = $this->getRevisionFormatter( $format );
 		$serializer->setIncludeHistoryProperties( true );
 
-		list( $limit, /* $offset */ ) = $wgRequest->getLimitOffsetForUser(
+		[ $limit, /* $offset */ ] = $wgRequest->getLimitOffsetForUser(
 			$this->context->getUser()
 		);
 		// don't use offset from getLimitOffset - that assumes an int, which our
@@ -921,20 +926,20 @@ class TopicBlock extends AbstractBlock {
 		}
 
 		// Show a snippet of the relevant log entry if available.
-		if ( \LogPage::isLogType( $state ) ) {
+		if ( LogPage::isLogType( $state ) ) {
 			// check if user has sufficient permissions to see log
-			$logPage = new \LogPage( $state );
+			$logPage = new LogPage( $state );
 			if ( MediaWikiServices::getInstance()->getPermissionManager()
 					->userHasRight( $this->context->getUser(), $logPage->getRestriction() )
 			) {
 				// LogEventsList::showLogExtract will write to OutputPage, but we
 				// actually just want that text, to write it ourselves wherever we want,
 				// so let's create an OutputPage object to then get the content from.
-				$rc = new \RequestContext();
+				$rc = new RequestContext();
 				$output = $rc->getOutput();
 
 				// get log extract
-				$entries = \LogEventsList::showLogExtract(
+				$entries = LogEventsList::showLogExtract(
 					$output,
 					[ $state ],
 					$this->workflow->getArticleTitle()->getPrefixedText(),
@@ -960,7 +965,7 @@ class TopicBlock extends AbstractBlock {
 
 				// check if there were any log extracts
 				if ( $entries ) {
-					$message = new \RawMessage( '$1' );
+					$message = new RawMessage( '$1' );
 					return $message->rawParams( $output->getHTML() );
 				}
 			}
@@ -1042,12 +1047,12 @@ class TopicBlock extends AbstractBlock {
 	}
 
 	/**
-	 * @param \OutputPage $out
+	 * @param OutputPage $out
 	 *
 	 * @todo Provide more informative page title for actions other than view,
 	 *       e.g. "Hide post in <TITLE>", "Unlock <TITLE>", etc.
 	 */
-	public function setPageTitle( \OutputPage $out ) {
+	public function setPageTitle( OutputPage $out ) {
 		$topic = $this->loadTopicTitle( $this->action === 'history' ? 'history' : 'view' );
 		if ( !$topic ) {
 			return;
@@ -1055,7 +1060,7 @@ class TopicBlock extends AbstractBlock {
 
 		$title = $this->workflow->getOwnerTitle();
 		$convertedTitle = Utils::getConvertedTitle( $title );
-		$out->setPageTitle( $out->msg( 'flow-topic-first-heading', $convertedTitle ) );
+		$out->setPageTitleMsg( $out->msg( 'flow-topic-first-heading', $convertedTitle ) );
 		if ( $this->permissions->isAllowed( $topic, 'view' ) ) {
 			if ( $this->action === 'undo-edit-post' ) {
 				$key = 'flow-undo-edit-post';

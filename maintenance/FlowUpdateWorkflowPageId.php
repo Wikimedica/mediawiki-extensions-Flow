@@ -10,16 +10,18 @@ use Flow\Container;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\OccupationController;
-use Language;
-use LoggedUpdateMaintenance;
+use MediaWiki\Language\Language;
+use MediaWiki\Language\RawMessage;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
 use MediaWiki\MediaWikiServices;
-use RawMessage;
+use MediaWiki\Status\Status;
+use MediaWiki\StubObject\StubUserLang;
+use MediaWiki\Title\Title;
+use MediaWiki\WikiMap\WikiMap;
 use RowUpdateGenerator;
-use Status;
+use RuntimeException;
 use stdClass;
-use StubUserLang;
-use Title;
-use WikiMap;
+use Wikimedia\Rdbms\IDBAccessObject;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -107,7 +109,7 @@ class WorkflowPageIdUpdateGenerator implements RowUpdateGenerator {
 	public function update( $row ) {
 		$title = Title::makeTitleSafe( $row->workflow_namespace, $row->workflow_title_text );
 		if ( $title === null ) {
-			throw new Exception( sprintf(
+			throw new RuntimeException( sprintf(
 				'Could not create title for %s at %s:%s',
 				UUID::create( $row->workflow_id )->getAlphadecimal(),
 				$this->lang->getNsText( $row->workflow_namespace ) ?: $row->workflow_namespace,
@@ -169,7 +171,7 @@ class WorkflowPageIdUpdateGenerator implements RowUpdateGenerator {
 
 		if ( $status->isGood() ) {
 			// force article id to be refetched from db
-			$title->getArticleID( Title::GAID_FOR_UPDATE );
+			$title->getArticleID( IDBAccessObject::READ_LATEST );
 		}
 
 		return $status;

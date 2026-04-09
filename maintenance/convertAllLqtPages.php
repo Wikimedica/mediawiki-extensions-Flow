@@ -4,19 +4,19 @@ namespace Flow\Maintenance;
 
 use AppendIterator;
 use Flow\Container;
-use Flow\Hooks;
 use Flow\Import\Converter;
 use Flow\Import\LiquidThreadsApi\ConversionStrategy;
 use Flow\Import\LiquidThreadsApi\LocalApiBackend;
 use Flow\Import\SourceStore\FileImportSourceStore;
 use Flow\Import\SourceStore\FlowRevisionsDb;
+use Flow\OccupationController;
 use Flow\Utils\NamespaceIterator;
 use Flow\Utils\PagesWithPropertyIterator;
-use Maintenance;
+use MediaWiki\Maintenance\Maintenance;
 use MediaWiki\MediaWikiServices;
 use Psr\Log\AbstractLogger;
 use Psr\Log\LogLevel;
-use Wikimedia\Rdbms\IDatabase;
+use Wikimedia\Rdbms\IReadableDatabase;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -40,10 +40,26 @@ class ConvertAllLqtPages extends Maintenance {
 			'option can be set to attempt to map threads to topics that have already been ' .
 			'imported to prevent doubles.' );
 		$this->addOption( 'debug', 'Include debug information with progress report' );
+		$this->addOption( 'dryrun', 'Show what would be converted, but do not make any changes.' );
+		$this->addOption( 'ignoreflowreadonly', 'Ignore $wgFlowReadOnly if set, allowing boards to be created.' );
+		$this->addOption( 'convertempty', 'Convert pages even if they have no threads.' );
+		$this->addOption( 'insert-ignore', 'Ignore duplicate key insert errors.' );
 		$this->requireExtension( 'Flow' );
 	}
 
 	public function execute() {
+		global $wgFlowReadOnly;
+
+		if ( $wgFlowReadOnly ) {
+			if ( $this->getOption( 'ignoreflowreadonly', false ) ) {
+				// Make Flow writable for the duration of the script
+				$wgFlowReadOnly = false;
+			} else {
+				$this->error( 'Flow is in read-only mode. Use --ignoreflowreadonly to continue.' );
+				return;
+			}
+		}
+
 		$logfile = $this->getOption( 'logfile' );
 		if ( $logfile ) {
 			$sourceStore = new FileImportSourceStore( $logfile );
@@ -66,9 +82,11 @@ class ConvertAllLqtPages extends Maintenance {
 		}
 
 		$importer = Container::get( 'importer' );
-		$talkpageManagerUser = Hooks::getOccupationController()->getTalkpageManager();
+		/** @var OccupationController $occupationController */
+		$occupationController = MediaWikiServices::getInstance()->getService( 'FlowTalkpageManager' );
+		$talkpageManagerUser = $occupationController->getTalkpageManager();
 
-		$dbw = wfGetDB( DB_PRIMARY );
+		$dbw = $this->getPrimaryDB();
 		$strategy = new ConversionStrategy(
 			$dbw,
 			$sourceStore,
@@ -87,30 +105,34 @@ class ConvertAllLqtPages extends Maintenance {
 		);
 
 		$titles = $this->buildIterator( $logger, $dbw );
+		$dryRun = $this->getOption( 'dryrun', false );
+		$convertEmpty = $this->getOption( 'convertempty', false );
 
 		$logger->info( "Starting full wiki LQT conversion of all LiquidThreads pages" );
-		$converter->convertAll( $titles );
+		$converter->convertAll( $titles, $dryRun, $convertEmpty );
+
 		$logger->info( "Finished conversion" );
 	}
 
 	/**
 	 * @param AbstractLogger $logger
-	 * @param IDatabase $dbw
+	 * @param IReadableDatabase $db
+	 *
 	 * @return AppendIterator
 	 */
-	private function buildIterator( $logger, $dbw ) {
+	private function buildIterator( $logger, $db ) {
 		global $wgLqtTalkPages;
 
 		$iterator = new AppendIterator();
 
 		$logger->info( "Considering for conversion: pages with the 'use-liquid-threads' property" );
-		$withProperty = new PagesWithPropertyIterator( $dbw, 'use-liquid-threads' );
+		$withProperty = new PagesWithPropertyIterator( $db, 'use-liquid-threads' );
 		$iterator->append( $withProperty->getIterator() );
 
 		if ( $wgLqtTalkPages ) {
-			foreach ( MediaWikiServices::getInstance()->getNamespaceInfo()->getTalkNamespaces() as $ns ) {
+			foreach ( $this->getServiceContainer()->getNamespaceInfo()->getTalkNamespaces() as $ns ) {
 				$logger->info( "Considering for conversion: pages in namespace $ns" );
-				$it = new NamespaceIterator( $dbw, $ns );
+				$it = new NamespaceIterator( $db, $ns );
 				$iterator->append( $it->getIterator() );
 			}
 		}

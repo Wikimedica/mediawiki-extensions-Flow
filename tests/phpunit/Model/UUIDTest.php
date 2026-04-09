@@ -31,7 +31,7 @@ class UUIDTest extends FlowTestCase {
 		$this->assertEquals( $uuid->getAlphadecimal(), $fixed->getAlphadecimal() );
 	}
 
-	public function invalidInputProvider() {
+	public static function invalidInputProvider() {
 		$valid = 'u9pdkbdvsgz206kh';
 
 		return [
@@ -51,7 +51,7 @@ class UUIDTest extends FlowTestCase {
 	}
 
 	public static function uuidConversionProvider() {
-		// sample uuid from UIDGenerator::newTimestampedUID128()
+		// sample uuid from GlobalIdGenerator::newTimestampedUID128()
 		$numeric_128 = '6709199728898751234959525538795913762';
 		$hex_128 = \Wikimedia\base_convert( $numeric_128, 10, 16, 32 );
 
@@ -198,4 +198,22 @@ class UUIDTest extends FlowTestCase {
 
 		$this->assertEquals( $expect->fetch(), $new->getBinary()->fetch() );
 	}
+
+	public function testJSONCodecSerializationRoundtrip() {
+		$uuid = UUID::create();
+		$codec = $this->getServiceContainer()->getJsonCodec();
+		$serialized = $codec->serialize( $uuid );
+
+		$deserialized = $codec->deserialize( $serialized );
+		$this->assertTrue( $uuid->equals( $deserialized ) );
+	}
+
+	public function testJSONCodecDeserialization() {
+		$codec = $this->getServiceContainer()->getJsonCodec();
+		$serialized = '{"alnum":"yq1e9xp0lzopcz53","_type_":"Flow\\\\Model\\\\UUID","_complex_":true}';
+
+		$deserialized = $codec->deserialize( $serialized );
+		$this->assertEquals( 'yq1e9xp0lzopcz53', $deserialized->getAlphadecimal() );
+	}
+
 }

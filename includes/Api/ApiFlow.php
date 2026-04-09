@@ -2,13 +2,14 @@
 
 namespace Flow\Api;
 
-use ApiBase;
-use ApiMain;
-use ApiModuleManager;
 use Flow\Container;
-use Hooks;
+use Flow\Exception\InvalidInputException;
+use Flow\Hooks\HookRunner;
+use MediaWiki\Api\ApiBase;
+use MediaWiki\Api\ApiMain;
+use MediaWiki\Api\ApiModuleManager;
 use MediaWiki\MediaWikiServices;
-use Title;
+use MediaWiki\Title\Title;
 use Wikimedia\ParamValidator\ParamValidator;
 
 class ApiFlow extends ApiBase {
@@ -66,16 +67,14 @@ class ApiFlow extends ApiBase {
 		return $this->moduleManager;
 	}
 
-	/**
-	 * @suppress PhanUndeclaredMethod Phan doesn't infer $module is ApiFlowBase
-	 */
 	public function execute() {
 		// To avoid API warning, register the parameter used to bust browser cache
 		$this->getMain()->getVal( '_' );
 
 		$params = $this->extractRequestParams();
-		/** @var $module ApiFlowBase */
+		/** @var ApiFlowBase $module */
 		$module = $this->moduleManager->getModule( $params['submodule'], 'submodule' );
+		'@phan-var ApiFlowBase $module';
 
 		// The checks for POST and tokens are the same as ApiMain.php
 		$wasPosted = $this->getRequest()->wasPosted();
@@ -99,8 +98,12 @@ class ApiFlow extends ApiBase {
 		if ( $module->needsPage() ) {
 			$module->setPage( $this->getPage( $params ) );
 		}
-		$module->execute();
-		Hooks::run( 'APIFlowAfterExecute', [ $module ] );
+		try {
+			$module->execute();
+		} catch ( InvalidInputException $e ) {
+			$this->dieWithError( $e->getMessageObject(), null, null, 400 );
+		}
+		( new HookRunner( MediaWikiServices::getInstance()->getHookContainer() ) )->onAPIFlowAfterExecute( $module );
 	}
 
 	/**
@@ -155,9 +158,9 @@ class ApiFlow extends ApiBase {
 	public function isWriteMode() {
 		// We can't use extractRequestParams() here because getHelpFlags() calls this function,
 		// and we'd error out because the submodule parameter isn't set.
-		$moduleName = $this->getMain()->getVal( 'submodule' );
+		$moduleName = $this->getMain()->getVal( 'submodule' ) ?? '';
 		$module = $this->moduleManager->getModule( $moduleName, 'submodule' );
-		return $module ? $module->isWriteMode() : false;
+		return $module && $module->isWriteMode();
 	}
 
 	public function getHelpUrls() {

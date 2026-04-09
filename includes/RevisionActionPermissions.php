@@ -11,7 +11,7 @@ use Flow\Model\PostRevision;
 use Flow\Model\PostSummary;
 use Flow\Model\Workflow;
 use MediaWiki\MediaWikiServices;
-use User;
+use MediaWiki\User\User;
 
 /**
  * Role based security for revisions based on moderation state
@@ -27,10 +27,6 @@ class RevisionActionPermissions {
 	 */
 	protected $user;
 
-	/**
-	 * @param FlowActions $actions
-	 * @param User $user
-	 */
 	public function __construct( FlowActions $actions, User $user ) {
 		$this->user = $user;
 		$this->actions = $actions;
@@ -42,7 +38,7 @@ class RevisionActionPermissions {
 	 * @param AbstractRevision|null $revision The revision to check permissions against
 	 * @return array Array of action names that are allowed
 	 */
-	public function getAllowedActions( AbstractRevision $revision = null ) {
+	public function getAllowedActions( ?AbstractRevision $revision = null ) {
 		$allowed = [];
 		foreach ( array_keys( $this->actions->getActions() ) as $action ) {
 			if ( $this->isAllowedAny( $revision, $action ) ) {
@@ -242,7 +238,7 @@ class RevisionActionPermissions {
 		} elseif ( $revision instanceof PostRevision && !$revision->isTopicTitle() ) {
 			try {
 				$topicId = $revision->getCollection()->getWorkflowId();
-			} catch ( DataModelException $e ) {
+			} catch ( DataModelException ) {
 				// failed to locate root post (most likely in unit tests, where
 				// we didn't store the tree)
 				return $revision;
@@ -270,9 +266,6 @@ class RevisionActionPermissions {
 		return $this->actions;
 	}
 
-	/**
-	 * @param User $user
-	 */
 	public function setUser( User $user ) {
 		$this->user = $user;
 	}

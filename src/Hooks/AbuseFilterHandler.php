@@ -7,8 +7,8 @@ use Flow\Hooks;
 use MediaWiki\Extension\AbuseFilter\Hooks\AbuseFilterGenerateVarsForRecentChangeHook;
 use MediaWiki\Extension\AbuseFilter\VariableGenerator\RCVariableGenerator;
 use MediaWiki\Extension\AbuseFilter\Variables\VariableHolder;
-use RecentChange;
-use User;
+use MediaWiki\RecentChanges\RecentChange;
+use MediaWiki\User\User;
 
 class AbuseFilterHandler implements AbuseFilterGenerateVarsForRecentChangeHook {
 	/**

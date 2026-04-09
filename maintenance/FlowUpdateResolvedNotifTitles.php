@@ -11,9 +11,9 @@ use BatchRowIterator;
 use Exception;
 use Flow\Container;
 use Flow\WorkflowLoaderFactory;
-use LoggedUpdateMaintenance;
-use MWEchoDbFactory;
-use Title;
+use MediaWiki\Extension\Notifications\DbFactory;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
+use MediaWiki\Title\Title;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -44,7 +44,7 @@ class FlowUpdateResolvedNotifTitles extends LoggedUpdateMaintenance {
 	}
 
 	public function doDBUpdates() {
-		$dbFactory = MWEchoDbFactory::newFromDefault();
+		$dbFactory = DbFactory::newFromDefault();
 		$dbw = $dbFactory->getEchoDb( DB_PRIMARY );
 		$dbr = $dbFactory->getEchoDb( DB_REPLICA );
 		// We can't join echo_event with page, because those tables can be on different
@@ -59,7 +59,7 @@ class FlowUpdateResolvedNotifTitles extends LoggedUpdateMaintenance {
 		);
 		$iterator->addConditions( [
 			'event_type' => 'flow-topic-resolved',
-			'event_page_id IS NOT NULL',
+			$dbr->expr( 'event_page_id', '!=', null ),
 		] );
 		$iterator->setFetchColumns( [ 'event_page_id' ] );
 		$iterator->setCaller( __METHOD__ );
@@ -82,15 +82,15 @@ class FlowUpdateResolvedNotifTitles extends LoggedUpdateMaintenance {
 					if ( $workflow ) {
 						$boardTitle = $workflow->getOwnerTitle();
 					}
-				} catch ( Exception $e ) {
+				} catch ( Exception ) {
 				}
 				if ( $boardTitle ) {
-					$dbw->update(
-						'echo_event',
-						[ 'event_page_id' => $boardTitle->getArticleID() ],
-						[ 'event_id' => $row->event_id ],
-						__METHOD__
-					);
+					$dbw->newUpdateQueryBuilder()
+						->update( 'echo_event' )
+						->set( [ 'event_page_id' => $boardTitle->getArticleID() ] )
+						->where( [ 'event_id' => $row->event_id ] )
+						->caller( __METHOD__ )
+						->execute();
 					$processed += $dbw->affectedRows();
 				} else {
 					$this->output( "Could not find board for topic: " . $topicTitle->getPrefixedText() . "\n" );

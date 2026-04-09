@@ -7,13 +7,13 @@
 	 *
 	 * @constructor
 	 * @param {Object} [config] Configuration options
-	 * @cfg {string} [termsKey='edit'] terms-of-use message key for the footer message
-	 * @cfg {string} [saveMsgKey='flow-newtopic-save'] i18n message key for the save button
-	 * @cfg {string} [cancelMsgKey='flow-cancel'] i18n message key for the cancel button
-	 * @cfg {boolean} [saveable=true] Initial state of saveable flag
+	 * @param {string} [config.termsKey='edit'] terms-of-use message key for the footer message
+	 * @param {string} [config.saveMsgKey='flow-newtopic-save'] i18n message key for the save button
+	 * @param {string} [config.cancelMsgKey='flow-cancel'] i18n message key for the cancel button
+	 * @param {boolean} [config.saveable=true] Initial state of saveable flag
 	 */
 	mw.flow.ui.EditorControlsWidget = function mwFlowUiEditorControlsWidget( config ) {
-		var $buttons = $( '<div>' ).addClass( 'flow-ui-editorControlsWidget-buttons' ),
+		const $buttons = $( '<div>' ).addClass( 'flow-ui-editorControlsWidget-buttons' ),
 			widget = this;
 
 		config = config || {};
@@ -43,7 +43,7 @@
 
 		// Keyboard shortcut messages are provided by VE, so only do this when VE is installed
 		if ( mw.loader.getState( 'ext.visualEditor.mwcore' ) ) {
-			mw.loader.using( 'ext.visualEditor.mwcore' ).then( function () {
+			mw.loader.using( 'ext.visualEditor.mwcore' ).then( () => {
 				widget.cancelButton.setTitle(
 					widget.cancelButton.getLabel() +
 					// eslint-disable-next-line no-undef

@@ -2,11 +2,11 @@
 
 namespace Flow\Data;
 
-use Flow\Data\Utils\RawSql;
 use Flow\DbFactory;
 use Flow\Exception\NoIndexException;
 use Flow\Model\UUID;
-use FormatJson;
+use MediaWiki\Exception\MWExceptionHandler;
+use MediaWiki\Json\FormatJson;
 
 /**
  * Denormalized indexes that are query-only.  The indexes used here must
@@ -76,7 +76,7 @@ class ObjectLocator {
 	 * array_map, maintaining order and key relationship between input $queries
 	 * and $result.
 	 *
-	 * @param array $queries
+	 * @param array[] $queries
 	 * @param array $options
 	 * @return array[]
 	 */
@@ -102,7 +102,7 @@ class ObjectLocator {
 					. json_encode( $options ) . ' : '
 					. json_encode( array_map( 'get_class', $this->indexes ) )
 				);
-				\MWExceptionHandler::logException( $e );
+				MWExceptionHandler::logException( $e );
 			} else {
 				wfDebugLog( 'FlowDebug', __METHOD__ . ': ' . $e->getMessage() );
 			}
@@ -359,28 +359,28 @@ class ObjectLocator {
 	protected function convertToDbQueries( array $queries, array $options ) {
 		if ( isset( $options['offset-id'] ) &&
 			isset( $options['sort'] ) && count( $options['sort'] ) === 1 &&
-			preg_match( '/_id$/', $options['sort'][0] ) ) {
-				if ( !$options['offset-id'] instanceof UUID ) {
-					$options['offset-id'] = UUID::create( $options['offset-id'] );
-				}
+			preg_match( '/_id$/', $options['sort'][0] )
+		) {
+			if ( !$options['offset-id'] instanceof UUID ) {
+				$options['offset-id'] = UUID::create( $options['offset-id'] );
+			}
 
-				if ( $options['order'] === 'ASC' ) {
-					$operator = '>';
-				} else {
-					$operator = '<';
-				}
+			if ( $options['order'] === 'ASC' ) {
+				$operator = '>';
+			} else {
+				$operator = '<';
+			}
 
-				if ( isset( $options['offset-include'] ) && $options['offset-include'] ) {
-					$operator .= '=';
-				}
+			if ( isset( $options['offset-include'] ) && $options['offset-include'] ) {
+				$operator .= '=';
+			}
 
-				$dbr = $this->dbFactory->getDB( DB_REPLICA );
-				$condition = new RawSql( $options['sort'][0] . ' ' . $operator . ' ' .
-					$dbr->addQuotes( $options['offset-id']->getBinary() ) );
+			$dbr = $this->dbFactory->getDB( DB_REPLICA );
+			$condition = $dbr->expr( $options['sort'][0], $operator, $options['offset-id']->getBinary() );
 
-				foreach ( $queries as &$query ) {
-					$query[] = $condition;
-				}
+			foreach ( $queries as &$query ) {
+				$query[] = $condition;
+			}
 		}
 
 		return $queries;

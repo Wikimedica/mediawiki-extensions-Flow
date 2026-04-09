@@ -5,7 +5,6 @@ namespace Flow\Tests\Formatter;
 use Flow\FlowActions;
 use Flow\Formatter\FormatterRow;
 use Flow\Formatter\RevisionFormatter;
-use Flow\Model\AbstractRevision;
 use Flow\Model\PostRevision;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
@@ -14,9 +13,10 @@ use Flow\RevisionActionPermissions;
 use Flow\Templating;
 use Flow\Tests\PostRevisionTestCase;
 use Flow\UrlGenerator;
-use RequestContext;
-use Title;
-use User;
+use MediaWiki\Context\RequestContext;
+use MediaWiki\Tests\User\TempUser\TempUserTestTrait;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 /**
  * @covers \Flow\Formatter\RevisionFormatter
@@ -27,11 +27,17 @@ use User;
  * @group Database
  */
 class RevisionFormatterTest extends PostRevisionTestCase {
+
+	use TempUserTestTrait;
+
 	/** @var User */
 	private $user;
 
 	protected function setUp(): void {
 		parent::setUp();
+		// Tests would need reworking to run with temp accounts enabled; instead
+		// just disable temp accounts for these tests.
+		$this->disableAutoCreateTempUser();
 
 		$this->user = User::newFromName( '127.0.0.1', false );
 
@@ -46,10 +52,12 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 		string $expectedFormat,
 		string $setContentRequestedFormat,
 		?UUID $setContentRevisionId,
-		AbstractRevision $revision
+		array $revisionSpec
 	) {
+		$revision = $this->mockPostRevision( ...$revisionSpec );
+
 		/** @var RevisionFormatter $formatter */
-		list( $formatter ) = $this->makeFormatter();
+		[ $formatter ] = $this->makeFormatter();
 		$formatter->setContentFormat( $setContentRequestedFormat, $setContentRevisionId );
 
 		$this->assertEquals(
@@ -58,12 +66,12 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 		);
 	}
 
-	public function decideContentFormatProvider() {
-		$topicTitleRevisionUnspecified = $this->mockTopicTitleRevision();
-		$topicTitleRevisionSpecified = $this->mockTopicTitleRevision();
+	public static function decideContentFormatProvider() {
+		$topicTitleRevisionUnspecified = [ true, UUID::create() ];
+		$topicTitleRevisionSpecified = [ true, UUID::create() ];
 
-		$postRevisionUnspecified = $this->mockPostRevision();
-		$postRevisionSpecified = $this->mockPostRevision();
+		$postRevisionUnspecified = [ false, UUID::create() ];
+		$postRevisionSpecified = [ false, UUID::create() ];
 
 		return [
 			[
@@ -77,7 +85,7 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 			[
 				'topic-title-html',
 				'topic-title-wikitext',
-				$topicTitleRevisionSpecified->getRevisionId(),
+				$topicTitleRevisionSpecified[1],
 				$topicTitleRevisionUnspecified,
 			],
 			[
@@ -103,7 +111,7 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 			[
 				'fixed-html',
 				'wikitext',
-				$postRevisionSpecified->getRevisionId(),
+				$postRevisionSpecified[1],
 				$postRevisionUnspecified,
 			],
 			[
@@ -133,31 +141,31 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 			[
 				'topic-title-html',
 				'topic-title-html',
-				$topicTitleRevisionSpecified->getRevisionId(),
+				$topicTitleRevisionSpecified[1],
 				$topicTitleRevisionSpecified,
 			],
 			[
 				'topic-title-wikitext',
 				'topic-title-wikitext',
-				$topicTitleRevisionSpecified->getRevisionId(),
+				$topicTitleRevisionSpecified[1],
 				$topicTitleRevisionSpecified,
 			],
 			[
 				'fixed-html',
 				'fixed-html',
-				$postRevisionSpecified->getRevisionId(),
+				$postRevisionSpecified[1],
 				$postRevisionSpecified,
 			],
 			[
 				'html',
 				'html',
-				$postRevisionSpecified->getRevisionId(),
+				$postRevisionSpecified[1],
 				$postRevisionSpecified,
 			],
 			[
 				'wikitext',
 				'wikitext',
-				$postRevisionSpecified->getRevisionId(),
+				$postRevisionSpecified[1],
 				$postRevisionSpecified,
 			],
 		];
@@ -166,28 +174,30 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 	/**
 	 * @dataProvider decideContentInvalidFormatProvider
 	 */
-	public function testDecideContentInvalidFormat( $setContentRequestedFormat, $setContentRevisionId, $revision ) {
+	public function testDecideContentInvalidFormat( $setContentRequestedFormat, $setContentRevisionId, array $revisionSpec ) {
+		$revision = $this->mockPostRevision( ...$revisionSpec );
+
 		/** @var RevisionFormatter $formatter */
-		list( $formatter ) = $this->makeFormatter();
+		[ $formatter ] = $this->makeFormatter();
 		$formatter->setContentFormat( $setContentRequestedFormat, $setContentRevisionId );
 		$this->expectException( \Flow\Exception\FlowException::class );
 		$formatter->decideContentFormat( $revision );
 	}
 
-	public function decideContentInvalidFormatProvider() {
-		$topicTitleRevisionSpecified = $this->mockTopicTitleRevision();
-		$postRevisionSpecified = $this->mockPostRevision();
-		$postRevisionUnspecified = $this->mockPostRevision();
+	public static function decideContentInvalidFormatProvider() {
+		$topicTitleRevisionSpecified = [ true, UUID::create() ];
+		$postRevisionSpecified = [ false, UUID::create() ];
+		$postRevisionUnspecified = [ false, UUID::create() ];
 
 		return [
 			[
 				'wikitext',
-				$topicTitleRevisionSpecified->getRevisionId(),
+				$topicTitleRevisionSpecified[1],
 				$topicTitleRevisionSpecified,
 			],
 			[
 				'topic-title-html',
-				$postRevisionSpecified->getRevisionId(),
+				$postRevisionSpecified[1],
 				$postRevisionSpecified,
 			],
 			[
@@ -197,7 +207,7 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 			],
 			[
 				'topic-title-wikitext',
-				$postRevisionSpecified->getRevisionId(),
+				$postRevisionSpecified[1],
 				$postRevisionSpecified,
 			],
 			[
@@ -211,15 +221,15 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 	/**
 	 * @dataProvider setContentFormatInvalidProvider
 	 */
-	public function testSetContentFormatInvalidProvider( $requestedFormat, $revisionId ) {
+	public function testSetContentFormatInvalidProvider( $requestedFormat, ?UUID $revisionId ) {
 		/** @var RevisionFormatter $formatter */
-		list( $formatter ) = $this->makeFormatter();
-		$this->expectException( \Flow\Exception\FlowException::class );
+		[ $formatter ] = $this->makeFormatter();
+		$this->expectException( \Flow\Exception\InvalidInputException::class );
 		$formatter->setContentFormat( $requestedFormat, $revisionId );
 	}
 
-	public function setContentFormatInvalidProvider() {
-		$postRevisionSpecified = $this->mockPostRevision();
+	public static function setContentFormatInvalidProvider() {
+		$postRevisionSpecified = UUID::create();
 
 		return [
 			[
@@ -228,14 +238,14 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 			],
 			[
 				'another-fake-format',
-				$postRevisionSpecified->getRevisionId()
+				$postRevisionSpecified
 			],
 		];
 	}
 
 	public function testMockFormatterBasicallyWorks() {
 		/** @var RevisionFormatter $formatter */
-		list( $formatter, $ctx ) = $this->makeFormatter();
+		[ $formatter, $ctx ] = $this->makeFormatter();
 		$result = $formatter->formatApi( $this->generateFormatterRow( 'my new topic' ), $ctx );
 		$this->assertEquals( 'new-post', $result['changeType'] );
 		$this->assertEquals( 'my new topic', $result['content']['content'] );
@@ -243,7 +253,7 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 
 	public function testFormattingEditedTitle() {
 		/** @var RevisionFormatter $formatter */
-		list( $formatter, $ctx ) = $this->makeFormatter();
+		[ $formatter, $ctx ] = $this->makeFormatter();
 		$row = $this->generateFormatterRow();
 		$row->previousRevision = $row->revision;
 		$row->revision = $row->revision->newNextRevision(
@@ -263,7 +273,7 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 		$nextContent = 'ברוכים הבאים לוויקיפדיה!';
 
 		/** @var RevisionFormatter $formatter */
-		list( $formatter, $ctx ) = $this->makeFormatter();
+		[ $formatter, $ctx ] = $this->makeFormatter();
 
 		$row = $this->generateFormatterRow( $content );
 		$result = $formatter->formatApi( $row, $ctx );
@@ -329,12 +339,12 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 		return $permissions;
 	}
 
-	private function mockPostRevision(): PostRevision {
+	private function mockPostRevision( bool $isTopicTitle = false, ?UUID $revisionUuid = null ): PostRevision {
 		$postRevision = $this->createMock( PostRevision::class );
 		$postRevision->method( 'isTopicTitle' )
-			->willReturn( false );
+			->willReturn( $isTopicTitle );
 		$postRevision->method( 'getRevisionId' )
-			->willReturn( UUID::create() );
+			->willReturn( $revisionUuid ?? UUID::create() );
 		return $postRevision;
 	}
 
@@ -348,15 +358,6 @@ class RevisionFormatterTest extends PostRevisionTestCase {
 			} );
 
 		return $templating;
-	}
-
-	private function mockTopicTitleRevision(): PostRevision {
-		$topicTitleRevision = $this->createMock( PostRevision::class );
-		$topicTitleRevision->method( 'isTopicTitle' )
-			->willReturn( true );
-		$topicTitleRevision->method( 'getRevisionId' )
-			->willReturn( UUID::create() );
-		return $topicTitleRevision;
 	}
 
 	public function makeFormatter(): array {

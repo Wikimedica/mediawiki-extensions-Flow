@@ -4,11 +4,11 @@ namespace Flow\Tests;
 
 use Flow\Container;
 use Flow\TalkpageManager;
-use HashConfig;
+use MediaWiki\Content\WikitextContent;
+use MediaWiki\MainConfigNames;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 use MediaWikiIntegrationTestCase;
-use Title;
-use User;
-use WikitextContent;
 
 /**
  * @covers \Flow\TalkpageManager
@@ -25,12 +25,6 @@ class TalkpageManagerTest extends MediaWikiIntegrationTestCase {
 	protected function setUp(): void {
 		parent::setUp();
 		$this->talkpageManager = Container::get( 'occupation_controller' );
-
-		$this->tablesUsed = array_merge( $this->tablesUsed, [
-			'page',
-			'revision',
-			'ip_changes',
-		] );
 	}
 
 	public function testCheckIfCreationIsPossible() {
@@ -46,15 +40,11 @@ class TalkpageManagerTest extends MediaWikiIntegrationTestCase {
 		}
 
 		$existTrueStatus = $this->talkpageManager->checkIfCreationIsPossible( $existentTitle, /*mustNotExist*/ true );
-		$this->assertTrue( $existTrueStatus->hasMessage( 'flow-error-allowcreation-already-exists' ),
-			'Error when page already exists and mustNotExist true was passed' );
-		$this->assertFalse( $existTrueStatus->isOK(),
+		$this->assertStatusError( 'flow-error-allowcreation-already-exists', $existTrueStatus,
 			'Error when page already exists and mustNotExist true was passed' );
 
 		$existFalseStatus = $this->talkpageManager->checkIfCreationIsPossible( $existentTitle, /*mustNotExist*/ false );
-		$this->assertFalse( $existFalseStatus->hasMessage( 'flow-error-allowcreation-already-exists' ),
-			'No error when page already exists and mustNotExist false was passed' );
-		$this->assertTrue( $existFalseStatus->isOK(),
+		$this->assertStatusGood( $existFalseStatus,
 			'No error when page already exists and mustNotExist false was passed' );
 	}
 
@@ -66,36 +56,25 @@ class TalkpageManagerTest extends MediaWikiIntegrationTestCase {
 
 		$unconfirmedUser = User::newFromName( 'UTFlowUnconfirmed' );
 
-		// TODO: remove this once core no longer accesses wgNamespaceContentModels directly.
-		$this->setMwGlobals( [
-			'wgNamespaceContentModels' => $tempModels,
-			'wgFlowReadOnly' => false,
+		$this->overrideConfigValues( [
+			'FlowReadOnly' => false,
+			MainConfigNames::NamespaceContentModels => $tempModels,
 		] );
-
-		$this->overrideMwServices( new HashConfig( [
-			'wgNamespaceContentModels' => $tempModels,
-			'wgFlowReadOnly' => false,
-		] ) );
 
 		$permissionStatus = $this->talkpageManager->checkIfUserHasPermission(
 			Title::newFromText( 'User talk:Test123' ), $unconfirmedUser );
-		$this->assertTrue( $permissionStatus->isOK(),
+		$this->assertStatusGood( $permissionStatus,
 			'No error when enabling Flow board in default-Flow namespace' );
 
 		$permissionStatus = $this->talkpageManager->checkIfUserHasPermission(
 			Title::newFromText( 'User:Test123' ), $unconfirmedUser );
-		$this->assertFalse( $permissionStatus->isOK(),
-			'Error when user without flow-create-board enables Flow board in non-default-Flow namespace' );
-		$this->assertTrue( $permissionStatus->hasMessage( 'flow-error-allowcreation-flow-create-board' ),
+		$this->assertStatusError( 'badaccess-groups', $permissionStatus,
 			'Correct error thrown when user does not have flow-create-board right' );
 
-		$adminUser = User::newFromName( 'UTSysop' );
-		$userGroupManager = $this->getServiceContainer()->getUserGroupManager();
-		$userGroupManager->addUserToGroup( $adminUser, 'flow-bot' );
-
+		$adminUser = $this->getTestUser( [ 'sysop', 'flow-bot' ] )->getUser();
 		$permissionStatus = $this->talkpageManager->checkIfUserHasPermission(
 			Title::newFromText( 'User:Test123' ), $adminUser );
-		$this->assertTrue( $permissionStatus->isOK(),
+		$this->assertStatusGood( $permissionStatus,
 			'No error when user with flow-create-board enables Flow board in non-default-Flow namespace' );
 	}
 }

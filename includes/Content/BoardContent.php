@@ -2,14 +2,15 @@
 
 namespace Flow\Content;
 
-use Content;
 use Flow\Model\UUID;
+use MediaWiki\Content\AbstractContent;
+use MediaWiki\Content\Content;
 
-class BoardContent extends \AbstractContent {
+class BoardContent extends AbstractContent {
 	/** @var UUID|null */
 	protected $workflowId;
 
-	public function __construct( $contentModel = CONTENT_MODEL_FLOW_BOARD, UUID $workflowId = null ) {
+	public function __construct( $contentModel = CONTENT_MODEL_FLOW_BOARD, ?UUID $workflowId = null ) {
 		parent::__construct( $contentModel );
 		$this->workflowId = $workflowId;
 	}
@@ -52,10 +53,16 @@ class BoardContent extends \AbstractContent {
 	 *
 	 * @param int $maxLength Maximum length of the summary text.
 	 *
-	 * @return string The summary text.
+	 * @return string|false The summary text.
 	 */
 	public function getTextForSummary( $maxLength = 250 ) {
-		return '[Flow board ' . $this->getWorkflowId()->getAlphadecimal() . ']';
+		$workflow = $this->getWorkflowId();
+		if ( !$workflow ) {
+			// This shouldn't happen but some Flow boards have no workflow
+			// due to ancient bugs, so don't crash
+			return '[Corrupt Flow board]';
+		}
+		return '[Flow board ' . $workflow->getAlphadecimal() . ']';
 	}
 
 	/**

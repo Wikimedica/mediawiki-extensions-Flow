@@ -6,7 +6,6 @@ use Flow\Container;
 use Flow\Data\Pager\Pager;
 use Flow\Data\Pager\PagerPage;
 use Flow\Exception\FailCommitException;
-use Flow\Exception\FlowException;
 use Flow\Formatter\TocTopicListFormatter;
 use Flow\Formatter\TopicListFormatter;
 use Flow\Formatter\TopicListQuery;
@@ -14,8 +13,11 @@ use Flow\Model\PostRevision;
 use Flow\Model\TopicListEntry;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
+use MediaWiki\Html\Html;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Output\OutputPage;
 use MediaWiki\Revision\RevisionRecord;
+use MediaWiki\Title\Title;
 use UserOptionsUpdateJob;
 
 class TopicListBlock extends AbstractBlock {
@@ -101,7 +103,7 @@ class TopicListBlock extends AbstractBlock {
 		}
 
 		// creates Workflow, Revision & TopicListEntry objects to be inserted into storage
-		list( $this->topicWorkflow, $this->topicListEntry, $this->topicTitle, $this->firstPost ) = $this->create();
+		[ $this->topicWorkflow, $this->topicListEntry, $this->topicTitle, $this->firstPost ] = $this->create();
 
 		if ( !$this->checkSpamFilters( null, $this->topicTitle ) ) {
 			return;
@@ -118,8 +120,6 @@ class TopicListBlock extends AbstractBlock {
 	 * * $this->topicTitle
 	 * * $this->firstPost
 	 *
-	 * @throws \MWException
-	 * @throws FailCommitException
 	 * @return array Array of [$topicWorkflow, $topicListEntry, $topicTitle, $firstPost]
 	 */
 	protected function create() {
@@ -291,7 +291,9 @@ class TopicListBlock extends AbstractBlock {
 				$workflowsByWorkflowId[$alphaWorkflowId] = $workflow;
 			}
 
-			return $response + $serializer->formatApi( $this->workflow, $topicRootRevisionsByWorkflowId, $workflowsByWorkflowId, $page );
+			return $response + $serializer->formatApi(
+				$this->workflow, $topicRootRevisionsByWorkflowId, $workflowsByWorkflowId, $page
+			);
 		}
 
 		/** @var TopicListQuery $query */
@@ -309,11 +311,10 @@ class TopicListBlock extends AbstractBlock {
 	 *
 	 * @param array $options
 	 * @return array
-	 * @throws \MWException
 	 */
 	protected function preloadTexts( $options ) {
 		if ( isset( $options['preload'] ) && !empty( $options['preload'] ) ) {
-			$title = \Title::newFromText( $options['preload'] );
+			$title = Title::newFromText( $options['preload'] );
 			$wikiPageFactory = MediaWikiServices::getInstance()->getWikiPageFactory();
 			$page = $wikiPageFactory->newFromTitle( $title );
 			if ( $page->isRedirect() ) {
@@ -390,7 +391,10 @@ class TopicListBlock extends AbstractBlock {
 				] + $findOptions;
 
 				if ( $requestOptions['offset-id'] ) {
-					throw new FlowException( 'The `updated` sort order does not allow the `offset-id` parameter. Please use `offset`.' );
+					$requestOptions['offset-id'] = null;
+					$this->context->getOutput()->addHTML(
+						Html::warningBox( $this->context->msg( 'flow-invalid-param-offset-id-for-updated' )->parse() )
+					);
 				}
 				break;
 
@@ -404,7 +408,10 @@ class TopicListBlock extends AbstractBlock {
 				] + $findOptions;
 
 				if ( $requestOptions['offset'] ) {
-					throw new FlowException( 'The `newest` sort order does not allow the `offset` parameter.  Please use `offset-id`.' );
+					$requestOptions['offset'] = null;
+					$this->context->getOutput()->addHTML(
+						Html::warningBox( $this->context->msg( 'flow-invalid-param-offset-for-newest' )->parse() )
+					);
 				}
 		}
 
@@ -492,10 +499,7 @@ class TopicListBlock extends AbstractBlock {
 		} );
 	}
 
-	/**
-	 * @param \OutputPage $out
-	 */
-	public function setPageTitle( \OutputPage $out ) {
+	public function setPageTitle( OutputPage $out ) {
 		if ( $this->action !== 'new-topic' ) {
 			// Only new-topic should override page title, rest should default
 			parent::setPageTitle( $out );
@@ -504,8 +508,7 @@ class TopicListBlock extends AbstractBlock {
 
 		$title = $this->workflow->getOwnerTitle();
 		$message = $out->msg( 'flow-newtopic-first-heading', $title->getPrefixedText() );
-		$out->setPageTitle( $message );
-		$out->setHTMLTitle( $message );
+		$out->setPageTitleMsg( $message );
 		$out->setSubtitle( '&lt; ' . MediaWikiServices::getInstance()->getLinkRenderer()->makeLink( $title ) );
 	}
 }

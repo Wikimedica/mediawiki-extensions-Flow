@@ -6,17 +6,17 @@ use Flow\Block\TopicListBlock;
 use Flow\Container;
 use Flow\Hooks;
 use Flow\Model\Workflow;
-use MediaWiki\MediaWikiServices;
-use Title;
-use User;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Title\Title;
 
 /**
  * @covers \Flow\Block\TopicListBlock
+ * @group Database
  */
 class TopicListBlockTest extends \MediaWikiIntegrationTestCase {
 
 	public function testSortByOption() {
-		$user = User::newFromId( 1 );
+		$user = $this->getTestUser()->getUser();
 		$this->getServiceContainer()->getUserOptionsManager()
 			->setOption( $user, 'flow-topiclist-sortby', '' );
 
@@ -27,7 +27,7 @@ class TopicListBlockTest extends \MediaWikiIntegrationTestCase {
 		$container = Container::getContainer();
 		$container['user'] = $user;
 
-		$ctx = $this->createMock( \IContextSource::class );
+		$ctx = $this->createMock( IContextSource::class );
 		$ctx->method( 'getUser' )
 			->willReturn( $user );
 
@@ -59,7 +59,7 @@ class TopicListBlockTest extends \MediaWikiIntegrationTestCase {
 		$this->assertEquals( 'updated', $res['sortby'], 'Request saving sortby option' );
 
 		// The preference is saved via a job; run the job for the next set of assertions.
-		MediaWikiServices::getInstance()->getJobRunner()->run( [
+		$this->getServiceContainer()->getJobRunner()->run( [
 			'type' => 'userOptionsUpdate'
 		] );
 

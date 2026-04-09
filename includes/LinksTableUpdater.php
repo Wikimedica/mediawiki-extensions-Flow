@@ -2,16 +2,16 @@
 
 namespace Flow;
 
-use DeferredUpdates;
 use Flow\Data\ManagerGroup;
 use Flow\Model\Reference;
 use Flow\Model\URLReference;
 use Flow\Model\WikiReference;
 use Flow\Model\Workflow;
+use MediaWiki\Deferred\DeferredUpdates;
 use MediaWiki\MediaWikiServices;
-use ParserOutput;
-use Title;
-use WikiMap;
+use MediaWiki\Parser\ParserOutput;
+use MediaWiki\Title\Title;
+use MediaWiki\WikiMap\WikiMap;
 
 class LinksTableUpdater {
 
@@ -29,7 +29,7 @@ class LinksTableUpdater {
 		$title = $workflow->getArticleTitle();
 		$page = MediaWikiServices::getInstance()->getWikiPageFactory()->newFromTitle( $title );
 
-		$page->doSecondaryDataUpdates( [ 'defer' => DeferredUpdates::PRESEND ] );
+		$page->doSecondaryDataUpdates( [ 'defer' => DeferredUpdates::PRESEND, 'causeAction' => 'flow' ] );
 	}
 
 	/**
@@ -37,7 +37,7 @@ class LinksTableUpdater {
 	 * @param ParserOutput $parserOutput
 	 * @param Reference[]|null $references
 	 */
-	public function mutateParserOutput( Title $title, ParserOutput $parserOutput, array $references = null ) {
+	public function mutateParserOutput( Title $title, ParserOutput $parserOutput, ?array $references = null ) {
 		$references ??= $this->getReferencesForTitle( $title );
 
 		$linkBatch = MediaWikiServices::getInstance()->getLinkBatchFactory()->newLinkBatch();
@@ -80,25 +80,13 @@ class LinksTableUpdater {
 		$linkCache = MediaWikiServices::getInstance()->getLinkCache();
 
 		foreach ( $internalLinks as $title ) {
-			$ns = $title->getNamespace();
-			$dbk = $title->getDBkey();
-			if ( !isset( $parserOutput->getLinks()[$ns] ) ) {
-				$parserOutput->getLinks()[$ns] = [];
-			}
-
 			$id = $linkCache->getGoodLinkID( $title->getPrefixedDBkey() );
-			$parserOutput->getLinks()[$ns][$dbk] = $id;
+			$parserOutput->addLink( $title, $id );
 		}
 
 		foreach ( $templates as $title ) {
-			$ns = $title->getNamespace();
-			$dbk = $title->getDBkey();
-			if ( !isset( $parserOutput->getTemplates()[$ns] ) ) {
-				$parserOutput->getTemplates()[$ns] = [];
-			}
-
 			$id = $linkCache->getGoodLinkID( $title->getPrefixedDBkey() );
-			$parserOutput->getTemplates()[$ns][$dbk] = $id;
+			$parserOutput->addTemplate( $title, $id, $title->getLatestRevID() );
 		}
 	}
 

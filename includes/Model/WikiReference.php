@@ -3,8 +3,8 @@
 namespace Flow\Model;
 
 use Flow\Exception\InvalidInputException;
-use Title;
-use WikiMap;
+use MediaWiki\Title\Title;
+use MediaWiki\WikiMap\WikiMap;
 
 class WikiReference extends Reference {
 	public const TYPE_FILE = 'file';
@@ -106,7 +106,7 @@ class WikiReference extends Reference {
 	public static function makeTitle( $namespace, $title ) {
 		try {
 			return Workflow::getFromTitleCache( WikiMap::getCurrentWikiId(), $namespace, $title );
-		} catch ( InvalidInputException $e ) {
+		} catch ( InvalidInputException ) {
 			// duplicate Title::makeTitleSafe which returns null on failure,
 			// but only for InvalidInputException
 

@@ -8,9 +8,9 @@ use Flow\Data\ManagerGroup;
 use Flow\DbFactory;
 use Flow\Model\AbstractRevision;
 use Flow\Model\UUID;
-use LoggedUpdateMaintenance;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
+use MediaWiki\WikiMap\WikiMap;
 use ReflectionProperty;
-use WikiMap;
 
 $IP = getenv( 'MW_INSTALL_PATH' );
 if ( $IP === false ) {
@@ -78,12 +78,10 @@ class FlowUpdateRevisionContentLength extends LoggedUpdateMaintenance {
 			AbstractRevision::class,
 			'contentLength'
 		);
-		$this->contentLengthProperty->setAccessible( true );
 		$this->previousContentLengthProperty = new ReflectionProperty(
 			AbstractRevision::class,
 			'previousContentLength'
 		);
-		$this->previousContentLengthProperty->setAccessible( true );
 
 		$dbw = $this->dbFactory->getDB( DB_PRIMARY );
 		// Walk through the flow_revision table
@@ -155,7 +153,7 @@ class FlowUpdateRevisionContentLength extends LoggedUpdateMaintenance {
 		return true;
 	}
 
-	protected function updateRevision( AbstractRevision $revision, AbstractRevision $previous = null ) {
+	protected function updateRevision( AbstractRevision $revision, ?AbstractRevision $previous = null ) {
 		$this->contentLengthProperty->setValue(
 			$revision,
 			$this->calcContentLength( $revision )

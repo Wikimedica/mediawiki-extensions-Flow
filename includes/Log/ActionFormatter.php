@@ -11,10 +11,11 @@ use Flow\Repository\TreeRepository;
 use Flow\RevisionActionPermissions;
 use Flow\Templating;
 use Flow\UrlGenerator;
-use LogEntry;
-use LogFormatter;
-use LogPage;
-use Message;
+use MediaWiki\Html\Html;
+use MediaWiki\Logging\LogEntry;
+use MediaWiki\Logging\LogFormatter;
+use MediaWiki\Logging\LogPage;
+use MediaWiki\Message\Message;
 
 class ActionFormatter extends LogFormatter {
 	/**
@@ -32,9 +33,6 @@ class ActionFormatter extends LogFormatter {
 	 */
 	protected $templating;
 
-	/**
-	 * @param LogEntry $entry
-	 */
 	public function __construct( LogEntry $entry ) {
 		parent::__construct( $entry );
 
@@ -43,7 +41,7 @@ class ActionFormatter extends LogFormatter {
 
 		$params = $this->entry->getParameters();
 		// serialized topicId or postId can be stored
-		foreach ( $params as $key => $value ) {
+		foreach ( $params as $value ) {
 			if ( $value instanceof UUID ) {
 				static::$uuids[$value->getAlphadecimal()] = $value;
 			}
@@ -66,7 +64,7 @@ class ActionFormatter extends LogFormatter {
 		 */
 		static $loaded = false;
 		if ( !$loaded ) {
-			/** @var ManagerGroup storage */
+			/** @var ManagerGroup $storage */
 			$storage = Container::get( 'storage' );
 			/** @var TreeRepository $treeRepository */
 			$treeRepository = Container::get( 'repository.tree' );
@@ -142,7 +140,7 @@ class ActionFormatter extends LogFormatter {
 
 		$message->parse();
 
-		return \Html::rawElement(
+		return Html::rawElement(
 			'span',
 			[ 'class' => 'plainlinks' ],
 			$message->parse()
@@ -184,7 +182,7 @@ class ActionFormatter extends LogFormatter {
 			// see if this post is valid
 			$collection->getLastRevision();
 			return $collection;
-		} catch ( \Exception $e ) {
+		} catch ( \Exception ) {
 			// failed finding the expected data in storage
 			wfWarn( __METHOD__ . ': Failed to locate root for: ' . serialize( $params ) .
 				' (potentially storage issue)' );

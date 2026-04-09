@@ -2,10 +2,6 @@
 
 namespace Flow\Content;
 
-use Article;
-use Content;
-use DerivativeContext;
-use FauxRequest;
 use Flow\Actions\FlowAction;
 use Flow\Container;
 use Flow\Diff\FlowBoardContentDiffView;
@@ -14,21 +10,26 @@ use Flow\LinksTableUpdater;
 use Flow\Model\UUID;
 use Flow\View;
 use Flow\WorkflowLoaderFactory;
-use FormatJson;
-use IContextSource;
+use InvalidArgumentException;
+use MediaWiki\Content\Content;
+use MediaWiki\Content\ContentHandler;
 use MediaWiki\Content\Renderer\ContentParseParams;
+use MediaWiki\Context\DerivativeContext;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Context\RequestContext;
+use MediaWiki\Json\FormatJson;
 use MediaWiki\MediaWikiServices;
-use MWException;
-use OutputPage;
-use ParserOutput;
-use RequestContext;
-use Title;
-use User;
+use MediaWiki\Output\OutputPage;
+use MediaWiki\Page\Article;
+use MediaWiki\Parser\ParserOutput;
+use MediaWiki\Request\FauxRequest;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
-class BoardContentHandler extends \ContentHandler {
+class BoardContentHandler extends ContentHandler {
 	public function __construct( $modelId ) {
 		if ( $modelId !== CONTENT_MODEL_FLOW_BOARD ) {
-			throw new MWException( __CLASS__ . " initialised for invalid content model" );
+			throw new InvalidArgumentException( __CLASS__ . " initialised for invalid content model" );
 		}
 
 		parent::__construct( CONTENT_MODEL_FLOW_BOARD, [ CONTENT_FORMAT_JSON ] );
@@ -53,14 +54,13 @@ class BoardContentHandler extends \ContentHandler {
 	 *
 	 * @since 1.21
 	 *
-	 * @param \Content $content The Content object to serialize
+	 * @param Content $content The Content object to serialize
 	 * @param string|null $format The desired serialization format
 	 * @return string Serialized form of the content
-	 * @throws MWException
 	 */
-	public function serializeContent( \Content $content, $format = null ) {
+	public function serializeContent( Content $content, $format = null ) {
 		if ( !$content instanceof BoardContent ) {
-			throw new MWException( "Expected a BoardContent object, got a " . get_class( $content ) );
+			throw new InvalidArgumentException( "Expected a BoardContent object, got a " . get_class( $content ) );
 		}
 
 		$info = [];
@@ -117,10 +117,10 @@ class BoardContentHandler extends \ContentHandler {
 	 *   default).  In such a namespace, non-existent pages are created as Flow.
 	 * * explicitly allowed for a user, requiring special permissions
 	 *
-	 * @param \Title $title
+	 * @param Title $title
 	 * @return bool
 	 */
-	public function canBeUsedOn( \Title $title ) {
+	public function canBeUsedOn( Title $title ) {
 		/** @var \Flow\TalkpageManager $manager */
 		$manager = Container::get( 'occupation_controller' );
 
@@ -192,9 +192,9 @@ class BoardContentHandler extends \ContentHandler {
 					->getUserFactory()
 					->newFromUserIdentity( $parserOptions->getUserIdentity() );
 				$this->generateHtml( $title, $user, $content, $output );
-			} catch ( \Exception $e ) {
+			} catch ( \Exception ) {
 				// Workflow does not yet exist (may be in the process of being created)
-				$output->setText( '' );
+				$output->setContentHolderText( '' );
 			}
 		}
 
@@ -208,7 +208,7 @@ class BoardContentHandler extends \ContentHandler {
 				->getTimestampFromId( $revId );
 		}
 
-		$output->setTimestamp( $timestamp );
+		$output->setRevisionTimestamp( $timestamp );
 
 		/** @var LinksTableUpdater $updater */
 		$updater = Container::get( 'reference.updater.links-tables' );
@@ -246,7 +246,7 @@ class BoardContentHandler extends \ContentHandler {
 		$view->show( $loader, 'view' );
 
 		// Extract data from derivative context
-		$output->setText( $childContext->getOutput()->getHTML() );
+		$output->setContentHolderText( $childContext->getOutput()->getHTML() );
 		$output->addModules( $childContext->getOutput()->getModules() );
 		$output->addModuleStyles( $childContext->getOutput()->getModuleStyles() );
 	}

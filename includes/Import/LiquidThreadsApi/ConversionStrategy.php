@@ -11,12 +11,12 @@ use Flow\Import\SourceStore\SourceStoreInterface;
 use Flow\Notifications\Controller;
 use Flow\UrlGenerator;
 use LqtDispatch;
+use MediaWiki\Content\WikitextContent;
 use MediaWiki\MediaWikiServices;
-use MWTimestamp;
-use Title;
-use User;
-use Wikimedia\Rdbms\IDatabase;
-use WikitextContent;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
+use MediaWiki\Utils\MWTimestamp;
+use Wikimedia\Rdbms\IReadableDatabase;
 
 /**
  * Converts LiquidThreads pages on a wiki to Flow. This converter is idempotent
@@ -29,11 +29,8 @@ use WikitextContent;
  * archive version of the page.
  */
 class ConversionStrategy implements IConversionStrategy {
-	/**
-	 * @var IDatabase Primary database for the current wiki
-	 */
-	protected $dbw;
 
+	protected IReadableDatabase $dbr;
 	/**
 	 * @var SourceStoreInterface
 	 */
@@ -60,14 +57,14 @@ class ConversionStrategy implements IConversionStrategy {
 	protected $notificationController;
 
 	public function __construct(
-		IDatabase $dbw,
+		IReadableDatabase $dbr,
 		SourceStoreInterface $sourceStore,
 		ApiBackend $api,
 		UrlGenerator $urlGenerator,
 		User $talkpageUser,
 		Controller $notificationController
 	) {
-		$this->dbw = $dbw;
+		$this->dbr = $dbr;
 		$this->sourceStore = $sourceStore;
 		$this->api = $api;
 		$this->urlGenerator = $urlGenerator;
@@ -87,7 +84,7 @@ class ConversionStrategy implements IConversionStrategy {
 		return "LQT to Flow conversion";
 	}
 
-	public function isConversionFinished( Title $title, Title $movedFrom = null ) {
+	public function isConversionFinished( Title $title, ?Title $movedFrom = null ) {
 		if ( LqtDispatch::isLqtPage( $title ) ) {
 			return false;
 		} else {
@@ -141,7 +138,7 @@ class ConversionStrategy implements IConversionStrategy {
 	public function getPostprocessor() {
 		$group = new ProcessorGroup;
 		$group->add( new LqtRedirector( $this->urlGenerator, $this->talkpageUser ) );
-		$group->add( new LqtNotifications( $this->notificationController, $this->dbw ) );
+		$group->add( new LqtNotifications( $this->notificationController, $this->dbr ) );
 
 		return $group;
 	}

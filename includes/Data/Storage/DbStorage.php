@@ -4,10 +4,10 @@ namespace Flow\Data\Storage;
 
 use Flow\Data\ObjectManager;
 use Flow\Data\ObjectStorage;
-use Flow\Data\Utils\RawSql;
 use Flow\DbFactory;
 use Flow\Exception\DataModelException;
 use Flow\Model\UUID;
+use Wikimedia\Rdbms\InsertQueryBuilder;
 
 /**
  * Base class for all ObjectStorage implementers
@@ -39,9 +39,6 @@ abstract class DbStorage implements ObjectStorage {
 	 */
 	protected $obsoleteUpdateColumns = [];
 
-	/**
-	 * @param DbFactory $dbFactory
-	 */
 	public function __construct( DbFactory $dbFactory ) {
 		$this->dbFactory = $dbFactory;
 	}
@@ -64,60 +61,15 @@ abstract class DbStorage implements ObjectStorage {
 	}
 
 	/**
-	 * At the moment, does three things:
-	 * 1. Finds UUID objects and returns their database representation.
-	 * 2. Checks for unarmoured raw SQL and errors out if it exists.
-	 * 3. Finds armoured raw SQL and expands it out.
+	 * Finds UUID objects and returns their database representation.
 	 *
 	 * @param array $data Query conditions for IDatabase::select
-	 * @return array query conditions escaped for use
-	 * @throws DataModelException
+	 * @return array query conditions
 	 */
 	protected function preprocessSqlArray( array $data ) {
-		// Assuming that all databases have the same escaping settings.
-		$db = $this->dbFactory->getDB( DB_REPLICA );
-
 		$data = UUID::convertUUIDs( $data, 'binary' );
 
-		foreach ( $data as $key => $value ) {
-			if ( $value instanceof RawSql ) {
-				$data[$key] = $value->getSQL( $db );
-			} elseif ( is_numeric( $key ) ) {
-				throw new DataModelException( "Unescaped raw SQL found in " . __METHOD__, 'process-data' );
-			} elseif ( !preg_match( '/^[A-Za-z0-9\._]+$/', $key ) ) {
-				throw new DataModelException( "Dangerous SQL field name '$key' found in " . __METHOD__, 'process-data' );
-			}
-		}
-
 		return $data;
-	}
-
-	/**
-	 * Internal security function which checks a row object
-	 * (for inclusion as a condition or a row for insert/update)
-	 * for any numeric keys (= raw SQL), or field names with
-	 * potentially unsafe characters.
-	 *
-	 * @param array $row The row to check.
-	 * @return bool True if raw SQL is found
-	 */
-	protected function hasUnescapedSQL( array $row ) {
-		foreach ( $row as $key => $value ) {
-			if ( $value instanceof RawSql ) {
-				// Specifically allowed SQL
-				continue;
-			}
-
-			if ( is_numeric( $key ) ) {
-				return true;
-			}
-
-			if ( !preg_match( '/^' . $this->getFieldRegexFragment() . '$/', $key ) ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	/**
@@ -225,5 +177,33 @@ abstract class DbStorage implements ObjectStorage {
 		}
 
 		return $changeSet;
+	}
+
+	/**
+	 * Checks if the --insert-ignore flag is set.
+	 *
+	 * @return bool
+	 */
+	public static function useInsertIgnore(): bool {
+		if ( MW_ENTRY_POINT !== 'cli' ) {
+			return false;
+		}
+		// Check if the command line script passed the --insert-ignore flag
+		// HACK: Read the global $argv as this method is too deep in the call stack to
+		// pass the option through properly.
+		global $argv;
+		return in_array( '--insert-ignore', $argv, true );
+	}
+
+	/**
+	 * If running in CLI and the --insert-ignore flag is set, modify the query builder
+	 * to ignore duplicate key insert errors.
+	 *
+	 * @param InsertQueryBuilder $queryBuilder
+	 */
+	public static function maybeSetInsertIgnore( InsertQueryBuilder $queryBuilder ): void {
+		if ( self::useInsertIgnore() ) {
+			$queryBuilder->ignore();
+		}
 	}
 }

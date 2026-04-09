@@ -7,12 +7,12 @@ use Flow\Conversion\Utils;
 use Flow\Exception\DataModelException;
 use Flow\Exception\InvalidDataException;
 use Flow\Exception\PermissionException;
-use Hooks;
+use Flow\Hooks\HookRunner;
 use MediaWiki\MediaWikiServices;
-use RecentChange;
-use Sanitizer;
-use Title;
-use User;
+use MediaWiki\Parser\Sanitizer;
+use MediaWiki\RecentChanges\RecentChange;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
 abstract class AbstractRevision {
 	public const MODERATED_NONE = '';
@@ -208,9 +208,7 @@ abstract class AbstractRevision {
 	 * @return array
 	 */
 	public static function toStorageRow( $obj ) {
-		$dbr = MediaWikiServices::getInstance()
-			->getDBLoadBalancer()
-			->getConnection( DB_REPLICA );
+		$dbr = MediaWikiServices::getInstance()->getConnectionProvider()->getReplicaDatabase();
 		return [
 			'rev_id' => $obj->revId->getAlphadecimal(),
 			'rev_user_id' => $obj->user->id,
@@ -409,7 +407,8 @@ abstract class AbstractRevision {
 		$sourceFormat = $this->getContentFormat();
 		if ( $this->xssCheck === null && $sourceFormat === 'html' ) {
 			// returns true if no handler aborted the hook
-			$this->xssCheck = Hooks::run( 'FlowCheckHtmlContentXss', [ $raw ] );
+			$this->xssCheck = ( new HookRunner( MediaWikiServices::getInstance()->getHookContainer() ) )
+				->onFlowCheckHtmlContentXss( $raw );
 			if ( !$this->xssCheck ) {
 				wfDebugLog( 'Flow', __METHOD__ . ': XSS check prevented display of revision ' .
 					$this->revId->getAlphadecimal() );
@@ -529,7 +528,7 @@ abstract class AbstractRevision {
 	 * @param Title|null $title When null the related workflow will be lazy-loaded to locate the title
 	 * @throws DataModelException
 	 */
-	protected function setContent( $content, $format, Title $title = null ) {
+	protected function setContent( $content, $format, ?Title $title = null ) {
 		if ( $this->moderationState !== self::MODERATED_NONE ) {
 			throw new DataModelException( 'TODO: Cannot change content of restricted revision',
 				'process-data' );
@@ -581,7 +580,7 @@ abstract class AbstractRevision {
 				$format, $storageFormat, $content, $title );
 		}
 
-		// @phan-suppress-next-line SecurityCheckMulti Seems a false positive
+		// @phan-suppress-next-line SecurityCheck-DoubleEscaped Seems a false positive
 		$this->setContentRaw( $this->convertedContent );
 	}
 
@@ -624,7 +623,7 @@ abstract class AbstractRevision {
 	 * @param Title|null $title When null the related workflow will be lazy-loaded to locate the title
 	 * @throws DataModelException
 	 */
-	protected function setNextContent( User $user, $content, $format, Title $title = null ) {
+	protected function setNextContent( User $user, $content, $format, ?Title $title = null ) {
 		if ( $this->moderationState !== self::MODERATED_NONE ) {
 			throw new DataModelException( 'Cannot change content of restricted revision', 'process-data' );
 		}
@@ -896,27 +895,20 @@ abstract class AbstractRevision {
 		}
 		$namespace = $title->getNamespace();
 
-		$conditions = [
-			'rc_title' => $title->getDBkey(),
-			'rc_timestamp' => $timestamp,
-			'rc_namespace' => $namespace
-		];
-		$options = [ 'USE INDEX' => [ 'recentchanges' => 'rc_timestamp' ] ];
-
-		$dbr = wfGetDB( DB_REPLICA );
+		$dbr = MediaWikiServices::getInstance()->getConnectionProvider()->getReplicaDatabase();
 		$rcQuery = RecentChange::getQueryInfo();
-		$rows = $dbr->select(
-			$rcQuery['tables'],
-			$rcQuery['fields'],
-			$conditions,
-			__METHOD__,
-			$options,
-			$rcQuery['joins']
-		);
-
-		if ( $rows === false ) {
-			return null;
-		}
+		$rows = $dbr->newSelectQueryBuilder()
+			->tables( $rcQuery['tables'] )
+			->fields( $rcQuery['fields'] )
+			->where( [
+				'rc_title' => $title->getDBkey(),
+				'rc_timestamp' => $timestamp,
+				'rc_namespace' => $namespace,
+			] )
+			->useIndex( [ 'recentchanges' => 'rc_timestamp' ] )
+			->joinConds( $rcQuery['joins'] )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 
 		if ( $rows->numRows() === 1 ) {
 			return RecentChange::newFromRow( $rows->fetchObject() );

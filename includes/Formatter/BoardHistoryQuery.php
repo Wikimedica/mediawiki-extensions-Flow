@@ -5,7 +5,7 @@ namespace Flow\Formatter;
 use Flow\Data\Utils\SortRevisionsByRevisionId;
 use Flow\Exception\FlowException;
 use Flow\Model\UUID;
-use MWExceptionHandler;
+use MediaWiki\Exception\MWExceptionHandler;
 
 class BoardHistoryQuery extends HistoryQuery {
 	/**
@@ -15,7 +15,7 @@ class BoardHistoryQuery extends HistoryQuery {
 	 * @param string $direction 'rev' or 'fwd'
 	 * @return FormatterRow[]
 	 */
-	public function getResults( UUID $boardWorkflowId, $limit = 50, UUID $offset = null, $direction = 'fwd' ) {
+	public function getResults( UUID $boardWorkflowId, $limit = 50, ?UUID $offset = null, $direction = 'fwd' ) {
 		$options = $this->getOptions( $direction, $limit, $offset );
 
 		$headerHistory = $this->getHeaderResults( $boardWorkflowId, $options ) ?: [];

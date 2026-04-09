@@ -3,7 +3,8 @@
 namespace Flow\Import;
 
 use Flow\Repository\TitleRepository;
-use Title;
+use MediaWiki\MediaWikiServices;
+use MediaWiki\Title\Title;
 
 class ArchiveNameHelper {
 
@@ -25,7 +26,7 @@ class ArchiveNameHelper {
 	 * @return Title
 	 * @throws ImportException
 	 */
-	public function decideArchiveTitle( Title $source, array $formats, TitleRepository $titleRepo = null ) {
+	public function decideArchiveTitle( Title $source, array $formats, ?TitleRepository $titleRepo = null ) {
 		$info = self::findLatestArchiveInfo( $source, $formats, $titleRepo );
 		$format = $info ? $info['format'] : $formats[0];
 		$counter = $info ? $info['counter'] + 1 : 1;
@@ -39,7 +40,7 @@ class ArchiveNameHelper {
 	 * @param TitleRepository|null $titleRepo
 	 * @return bool|mixed
 	 */
-	public function findLatestArchiveTitle( Title $source, array $formats, TitleRepository $titleRepo = null ) {
+	public function findLatestArchiveTitle( Title $source, array $formats, ?TitleRepository $titleRepo = null ) {
 		$info = self::findLatestArchiveInfo( $source, $formats, $titleRepo );
 		return $info ? $info['title'] : false;
 	}
@@ -50,13 +51,14 @@ class ArchiveNameHelper {
 	 * @param TitleRepository|null $titleRepo
 	 * @return bool|array
 	 */
-	protected function findLatestArchiveInfo( Title $source, array $formats, TitleRepository $titleRepo = null ) {
+	protected function findLatestArchiveInfo( Title $source, array $formats, ?TitleRepository $titleRepo = null ) {
 		$titleRepo ??= new TitleRepository();
 
 		$format = false;
 		$text = $source->getPrefixedText();
+		$titleFactory = MediaWikiServices::getInstance()->getTitleFactory();
 		foreach ( $formats as $potential ) {
-			$title = Title::newFromText( sprintf( $potential, $text, 1 ) );
+			$title = $titleFactory->newFromText( sprintf( $potential, $text, 1 ) );
 			if ( $title && $titleRepo->exists( $title ) ) {
 				$format = $potential;
 				break;

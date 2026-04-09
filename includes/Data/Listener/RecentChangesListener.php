@@ -10,8 +10,9 @@ use Flow\Model\AbstractRevision;
 use Flow\Model\Workflow;
 use Flow\Repository\UserNameBatch;
 use MediaWiki\MediaWikiServices;
-use RecentChange;
-use WikiMap;
+use MediaWiki\RecentChanges\RecentChange;
+use MediaWiki\Title\Title;
+use MediaWiki\WikiMap\WikiMap;
 
 /**
  * Inserts mw recentchange rows for flow AbstractRevision instances.
@@ -95,7 +96,6 @@ class RecentChangesListener extends AbstractListener {
 			'rc_source' => self::SRC_FLOW,
 			'rc_minor' => 0,
 			'rc_bot' => 0, // TODO: is revision by bot
-			'rc_new' => 0,
 			'rc_patrolled' => $autopatrolAllowed ? RecentChange::PRC_AUTOPATROLLED : RecentChange::PRC_UNPATROLLED,
 			'rc_old_len' => $revision->getPreviousContentLength(),
 			'rc_new_len' => $revision->getContentLength(),
@@ -139,7 +139,7 @@ class RecentChangesListener extends AbstractListener {
 	/**
 	 * @param Workflow $workflow
 	 * @param string $action
-	 * @return \Title
+	 * @return Title
 	 */
 	public function getRcTitle( Workflow $workflow, $action ) {
 		if ( $this->actions->getValue( $action, 'rc_title' ) === 'owner' ) {

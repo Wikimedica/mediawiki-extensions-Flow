@@ -8,20 +8,26 @@ use Flow\Exception\WikitextException;
 use Flow\Model\UUID;
 use Flow\Parsoid\ReferenceFactory;
 use Flow\Tests\FlowTestCase;
+use MediaWiki\Title\Title;
 use ReflectionMethod;
-use Title;
 
 /**
  * @group Database
  * @group Flow
+ * @covers \Flow\Parsoid\ReferenceExtractor
  */
-class ReferenceExtractorTestCase extends FlowTestCase {
+class ReferenceExtractorTest extends FlowTestCase {
 	protected function setUp(): void {
+		// https://gerrit.wikimedia.org/r/c/mediawiki/extensions/Flow/+/927619 needs to be merged
+		// but until then, skip this test unconditionally.
+		// TODO: remove the below line once the above patch is merged.
+		$this->markTestSkipped( 'Until Ifb85f4733be3b43b71b111df0cd3d88281101153 gets merged' );
+
 		parent::setUp();
 
 		// Check for Parsoid
 		try {
-			Utils::convert( 'html', 'wikitext', 'Foo', Title::newFromText( 'UTPage' ) );
+			Utils::convert( 'html', 'wikitext', 'Foo', Title::makeTitle( NS_MAIN, 'ReferenceExtractorTestCase' ) );
 		} catch ( WikitextException $excep ) {
 			$this->markTestSkipped( 'Parsoid not enabled' );
 		}
@@ -60,9 +66,9 @@ class ReferenceExtractorTestCase extends FlowTestCase {
 				// expected type
 				'link',
 				// expected target
-				'title:Talk:UTPage/Subpage',
-				// ???
-				'Talk:UTPage',
+				'title:Talk:TestReferenceExtractor/Subpage',
+				// page
+				'Talk:TestReferenceExtractor',
 			],
 			[
 				'External link',
@@ -143,7 +149,7 @@ class ReferenceExtractorTestCase extends FlowTestCase {
 		$expectedClass,
 		$expectedType,
 		$expectedTarget,
-		$page = 'UTPage'
+		$page = 'TestReferenceExtractor'
 	) {
 		$referenceExtractor = Container::get( 'reference.extractor' );
 
@@ -155,10 +161,8 @@ class ReferenceExtractorTestCase extends FlowTestCase {
 		$factory = new ReferenceFactory( $workflow, 'foo', UUID::create() );
 
 		$reflMethod = new ReflectionMethod( $referenceExtractor, 'extractReferences' );
-		$reflMethod->setAccessible( true );
 
 		$reflProperty = new \ReflectionProperty( $referenceExtractor, 'extractors' );
-		$reflProperty->setAccessible( true );
 		$extractors = $reflProperty->getValue( $referenceExtractor );
 
 		$html = Utils::convert( 'wt', 'html', $wikitext, Title::newFromText( $page ) );

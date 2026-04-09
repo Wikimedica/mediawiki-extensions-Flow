@@ -3,8 +3,7 @@
 namespace Flow\Maintenance;
 
 use Flow\Data\Listener\RecentChangesListener;
-use LoggedUpdateMaintenance;
-use MediaWiki\MediaWikiServices;
+use MediaWiki\Maintenance\LoggedUpdateMaintenance;
 use Wikimedia\AtEase\AtEase;
 use Wikimedia\Rdbms\IDatabase;
 
@@ -37,15 +36,13 @@ class FlowUpdateRecentChanges extends LoggedUpdateMaintenance {
 	}
 
 	protected function doDBUpdates() {
-		$dbw = wfGetDB( DB_PRIMARY );
+		$dbw = $this->getPrimaryDB();
 
 		$continue = 0;
 
-		$lbFactory = MediaWikiServices::getInstance()->getDBLoadBalancerFactory();
-
 		while ( $continue !== null ) {
 			$continue = $this->refreshBatch( $dbw, $continue );
-			$lbFactory->waitForReplication();
+			$this->waitForReplication();
 		}
 
 		return true;
@@ -59,13 +56,17 @@ class FlowUpdateRecentChanges extends LoggedUpdateMaintenance {
 	 * @return int|null Start id for the next batch
 	 */
 	public function refreshBatch( IDatabase $dbw, $continue = null ) {
-		$rows = $dbw->select(
-			/* table */'recentchanges',
-			/* select */[ 'rc_id', 'rc_params' ],
-			/* conds */[ "rc_id > $continue", 'rc_source' => RecentChangesListener::SRC_FLOW ],
-			__METHOD__,
-			/* options */[ 'LIMIT' => $this->getBatchSize(), 'ORDER BY' => 'rc_id' ]
-		);
+		$rows = $dbw->newSelectQueryBuilder()
+			->select( [ 'rc_id', 'rc_params' ] )
+			->from( 'recentchanges' )
+			->where( [
+				$dbw->expr( 'rc_id', '>', $continue ),
+				'rc_source' => RecentChangesListener::SRC_FLOW
+			] )
+			->limit( $this->getBatchSize() )
+			->orderBy( 'rc_id' )
+			->caller( __METHOD__ )
+			->fetchResultSet();
 
 		$continue = null;
 
@@ -162,12 +163,12 @@ class FlowUpdateRecentChanges extends LoggedUpdateMaintenance {
 			unset( $params['flow-workflow-change']['type'] );
 
 			// update log entry
-			$dbw->update(
-				'recentchanges',
-				[ 'rc_params' => serialize( $params ) ],
-				[ 'rc_id' => $row->rc_id ],
-				__METHOD__
-			);
+			$dbw->newUpdateQueryBuilder()
+				->update( 'recentchanges' )
+				->set( [ 'rc_params' => serialize( $params ) ] )
+				->where( [ 'rc_id' => $row->rc_id ] )
+				->caller( __METHOD__ )
+				->execute();
 
 			$this->completeCount++;
 		}

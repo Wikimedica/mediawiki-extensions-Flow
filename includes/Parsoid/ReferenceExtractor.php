@@ -8,7 +8,8 @@ use Flow\Exception\InvalidReferenceException;
 use Flow\Model\Reference;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
-use MWException;
+use LogicException;
+use RuntimeException;
 
 /**
  * Extracts references to templates, files and pages (in the form of links)
@@ -44,7 +45,7 @@ class ReferenceExtractor {
 				$text
 			);
 		} else {
-			throw new \Exception( "No extractors available for $objectType" );
+			throw new LogicException( "No extractors available for $objectType" );
 		}
 	}
 
@@ -53,8 +54,6 @@ class ReferenceExtractor {
 	 * @param Extractor[] $extractors
 	 * @param string $text
 	 * @return Reference[]
-	 * @throws MWException
-	 * @throws \Flow\Exception\WikitextException
 	 */
 	protected function extractReferences( ReferenceFactory $factory, array $extractors, $text ) {
 		$dom = Utils::createDOM( $text );
@@ -68,13 +67,13 @@ class ReferenceExtractor {
 
 			if ( !$elements ) {
 				$class = get_class( $extractor );
-				throw new MWException( "Malformed xpath from $class: " . $extractor->getXPath() );
+				throw new RuntimeException( "Malformed xpath from $class: " . $extractor->getXPath() );
 			}
 
 			foreach ( $elements as $element ) {
 				try {
 					$ref = $extractor->perform( $factory, $element );
-				} catch ( InvalidReferenceException $e ) {
+				} catch ( InvalidReferenceException ) {
 					wfDebugLog( 'Flow', 'Invalid reference detected, skipping element' );
 					$ref = null;
 				}

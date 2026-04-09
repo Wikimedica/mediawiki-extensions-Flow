@@ -8,8 +8,8 @@ namespace Flow\Repository;
 use Flow\Model\UserTuple;
 use MapCacheLRU;
 use MediaWiki\MediaWikiServices;
-use User;
-use WikiMap;
+use MediaWiki\User\User;
+use MediaWiki\WikiMap\WikiMap;
 
 /**
  * Batch together queries for a bunch of wiki+userid -> username
@@ -77,9 +77,6 @@ class UserNameBatch {
 		}
 	}
 
-	/**
-	 * @param UserTuple $tuple
-	 */
 	public function addFromTuple( UserTuple $tuple ) {
 		$this->add( $tuple->wiki, $tuple->id, $tuple->ip );
 	}

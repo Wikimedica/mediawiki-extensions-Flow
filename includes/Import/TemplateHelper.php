@@ -6,7 +6,7 @@ use DOMDocument;
 use DOMElement;
 use DOMXPath;
 use Flow\Conversion\Utils;
-use Title;
+use MediaWiki\Title\Title;
 
 class TemplateHelper {
 
@@ -48,7 +48,7 @@ class TemplateHelper {
 			$mwAttr = json_decode( $dataMW );
 			// phpcs:ignore Generic.PHP.NoSilencedErrors.Discouraged
 			return @$mwAttr->parts[0]->template->target->wt;
-		} catch ( \Throwable $e ) {
+		} catch ( \Throwable ) {
 			return null;
 		}
 	}

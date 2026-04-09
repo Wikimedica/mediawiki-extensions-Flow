@@ -2,19 +2,20 @@
 
 namespace Flow;
 
-use ExtensionRegistry;
 use Flow\Content\BoardContent;
 use Flow\Exception\InvalidInputException;
 use Flow\Model\Workflow;
 use MediaWiki\Extension\CentralAuth\User\CentralAuthUser;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Page\WikiPage;
+use MediaWiki\Registration\ExtensionRegistry;
 use MediaWiki\Revision\SlotRecord;
+use MediaWiki\Status\Status;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 use MediaWiki\User\UserGroupManager;
-use Status;
-use Title;
-use User;
-use WikiMap;
-use WikiPage;
+use MediaWiki\WikiMap\WikiMap;
+use Wikimedia\Rdbms\IDBAccessObject;
 
 class TalkpageManager implements OccupationController {
 	/**
@@ -33,9 +34,6 @@ class TalkpageManager implements OccupationController {
 	 */
 	protected $talkPageManagerUser;
 
-	/**
-	 * @param UserGroupManager $userGroupManager
-	 */
 	public function __construct( UserGroupManager $userGroupManager ) {
 		$this->userGroupManager = $userGroupManager;
 	}
@@ -57,7 +55,7 @@ class TalkpageManager implements OccupationController {
 	 *
 	 * @param WikiPage $page
 	 * @param Workflow $workflow
-	 * @return Status Status for revision creation; On success (including if it already
+	 * @return Status<array> Status for revision creation; On success (including if it already
 	 *  had a top-most Flow revision), it will return a good status with an associative
 	 *  array value.  $status->getValue()['revision-record'] will be a RevisionRecord
 	 *  $status->getValue()['already-existed'] will be set to true if no revision needed
@@ -97,7 +95,7 @@ class TalkpageManager implements OccupationController {
 	public function checkIfCreationIsPossible( Title $title, $mustNotExist = true, $forWrite = true ) {
 		// Only allow converting a non-existent page to Flow
 		if ( $mustNotExist ) {
-			if ( $title->exists( $forWrite ? Title::GAID_FOR_UPDATE : 0 ) ) {
+			if ( $title->exists( $forWrite ? IDBAccessObject::READ_LATEST : 0 ) ) {
 				return Status::newFatal( 'flow-error-allowcreation-already-exists' );
 			}
 		}
@@ -113,17 +111,15 @@ class TalkpageManager implements OccupationController {
 		if (
 			// If the title is default-Flow, the user always has permission
 			$services->getSlotRoleRegistry()->getRoleHandler( SlotRecord::MAIN )
-				->getDefaultModel( $title ) === CONTENT_MODEL_FLOW_BOARD ||
-
-			// Gate this on the flow-create-board right, essentially giving
-			// wiki communities control over if Flow board creation is allowed
-			// to everyone or just a select few.
-			$services->getPermissionManager()
-				->userCan( 'flow-create-board', $user, $title )
+				->getDefaultModel( $title ) === CONTENT_MODEL_FLOW_BOARD
 		) {
 			return Status::newGood();
 		} else {
-			return Status::newFatal( 'flow-error-allowcreation-flow-create-board' );
+			// Gate this on the flow-create-board right, essentially giving
+			// wiki communities control over if Flow board creation is allowed
+			// to everyone or just a select few.
+			return Status::wrap( $services->getPermissionManager()
+				->getPermissionStatus( 'flow-create-board', $user, $title ) );
 		}
 	}
 

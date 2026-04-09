@@ -4,14 +4,14 @@
 	 *
 	 * @class
 	 * @extends OO.ui.Widget
-	 * @mixins OO.ui.mixin.GroupElement
+	 * @mixes OO.ui.mixin.GroupElement
 	 *
 	 * @constructor
 	 * @param {mw.flow.dm.Board} model Board model
 	 * @param {Object} [config]
 	 */
 	mw.flow.ui.CategoriesWidget = function mwFlowUiCategoriesWidget( model, config ) {
-		var $categoryList = $( '<ul>' )
+		const $categoryList = $( '<ul>' )
 				.addClass( 'flow-board-header-category-list' ),
 			categoriesTitle = mw.Title.newFromText( 'Special:Categories' );
 
@@ -21,7 +21,7 @@
 		mw.flow.ui.CategoriesWidget.super.call( this, config );
 
 		// Mixin constructor
-		OO.ui.mixin.GroupElement.call( this, $.extend( { $group: $categoryList }, config ) );
+		OO.ui.mixin.GroupElement.call( this, Object.assign( { $group: $categoryList }, config ) );
 
 		this.model = model;
 		this.model.connect( this, {
@@ -65,7 +65,7 @@
 	 * @param {mw.flow.dm.CategoryItem[]} categories Added categories
 	 */
 	mw.flow.ui.CategoriesWidget.prototype.onModelAddCategories = function ( categories ) {
-		var i, len,
+		let i, len,
 			widgets = [];
 
 		for ( i = 0, len = categories.length; i < len; i++ ) {
@@ -83,7 +83,7 @@
 	 * @param {mw.flow.dm.CategoryItem[]} categories Removed categories
 	 */
 	mw.flow.ui.CategoriesWidget.prototype.onModelRemoveCategories = function ( categories ) {
-		var i, len,
+		let i, len,
 			widgets = [];
 
 		for ( i = 0, len = categories.length; i < len; i++ ) {

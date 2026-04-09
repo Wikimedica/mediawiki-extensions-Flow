@@ -91,7 +91,7 @@
                         "align": "after",
                         "type": "list",
                         "icon": "edit",
-                        "title": "Changer d’éditeur",
+                        "title": "Changer d'éditeur",
                         "include": [
                             "editModeVisual",
                             "editModeSource"
@@ -102,14 +102,14 @@
                     }]);
 	}
 
+	mw.flow.ve.Target.static.allowTabFocusChange = true;
+
 	// Methods
 
 	mw.flow.ve.Target.prototype.addSurface = function ( dmDoc, config ) {
 		config = ve.extendObject( {
 			// eslint-disable-next-line no-jquery/no-global-selector
 			$overlayContainer: $( '#content' )
-			// Disable to allow Tab/Shift+Tab to move focus out of the widget (T172694)
-			//excludeCommands: [ 'indent', 'outdent' ]
 		}, config );
 		// Parent method
 		return mw.flow.ve.Target.super.prototype.addSurface.call( this, dmDoc, config );
@@ -121,7 +121,7 @@
 	 * @param {string} content HTML or wikitext
 	 */
 	mw.flow.ve.Target.prototype.loadContent = function ( content ) {
-		var doc,
+		let doc,
 			sessionState = ve.init.platform.sessionStorage.getObject( this.id + '/ve-docstate' );
 
 		if ( sessionState && !this.switchingDeferred ) {
@@ -145,7 +145,7 @@
 	};
 
 	mw.flow.ve.Target.prototype.setDisabled = function ( disabled ) {
-		var i, len;
+		let i, len;
 		for ( i = 0, len = this.surfaces.length; i < len; i++ ) {
 			this.surfaces[ i ].setReadOnly( disabled );
 		}
@@ -160,7 +160,7 @@
 	 * @return {jQuery.Promise} Promise that is resolved when the switch is complete
 	 */
 	mw.flow.ve.Target.prototype.switchMode = function () {
-		var newMode, oldFormat, newFormat, doc, content;
+		let newMode, oldFormat, newFormat, doc, content;
 
 		if ( this.switchingDeferred ) {
 			return this.switchingDeferred;
@@ -184,7 +184,7 @@
 	};
 
 	mw.flow.ve.Target.prototype.surfaceReady = function () {
-		var deferred,
+		let deferred,
 			surfaceModel = this.getSurface().getModel();
 
 		// ime-position-inside needs to be added before first focus
@@ -238,11 +238,7 @@
 			content: content,
 			title: mw.config.get( 'wgPageName' )
 		} )
-			.then( function ( data ) {
-				return data[ 'flow-parsoid-utils' ].content;
-			}, function () {
-				return mw.msg( 'flow-error-parsoid-failure' );
-			} );
+			.then( ( data ) => data[ 'flow-parsoid-utils' ].content, () => mw.msg( 'flow-error-parsoid-failure' ) );
 	};
 
 	// Registration

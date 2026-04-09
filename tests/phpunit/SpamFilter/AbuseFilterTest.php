@@ -6,9 +6,9 @@ namespace Flow\Tests\SpamFilter;
 
 use Flow\SpamFilter\AbuseFilter;
 use Flow\Tests\PostRevisionTestCase;
-use IContextSource;
-use Title;
-use User;
+use MediaWiki\Context\IContextSource;
+use MediaWiki\Context\RequestContext;
+use MediaWiki\Title\Title;
 
 /**
  * @covers \Flow\Model\AbstractRevision
@@ -27,9 +27,6 @@ class AbuseFilterTest extends PostRevisionTestCase {
 	 */
 	private $spamFilter;
 
-	/** @inheritDoc */
-	protected $tablesUsed = [ 'abuse_filter', 'abuse_filter_action', 'abuse_filter_history', 'abuse_filter_log' ];
-
 	private const FILTERS = [
 		// no CSS screen hijack
 		'(new_wikitext rlike "position\s*:\s*(fixed|absolute)|style\s*=\s*\"[a-z0-9:;\s]*&|z-index\s*:\s*\d|\|([4-9]\d{3}|\d{5,})px")' => 'disallow',
@@ -37,9 +34,9 @@ class AbuseFilterTest extends PostRevisionTestCase {
 		'(board_prefixedtitle === "BadBoard" & board_prefixedtitle === board_prefixedtext)' => 'disallow',
 	];
 
-	public function spamProvider() {
+	public static function spamProvider() {
 		$goodTopicTitle = Title::newFromText( 'Topic:Tnpn1618hctgeguu' );
-		$goodOwnerTitle = Title::newFromText( 'UTPage' );
+		$goodOwnerTitle = Title::newFromText( 'AbuseFilterTest GoodOwnerTitle' );
 
 		$badTopicTitle = Title::newFromText( self::BAD_TOPIC_TITLE_TEXT );
 		$badOwnerTitle = Title::newFromText( self::BAD_OWNER_TITLE_TEXT );
@@ -92,7 +89,7 @@ class AbuseFilterTest extends PostRevisionTestCase {
 
 		$context = $this->createMock( IContextSource::class );
 		$context->method( 'getUser' )
-				->willReturn( User::newFromName( 'UTSysop' ) );
+				->willReturn( $this->getTestSysop()->getUser() );
 
 		$status = $this->spamFilter->validate( $context, $newRevision, $oldRevision, $title, $ownerTitle );
 		$this->assertEquals( $expected, $status->isOK() );
@@ -109,10 +106,10 @@ class AbuseFilterTest extends PostRevisionTestCase {
 		// Needed because abuse filter tries to read the title out and then
 		// set it back.  If we never provide one it tries to set a null title
 		// and bails.
-		\RequestContext::getMain()->setTitle( Title::newMainPage() );
+		RequestContext::getMain()->setTitle( Title::newMainPage() );
 
-		$user = User::newFromName( 'UTSysop' );
-		\RequestContext::getMain()->setUser( $user );
+		$user = $this->getTestSysop()->getUser();
+		RequestContext::getMain()->setUser( $user );
 
 		$this->spamFilter = new AbuseFilter( $wgFlowAbuseFilterGroup );
 		if ( !$this->spamFilter->enabled() ) {
@@ -130,13 +127,6 @@ class AbuseFilterTest extends PostRevisionTestCase {
 		}
 	}
 
-	protected function tearDown(): void {
-		parent::tearDown();
-		foreach ( $this->tablesUsed as $table ) {
-			$this->db->delete( $table, '*', __METHOD__ );
-		}
-	}
-
 	/**
 	 * Inserts a filter into stub database.
 	 *
@@ -145,39 +135,39 @@ class AbuseFilterTest extends PostRevisionTestCase {
 	 */
 	protected function createFilter( $pattern, $action = 'disallow' ) {
 		global $wgFlowAbuseFilterGroup;
-		$user = User::newFromName( 'UTSysop' );
+		$db = $this->getDb();
+		$row = [
+			'af_pattern' => $pattern,
+			'af_timestamp' => $db->timestamp(),
+			'af_enabled' => 1,
+			'af_comments' => null,
+			'af_public_comments' => 'Test filter',
+			'af_hidden' => 0,
+			'af_hit_count' => 0,
+			'af_throttled' => 0,
+			'af_deleted' => 0,
+			'af_actions' => $action,
+			'af_group' => $wgFlowAbuseFilterGroup,
+			'af_actor' => $this->getServiceContainer()->getActorNormalization()
+				->acquireActorId( $this->getTestUser()->getUserIdentity(), $db ),
+		];
 
-		$this->db->replace(
-			'abuse_filter',
-			[ 'af_id' ],
-			[
-				// 'af_id',
-				'af_pattern' => $pattern,
-				'af_user' => $user->getId(),
-				'af_user_text' => $user->getName(),
-				'af_timestamp' => wfTimestampNow(),
-				'af_enabled' => 1,
-				'af_comments' => null,
-				'af_public_comments' => 'Test filter',
-				'af_hidden' => 0,
-				'af_hit_count' => 0,
-				'af_throttled' => 0,
-				'af_deleted' => 0,
-				'af_actions' => $action,
-				'af_group' => $wgFlowAbuseFilterGroup,
-			],
-			__METHOD__
-		);
+		$db->startAtomic( __METHOD__ );
+		$db->newInsertQueryBuilder()
+			->insertInto( 'abuse_filter' )
+			->row( $row )
+			->caller( __METHOD__ )
+			->execute();
 
-		$this->db->replace(
-			'abuse_filter_action',
-			[ 'afa_filter' ],
-			[
-				'afa_filter' => $this->db->insertId(),
+		$db->newInsertQueryBuilder()
+			->insertInto( 'abuse_filter_action' )
+			->row( [
+				'afa_filter' => $db->insertId(),
 				'afa_consequence' => $action,
 				'afa_parameters' => '',
-			],
-			__METHOD__
-		);
+			] )
+			->caller( __METHOD__ )
+			->execute();
+		$db->endAtomic( __METHOD__ );
 	}
 }
