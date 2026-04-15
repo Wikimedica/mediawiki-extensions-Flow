@@ -20,6 +20,14 @@
 	 * @param {jQuery} $container .flow-embedded-board element (already contains board HTML)
 	 */
 	function initEmbeddedBoard( $container ) {
+		// Guard against re-initialization: Flow fires mw.hook('wikipage.content')
+		// after every post/reply, which would otherwise cause this to run again and
+		// duplicate the board header and "new topic" widget.
+		if ( $container.data( 'flow-embed-initialized' ) ) {
+			return;
+		}
+		$container.data( 'flow-embed-initialized', true );
+
 		// eslint-disable-next-line no-jquery/no-global-selector
 		const $component = $container.find( '.flow-component' );
 		// eslint-disable-next-line no-jquery/no-global-selector
