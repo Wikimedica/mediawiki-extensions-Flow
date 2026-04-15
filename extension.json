@@ -546,6 +546,9 @@
 			"scripts": [
 				"mw.flow.embed.js"
 			],
+			"styles": [
+				"mw.flow.embed.less"
+			],
 			"dependencies": [
 				"ext.flow",
 				"mediawiki.Title"

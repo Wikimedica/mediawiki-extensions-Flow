@@ -2099,7 +2099,7 @@ class Hooks implements
 	 * Populated in onBeforeParserFetchTemplateRevisionRecord, consumed in
 	 * onParserAfterTidy (after Tidy has run on the embedding page).
 	 *
-	 * @var array[]  ['html'=>string, 'modules'=>string[], 'moduleStyles'=>string[], 'key'=>string]
+	 * @var array[]  ['html'=>string, 'modules'=>string[], 'moduleStyles'=>string[], 'key'=>string, 'noDescription'=>bool]
 	 */
 	private static array $embeddedBoards = [];
 
@@ -2188,7 +2188,15 @@ class Hooks implements
 		$mutableRevision = new MutableRevisionRecord( $titleObj );
 		$mutableRevision->setContent(
 			SlotRecord::MAIN,
-			new WikitextContent( '<flowembed>' . $prefixedTitle . '</flowembed>' )
+			// Use {{#ifeq}} so that template argument substitution happens before the
+		// tag hook fires.  nodescription defaults to 0; any value other than 0
+		// hides the description sidebar.
+		new WikitextContent(
+			'{{#ifeq:{{{nodescription|0}}}|0' .
+			'|<flowembed>' . $prefixedTitle . '</flowembed>' .
+			'|<flowembed nodescription="1">' . $prefixedTitle . '</flowembed>' .
+			'}}'
+		)
 		);
 		$revRecord = $mutableRevision;
 	}
@@ -2213,7 +2221,7 @@ class Hooks implements
 	 * onParserAfterTidy(), after RemexHtml/Tidy has finished processing the page.
 	 *
 	 * @param string|null $input Tag content (the board page title)
-	 * @param array $args Tag attributes (unused)
+	 * @param array $args Tag attributes (nodescription: hide the description sidebar)
 	 * @param Parser $parser
 	 * @param \PPFrame $frame
 	 * @return string HTML comment placeholder
@@ -2224,6 +2232,9 @@ class Hooks implements
 		if ( $page === '' || !isset( self::$embeddedBoards[$page] ) ) {
 			return '';
 		}
+
+		// nodescription=1 hides the "About this discussion" description sidebar.
+		self::$embeddedBoards[$page]['noDescription'] = !empty( $args['nodescription'] );
 
 		$data = self::$embeddedBoards[$page];
 
@@ -2266,8 +2277,12 @@ class Hooks implements
 			}
 
 			$title = Title::newFromText( $page );
+			$classes = [ 'flow-embedded-board' ];
+			if ( !empty( $data['noDescription'] ) ) {
+				$classes[] = 'flow-embed-no-description';
+			}
 			$boardDiv = Html::rawElement( 'div', [
-				'class'          => 'flow-embedded-board',
+				'class'          => implode( ' ', $classes ),
 				'data-flow-page' => $title ? $title->getPrefixedText() : $page,
 			], $data['html'] );
 

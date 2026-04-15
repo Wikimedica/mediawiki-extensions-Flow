@@ -1,0 +1,29 @@
+/**
+ * Styles for embedded Flow boards.
+ */
+
+/* nodescription=1: hide the description sidebar. */
+.flow-embedded-board.flow-embed-no-description .flow-board-header {
+	display: none;
+}
+
+/*
+ * nodescription=1: expand topics to full width once the side rail is gone.
+ * The native Flow layout at @medium reserves 34% for the side rail and 66%
+ * for the board; once the side rail is hidden we override those floats.
+ */
+@media all and ( min-width: 1165px ) {
+	.flow-embedded-board.flow-embed-no-description .flow-component.flow-board-page {
+		.flow-board-navigation,
+		.flow-board {
+			float: none;
+			width: 100%;
+			max-width: none;
+			padding-right: 0;
+		}
+
+		&.flow-full-height-side-rail .flow-board-header::before {
+			display: none;
+		}
+	}
+}
