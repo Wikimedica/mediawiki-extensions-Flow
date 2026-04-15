@@ -9,10 +9,16 @@
 	 */
 	$( () => {
 		let flowBoard,
+			// Exclude boards that are embedded via flow-embed tags; those are
+			// initialized separately by mw.flow.embed.js with the correct pageTitle.
 			// eslint-disable-next-line no-jquery/no-global-selector
-			$component = $( '.flow-component' ),
+			$component = $( '.flow-component' ).filter( function () {
+				return !$( this ).closest( '.flow-embedded-board' ).length;
+			} ),
 			// eslint-disable-next-line no-jquery/no-global-selector
-			$board = $( '.flow-board' ),
+			$board = $( '.flow-board' ).filter( function () {
+				return !$( this ).closest( '.flow-embedded-board' ).length;
+			} ),
 			pageTitle = mw.Title.newFromText( mw.config.get( 'wgPageName' ) ),
 			initializer = new mw.flow.Initializer( {
 				pageTitle: pageTitle,

@@ -17,6 +17,7 @@ use MediaWiki\Api\Hook\ApiFeedContributions__feedItemHook;
 use MediaWiki\CheckUser\CheckUser\Pagers\AbstractCheckUserPager;
 use MediaWiki\Config\Config;
 use MediaWiki\Content\Content;
+use MediaWiki\Content\WikitextContent;
 use MediaWiki\Context\IContextSource;
 use MediaWiki\Context\RequestContext;
 use MediaWiki\Deferred\DeferredUpdates;
@@ -26,6 +27,7 @@ use MediaWiki\Extension\AbuseFilter\Variables\VariableHolder;
 use MediaWiki\Extension\BetaFeatures\BetaFeatures;
 use MediaWiki\Extension\GuidedTour\GuidedTourLauncher;
 use MediaWiki\Feed\FeedItem;
+use MediaWiki\Hook\BeforeParserFetchTemplateRevisionRecordHook;
 use MediaWiki\Hook\CategoryViewer__doCategoryQueryHook;
 use MediaWiki\Hook\CategoryViewer__generateLinkHook;
 use MediaWiki\Hook\ChangesListInitRowsHook;
@@ -41,6 +43,9 @@ use MediaWiki\Hook\ImportHandleToplevelXMLTagHook;
 use MediaWiki\Hook\InfoActionHook;
 use MediaWiki\Hook\IRCLineURLHook;
 use MediaWiki\Hook\MovePageCheckPermissionsHook;
+use MediaWiki\Hook\ParserAfterTidyHook;
+use MediaWiki\Hook\ParserFirstCallInitHook;
+use MediaWiki\Linker\LinkTarget;
 use MediaWiki\Hook\MovePageIsValidMoveHook;
 use MediaWiki\Hook\OldChangesListRecentChangesLineHook;
 use MediaWiki\Hook\PageMoveCompletingHook;
@@ -70,7 +75,9 @@ use MediaWiki\Page\WikiPage;
 use MediaWiki\Pager\ContribsPager;
 use MediaWiki\Pager\DeletedContribsPager;
 use MediaWiki\Pager\IndexPager;
+use MediaWiki\Parser\Parser;
 use MediaWiki\Parser\ParserOptions;
+use MediaWiki\Revision\MutableRevisionRecord;
 use MediaWiki\Permissions\Hook\GetUserPermissionsErrorsHook;
 use MediaWiki\Preferences\Hook\GetPreferencesHook;
 use MediaWiki\RecentChanges\ChangesList;
@@ -144,7 +151,10 @@ class Hooks implements
 	SearchableNamespacesHook,
 	ImportHandleToplevelXMLTagHook,
 	SaveUserOptionsHook,
-	GetUserPermissionsErrorsHook
+	GetUserPermissionsErrorsHook,
+	ParserFirstCallInitHook,
+	ParserAfterTidyHook,
+	BeforeParserFetchTemplateRevisionRecordHook
 {
 	/**
 	 * @var AbuseFilter|null Initialized during extension initialization
@@ -2078,5 +2088,190 @@ class Hooks implements
 			];
 		}
 		return $messages;
+	}
+
+	// -----------------------------------------------------------------------
+	// Flow board embedding (server-side rendering via {{TalkPage:SomePage}})
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Pre-rendered board HTML keyed by prefixed page title.
+	 * Populated in onBeforeParserFetchTemplateRevisionRecord, consumed in
+	 * onParserAfterTidy (after Tidy has run on the embedding page).
+	 *
+	 * @var array[]  ['html'=>string, 'modules'=>string[], 'moduleStyles'=>string[], 'key'=>string]
+	 */
+	private static array $embeddedBoards = [];
+
+	/**
+	 * Intercept transclusion of Flow board pages.
+	 *
+	 * Pre-renders the board and stores the HTML + modules, then returns
+	 * synthetic WikitextContent containing {{#flowembed:PAGE}} so the
+	 * parser function can inject the HTML verbatim (bypassing sanitization).
+	 */
+	public function onBeforeParserFetchTemplateRevisionRecord(
+		?LinkTarget $contextTitle,
+		LinkTarget $title,
+		bool &$skip,
+		?RevisionRecord &$revRecord
+	): void {
+		$titleObj = Title::newFromLinkTarget( $title );
+
+		if ( $titleObj->getContentModel() !== CONTENT_MODEL_FLOW_BOARD ) {
+			return;
+		}
+
+		$services = MediaWikiServices::getInstance();
+		$wikiPage = $services->getWikiPageFactory()->newFromTitle( $titleObj );
+		/** @var \Flow\Content\BoardContent $content */
+		$content = $wikiPage->getContent();
+
+		// Non-existent board (page not yet created): use an empty BoardContent so
+		// Flow renders its "start a new discussion" / new-topic UI.
+		if ( $content === null ) {
+			$content = new \Flow\Content\BoardContent();
+		} elseif ( !( $content instanceof \Flow\Content\BoardContent ) ) {
+			return;
+		}
+
+		$prefixedTitle = $titleObj->getPrefixedText();
+
+		// Render the board via ContentRenderer so the result is a proper ParserOutput
+		// (handles both existing and non-existent boards through BoardContentHandler).
+		$mainContext = RequestContext::getMain();
+		$parserOptions = ParserOptions::newFromUserAndLang(
+			$mainContext->getUser(),
+			$mainContext->getLanguage()
+		);
+		$boardParserOutput = $services->getContentRenderer()->getParserOutput(
+			$content,
+			$titleObj->toPageIdentity(),
+			null,
+			$parserOptions,
+			true
+		);
+
+		// WHY A UNIQUE KEY INSTEAD OF INJECTING HTML HERE:
+		//
+		// Flow board HTML (from BoardContentHandler::generateHtml() via View::show())
+		// is never run through RemexHtml/Tidy in normal operation — when viewing a
+		// board page directly, the HTML is added to OutputPage::mBodytext raw and
+		// served as-is.  As a result it has never been validated for Tidy compliance.
+		//
+		// The wikitext parser calls tidy() on the *full* embedding-page output AFTER
+		// strip-state expansion (Parser::internalParseHalfParsed(), lines ~1658-1660):
+		//
+		//   $text = $this->mStripState->unstripGeneral( $text );   // expands tag hooks
+		//   $text = $this->tidy->tidy( $text, ... );               // RemexHtml runs here
+		//
+		// If we injected the board HTML directly via the tag hook (strip state), Tidy
+		// would process it and mangle certain multi-line opening tags (e.g. <div …\n>)
+		// by treating the later attribute lines as text content — producing visible
+		// garbage like: class="flow-post" data-flow-id="…" >
+		//
+		// The fix: the tag hook stores a unique HTML comment as a placeholder.
+		// onParserAfterTidy() fires on the same $text AFTER tidy has run, finds the
+		// comment, and substitutes the real board HTML — which is therefore never
+		// touched by Tidy.
+		$placeholderKey = 'flow-embed-' . uniqid( '', true );
+
+		self::$embeddedBoards[$prefixedTitle] = [
+			'html'          => $boardParserOutput->getContentHolderText(),
+			'modules'       => $boardParserOutput->getModules(),
+			'moduleStyles'  => $boardParserOutput->getModuleStyles(),
+			'key'           => $placeholderKey,
+		];
+
+		// Return synthetic WikitextContent containing a tag hook that will place
+		// the placeholder comment at the correct position in the page.
+		$mutableRevision = new MutableRevisionRecord( $titleObj );
+		$mutableRevision->setContent(
+			SlotRecord::MAIN,
+			new WikitextContent( '<flowembed>' . $prefixedTitle . '</flowembed>' )
+		);
+		$revRecord = $mutableRevision;
+	}
+
+	/**
+	 * Register the <flowembed> tag hook.
+	 *
+	 * Tag hooks use Parser::extensionSubstitution(), which stores the returned
+	 * string in the general strip state before the sanitizer runs.  We exploit
+	 * this to place a comment placeholder at the right position in the page
+	 * without the placeholder itself being touched by the sanitizer or Tidy.
+	 */
+	public function onParserFirstCallInit( $parser ): void {
+		$parser->setHook( 'flowembed', [ $this, 'onFlowEmbedTag' ] );
+	}
+
+	/**
+	 * Tag hook handler for <flowembed>PAGE</flowembed>.
+	 *
+	 * Adds the board's ResourceLoader modules to the embedding page and returns
+	 * an HTML comment placeholder.  The actual board HTML is injected later by
+	 * onParserAfterTidy(), after RemexHtml/Tidy has finished processing the page.
+	 *
+	 * @param string|null $input Tag content (the board page title)
+	 * @param array $args Tag attributes (unused)
+	 * @param Parser $parser
+	 * @param \PPFrame $frame
+	 * @return string HTML comment placeholder
+	 */
+	public function onFlowEmbedTag( $input, array $args, $parser, $frame ): string {
+		$page = trim( (string)$input );
+
+		if ( $page === '' || !isset( self::$embeddedBoards[$page] ) ) {
+			return '';
+		}
+
+		$data = self::$embeddedBoards[$page];
+
+		// Propagate ResourceLoader modules to the embedding page now, while we
+		// still have access to the parser output.  (We cannot do this in
+		// onParserAfterTidy because the ParserOutput is no longer writable there.)
+		$parserOutput = $parser->getOutput();
+		$parserOutput->addModules( $data['modules'] );
+		$parserOutput->addModuleStyles( $data['moduleStyles'] );
+		// JS initializer that re-runs Flow setup with the correct pageTitle and
+		// skips the global flow-initialize.js (which would use wgPageName instead).
+		$parserOutput->addModules( [ 'ext.flow.embed' ] );
+		// Board content changes on every post; disable the parser cache for this page.
+		$parserOutput->updateCacheExpiry( 0 );
+
+		// Return a unique comment marker.  RemexHtml/Tidy preserves HTML comments
+		// verbatim, so this placeholder survives the tidy() pass intact and can be
+		// found and replaced by onParserAfterTidy().
+		return '<!-- ' . $data['key'] . ' -->';
+	}
+
+	/**
+	 * Replace flow-embed placeholders with the actual board HTML.
+	 *
+	 * This hook fires on the embedding page's parsed text AFTER RemexHtml/Tidy
+	 * has run (Parser::internalParseHalfParsed(), after the tidy() call).
+	 * Injecting the board HTML here means it is never processed by Tidy, which
+	 * is intentional: Flow board HTML is designed to be served raw (the direct
+	 * board-view path does not run it through Tidy either), and Tidy mangles
+	 * its multi-line opening tags into visible attribute garbage.
+	 *
+	 * @param Parser $parser
+	 * @param string &$text Page HTML, modifiable in place
+	 */
+	public function onParserAfterTidy( $parser, &$text ): void {
+		foreach ( self::$embeddedBoards as $page => $data ) {
+			$placeholder = '<!-- ' . $data['key'] . ' -->';
+			if ( !str_contains( $text, $placeholder ) ) {
+				continue;
+			}
+
+			$title = Title::newFromText( $page );
+			$boardDiv = Html::rawElement( 'div', [
+				'class'          => 'flow-embedded-board',
+				'data-flow-page' => $title ? $title->getPrefixedText() : $page,
+			], $data['html'] );
+
+			$text = str_replace( $placeholder, $boardDiv, $text );
+		}
 	}
 }

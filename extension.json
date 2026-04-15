@@ -542,6 +542,16 @@
 				"flow-reply-link-anonymously"
 			]
 		},
+		"ext.flow.embed": {
+			"scripts": [
+				"mw.flow.embed.js"
+			],
+			"dependencies": [
+				"ext.flow",
+				"mediawiki.Title"
+			],
+			"messages": []
+		},
 		"ext.flow.mobileVisualEditor": {
 			"scripts": [
 				"editor/editors/visualeditor/mw.flow.ve.Target.js",
@@ -775,7 +785,10 @@
 		"SaveUserOptions": "main",
 		"NukeGetNewPages": "Flow\\Hooks::onNukeGetNewPages",
 		"NukeDeletePage": "Flow\\Hooks::onNukeDeletePage",
-		"getUserPermissionsErrors": "main"
+		"getUserPermissionsErrors": "main",
+		"ParserFirstCallInit": "main",
+		"ParserAfterTidy": "main",
+		"BeforeParserFetchTemplateRevisionRecord": "main"
 	},
 	"NotificationMiddleware": [
 		{

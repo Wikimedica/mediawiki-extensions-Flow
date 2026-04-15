@@ -8,6 +8,7 @@ use Flow\UrlGenerator;
 use MediaWiki\Extension\Notifications\Formatters\EchoEventPresentationModel;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Title\Title;
+use MWException;
 
 abstract class FlowPresentationModel extends EchoEventPresentationModel {
 
@@ -30,8 +31,33 @@ abstract class FlowPresentationModel extends EchoEventPresentationModel {
 	}
 
 	/**
-	 * Return a full url of following format:
-	 *   https://<site>/wiki/Topic:<topicId>?topic_showPostId=<$firstChronologicallyPostId>&fromnotif=1#flow-post-<$anchorPostID>
+	 * Get the notification target title — the board page by default, or the task article
+	 * page if the board's subject is in the 'Tâches' category.
+	 *
+	 * @param string $fragment Optional URL fragment (without leading #)
+	 * @return Title
+	 */
+	protected function getNotificationTarget( string $fragment = '' ): Title {
+		$board = $this->event->getTitle();
+
+		try {
+			$subjectPage = $board->getOtherPage();
+			$wikiPage = MediaWikiServices::getInstance()->getWikiPageFactory()->newFromTitle( $subjectPage );
+			foreach ( $wikiPage->getCategories() as $category ) {
+				if ( $category->getDBKey() === 'Tâches' ) {
+					return $subjectPage->createFragmentTarget( $fragment );
+				}
+			}
+		} catch ( MWException $e ) {
+			// Board namespace has no associated subject page; fall through to board link.
+		}
+
+		return $board->createFragmentTarget( $fragment );
+	}
+
+	/**
+	 * Return a full url to the board (or task article) with the post anchor and fromnotif flag.
+	 *   https://<site>/wiki/<Board>?topic_showPostId=<$firstChronologicallyPostId>&fromnotif=1#flow-post-<$anchorPostID>
 	 * @param UUID|null $firstChronologicallyPostId First unread post ID
 	 * @param UUID|null $anchorPostId Post ID for anchor (i.e. to scroll to)
 	 * @return string
@@ -42,27 +68,21 @@ abstract class FlowPresentationModel extends EchoEventPresentationModel {
 		'@phan-var UUID $firstChronologicallyPostId';
 
 		$anchorPostId ??= $firstChronologicallyPostId;
-		$title = $this->getTopicTitleObj(
-			'flow-post-' . $anchorPostId->getAlphadecimal()
-		);
+		$target = $this->getNotificationTarget( 'flow-post-' . $anchorPostId->getAlphadecimal() );
 
-		$url = $title->getFullURL(
-			[
-				'topic_showPostId' => $firstChronologicallyPostId->getAlphadecimal(),
-				'fromnotif' => 1,
-			]
-		);
-
-		return $url;
+		return $target->getFullURL( [
+			'topic_showPostId' => $firstChronologicallyPostId->getAlphadecimal(),
+			'fromnotif' => 1,
+		] );
 	}
 
 	/**
-	 * Return a full url of following format:
-	 *   https://<site>/wiki/Topic:<topicId>&fromnotif=1
+	 * Return a full url to the board (or task article) with the fromnotif flag.
+	 *   https://<site>/wiki/<Board>?fromnotif=1
 	 * @return string
 	 */
 	protected function getTopicLinkUrl() {
-		return $this->getTopicTitleObj()->getFullURL( [ 'fromnotif' => 1 ] );
+		return $this->getNotificationTarget()->getFullURL( [ 'fromnotif' => 1 ] );
 	}
 
 	/**
@@ -102,13 +122,8 @@ abstract class FlowPresentationModel extends EchoEventPresentationModel {
 	}
 
 	protected function getViewTopicLink() {
-		/** @var UUID $workflow */
-		$workflow = $this->event->getExtraParam( 'topic-workflow' );
-		'@phan-var UUID $workflow';
-
-		$title = Title::newFromText( $workflow->getAlphadecimal(), NS_TOPIC );
 		return [
-			'url' => $title->getFullURL(),
+			'url' => $this->getNotificationTarget()->getFullURL( [ 'fromnotif' => 1 ] ),
 			'label' => $this->msg( 'flow-notification-link-text-view-topic' )->text(),
 		];
 	}

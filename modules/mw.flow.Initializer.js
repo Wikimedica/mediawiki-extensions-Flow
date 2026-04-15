@@ -145,14 +145,16 @@
 		// Set up sidebar widget if it needs to be there
 		this.setupSidebarWidget();
 
+		// Scope selectors to this.$component so that multiple embedded boards
+		// on the same page don't interfere with each other.
 		// Set up navigation widget
-		this.setupNavigationWidget( $( '.flow-board-navigation' ) );
+		this.setupNavigationWidget( this.$component.find( '.flow-board-navigation' ) );
 
 		// Set up new topic widget
-		this.setupNewTopicWidget( $( 'form.flow-newtopic-form' ) );
+		this.setupNewTopicWidget( this.$component.find( 'form.flow-newtopic-form' ) );
 
 		// Set up description widget
-		this.setupDescriptionWidget( $( '.flow-ui-boardDescriptionWidget' ) );
+		this.setupDescriptionWidget( this.$component.find( '.flow-ui-boardDescriptionWidget' ) );
 
 		// Replace reply forms on the board
 		this.replaceReplyForms( this.$board );
@@ -345,13 +347,13 @@
 					// it. This also takes away the original navWidget, so we need to
 					// make sure it's reinitialized too
 					self.flowBoard.reinitializeContainer( $rendered );
-					$( '.flow-board-navigation' ).append( self.navWidget.$element );
+					self.$component.find( '.flow-board-navigation' ).append( self.navWidget.$element );
 
 					self.setBoardDom( $( boardEl ) );
 
 					self.replaceReplyForms( self.$board );
 
-					self.setupNewTopicWidget( $( 'form.flow-newtopic-form' ) );
+					self.setupNewTopicWidget( self.$component.find( 'form.flow-newtopic-form' ) );
 
 					self.$component.removeClass( 'flow-api-inprogress' );
 				}, 50 );
@@ -406,8 +408,8 @@
 		}
 
 		this.descriptionWidget = new mw.flow.ui.BoardDescriptionWidget( this.board, {
-			$existing: $( '.flow-ui-boardDescriptionWidget-content' ).contents(),
-			$categories: $( '.flow-board-header-category-view-nojs' ).contents(),
+			$existing: this.$component.find( '.flow-ui-boardDescriptionWidget-content' ).contents(),
+			$categories: this.$component.find( '.flow-board-header-category-view-nojs' ).contents(),
 			editor: {
 				confirmLeave: !!mw.user.options.get( 'useeditwarning' )
 			}
@@ -420,9 +422,9 @@
 
 		// The category widget is inside the board description widget.
 		// Remove it from the nojs version here
-		$( '.flow-board-header-category-view-nojs' ).detach();
-		// HACK: Remove the MW page categories
-		$( '.catlinks:not(.flow-ui-categoriesWidget)' ).detach();
+		this.$component.find( '.flow-board-header-category-view-nojs' ).detach();
+		// HACK: Remove the MW page categories (only within this board, not the whole page)
+		this.$component.find( '.catlinks:not(.flow-ui-categoriesWidget)' ).detach();
 
 		$element.replaceWith( this.descriptionWidget.$element );
 	};
