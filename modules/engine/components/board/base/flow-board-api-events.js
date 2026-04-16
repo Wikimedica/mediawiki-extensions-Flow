@@ -283,8 +283,11 @@
 		$target = ( $form.data( 'flow-dialog-owner' ) || $form ).closest( '.flow-topic' );
 		flowBoard = mw.flow.getPrototypeMethod( 'board', 'getInstanceByElement' )( $this );
 
-		// Read destination from the form input so we can link to it in the notice.
-		destination = $form.find( '[name="flow_destination"]' ).val();
+		// Use the actual resolved destination board title returned by the API
+		// (may differ from user input when auto-redirected to a talk page).
+		const committed = OO.getProp( data, 'flow', 'move-topic', 'committed', 'topic' );
+		destination = ( committed && committed[ 'destination-title' ] ) ||
+			$form.find( '[name="flow_destination"]' ).val();
 
 		// Close the dialog.
 		flowBoard.emitWithReturn( 'cancelForm', $form );

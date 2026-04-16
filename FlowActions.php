@@ -565,12 +565,13 @@ return [
 		'log_type' => 'flow-move',
 		'rc_insert' => true,
 		'permissions' => [
-			PostRevision::MODERATED_NONE => 'flow-move',
+			PostRevision::MODERATED_NONE   => 'flow-move',
+			PostRevision::MODERATED_LOCKED => 'flow-move',
 		],
 		'links' => [ 'topic', 'topic-history' ],
 		'actions' => [
 			'reply', 'thank', 'edit-title', 'hide-topic', 'delete-topic', 'suppress-topic',
-			'edit-topic-summary', 'restore-topic', 'move-topic',
+			'edit-topic-summary', 'lock-topic', 'restore-topic', 'move-topic',
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-move-topic',
@@ -598,7 +599,7 @@ return [
 			PostRevision::MODERATED_NONE => [ 'flow-lock', 'flow-delete', 'flow-suppress' ],
 		],
 		'links' => [ 'topic', 'topic-history', 'watch-topic', 'unwatch-topic', 'topic-revision' ],
-		'actions' => [ 'edit-topic-summary', 'restore-topic', 'delete-topic', 'suppress-topic' ],
+		'actions' => [ 'edit-topic-summary', 'restore-topic', 'delete-topic', 'suppress-topic', 'move-topic' ],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-locked-topic',
 			'i18n-params' => [

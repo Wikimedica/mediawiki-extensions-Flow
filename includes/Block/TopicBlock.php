@@ -745,12 +745,13 @@ class TopicBlock extends AbstractBlock {
 		$this->storage->put( $topicWorkflow, [] );
 
 		// 4. Create a revision on the topic root recording the move in flow_revision.
-		// Using moderate() with MODERATED_NONE so that the changeType is stored without
-		// altering the moderation state. We encode the source board and the user's move
-		// reason as JSON in rev_mod_reason so the history formatter can show both.
+		// We preserve the original moderation state so a resolved topic stays resolved after
+		// the move. The source board and user's reason are JSON-encoded in rev_mod_reason so
+		// the history formatter can display both.
 		$root = $this->loadRootPost();
+		$originalModerationState = $root->getModerationState();
 		$revModReason = json_encode( [ 'src' => $sourceBoardTitle, 'reason' => $reason ] );
-		$moveRevision = $root->moderate( $user, AbstractRevision::MODERATED_NONE, 'move-topic', $revModReason );
+		$moveRevision = $root->moderate( $user, $originalModerationState, 'move-topic', $revModReason );
 		if ( !$moveRevision ) {
 			throw new FailCommitException( 'Could not create move-topic revision', 'fail-commit' );
 		}
@@ -775,8 +776,9 @@ class TopicBlock extends AbstractBlock {
 		$logEntry->insert();
 
 		return [
-			'post-id'          => $root->getPostId(),
-			'post-revision-id' => $moveRevision->getRevisionId(),
+			'post-id'           => $root->getPostId(),
+			'post-revision-id'  => $moveRevision->getRevisionId(),
+			'destination-title' => $destWorkflow->getOwnerTitle()->getPrefixedText(),
 		];
 	}
 
