@@ -421,4 +421,23 @@
 		return this.lockTopic( topicId, 'unlock', 'flow-rev-message-restore-topic-reason' );
 	};
 
+	/**
+	 * Move a topic to another board.
+	 *
+	 * @param {string} topicId
+	 * @param {string} destination Prefixed page title of the target board
+	 * @param {string} [reason]
+	 * @return {jQuery.Promise} Promise resolved with workflow id
+	 */
+	mw.flow.dm.APIHandler.prototype.moveTopic = function ( topicId, destination, reason ) {
+		const params = {
+			page: this.getTopicTitle( topicId ),
+			mtdestination: destination,
+			mtreason: reason || ''
+		};
+
+		return this.postEdit( 'move-topic', params )
+			.then( ( data ) => OO.getProp( data.flow, 'move-topic', 'workflow' ) );
+	};
+
 }() );

@@ -3,6 +3,7 @@
 namespace Flow\Formatter;
 
 use Flow\Collection\PostCollection;
+use Flow\Container;
 use Flow\Conversion\Utils;
 use Flow\Exception\FlowException;
 use Flow\Exception\InvalidInputException;
@@ -12,6 +13,7 @@ use Flow\Model\Anchor;
 use Flow\Model\PostRevision;
 use Flow\Model\PostSummary;
 use Flow\Model\UUID;
+use Flow\Model\Workflow;
 use Flow\Repository\UserNameBatch;
 use Flow\RevisionActionPermissions;
 use Flow\Templating;
@@ -655,6 +657,15 @@ class RevisionFormatter {
 					$links['suppress'] = $this->urlGenerator->suppressPostAction( $title, $workflowId, $postId );
 					break;
 
+				case 'move-topic':
+					// move topic link is only available to topics
+					if ( !$revision instanceof PostRevision || !$revision->isTopicTitle() ) {
+						break;
+					}
+
+					$links['move'] = $this->urlGenerator->moveTopicAction( $title, $workflowId );
+					break;
+
 				case 'lock-topic':
 					// lock topic link is only available to topics
 					if ( !$revision instanceof PostRevision || !$revision->isTopicTitle() ) {
@@ -1082,6 +1093,39 @@ class RevisionFormatter {
 				} else {
 					return Message::rawParam( $this->templating->getContent( $post, 'fixed-html' ) );
 				}
+
+			case 'owner-title':
+				// Returns a rendered HTML link to the board that owns this workflow.
+				// For a topic that has been moved, this reflects the destination board.
+				$workflow = Container::get( 'storage' )->get( Workflow::class, $workflowId );
+				if ( $workflow ) {
+					$ownerTitle = $workflow->getOwnerTitle();
+					$linkRenderer = MediaWikiServices::getInstance()->getLinkRenderer();
+					return Message::rawParam( $linkRenderer->makeLink( $ownerTitle ) );
+				}
+				return '';
+
+			case 'source-board':
+				// For move-topic: rev_mod_reason holds JSON {"src":..., "reason":...}.
+				// Returns a rendered HTML link to the source board.
+				$moveData = json_decode( $revision->getModeratedReason() ?? '', true );
+				if ( is_array( $moveData ) && isset( $moveData['src'] ) ) {
+					$sourceBoardTitleObj = Title::newFromText( $moveData['src'] );
+					if ( $sourceBoardTitleObj ) {
+						$linkRenderer = MediaWikiServices::getInstance()->getLinkRenderer();
+						return Message::rawParam( $linkRenderer->makeLink( $sourceBoardTitleObj ) );
+					}
+				}
+				return '';
+
+			case 'move-reason':
+				// For move-topic: rev_mod_reason holds JSON {"src":..., "reason":...}.
+				// Returns " (<i>reason</i>)" or empty string when no reason was provided.
+				$moveData = json_decode( $revision->getModeratedReason() ?? '', true );
+				if ( is_array( $moveData ) && !empty( $moveData['reason'] ) ) {
+					return Message::rawParam( ' (<i>' . htmlspecialchars( $moveData['reason'] ) . '</i>)' );
+				}
+				return '';
 
 			case 'bundle-count':
 				return Message::numParam( count( $revision ) );

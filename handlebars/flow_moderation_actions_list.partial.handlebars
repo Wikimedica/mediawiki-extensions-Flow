@@ -160,6 +160,24 @@
 			</li>
 		{{~/if~}}
 	{{~/ifCond~}}
+	{{~#ifCond moderationType "!==" "history"~}}
+		{{~#if actions.move~}}
+			<li>
+				{{~noop~}}
+				<a class="{{moderationMwUiClass}} mw-ui-quiet"
+				   href="{{actions.move.url}}"
+				   data-flow-interactive-handler="moderationDialog"
+				   data-flow-template="flow_topic_move_dialog.partial"
+				   data-flow-id="{{postId}}"
+				   data-role="move">
+				   {{~#if moderationIcons}}<span class="mw-ui-icon mw-ui-icon-before mw-ui-icon-move"><span>{{/if~}}
+					{{~l10n "flow-topic-action-move-topic"~}}
+				   {{~#if moderationIcons}}</span></span>{{/if~}}
+				</a>
+				{{~noop~}}
+			</li>
+		{{~/if~}}
+	{{~/ifCond~}}
 	{{~#if actions.hide~}}
 		<li>
 			{{~noop~}}

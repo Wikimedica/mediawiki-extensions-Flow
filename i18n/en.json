@@ -26,6 +26,8 @@
 	"nstab-topic": "Topic",
 	"flow-talk-taken-over-comment": "/* This page has been converted into a Structured Discussions board */",
 	"log-name-flow": "Structured Discussions activity log",
+	"log-name-flow-move": "Structured Discussions topic moves",
+	"log-description-flow-move": "Log of topics moved between Structured Discussions boards.",
 	"logentry-delete-flow-delete-post": "$1 {{GENDER:$2|deleted}} a [$4 post] on \"[[$3|$5]]\" on [[$6]]",
 	"logentry-delete-flow-delete-post-topic-title-not-visible": "$1 {{GENDER:$2|deleted}} a post on a topic on [[$3]]",
 	"logentry-delete-flow-restore-post": "$1 {{GENDER:$2|restored}} a [$4 post] on \"[[$3|$5]]\" on [[$6]]",
@@ -46,6 +48,8 @@
 	"logentry-lock-flow-lock-topic-topic-title-not-visible": "$1 {{GENDER:$2|marked}} a topic as resolved on [[$3]]",
 	"logentry-lock-flow-restore-topic": "$1 {{GENDER:$2|reopened}} topic \"[[$3|$5]]\" on [[$6]]",
 	"logentry-lock-flow-restore-topic-topic-title-not-visible": "$1 {{GENDER:$2|reopened}} a topic on [[$3]]",
+	"logentry-flow-move-flow-move-topic": "$1 {{GENDER:$2|moved}} topic \"[[$3|$5]]\" from [[$6]] to [[$7]]",
+	"logentry-flow-move-flow-move-topic-topic-title-not-visible": "$1 {{GENDER:$2|moved}} a topic from [[$3]] to [[$4]]",
 	"logentry-import-lqt-to-flow-topic": "[[$1|$2]] on [[$3]] was imported from LiquidThreads to Structured Discussions",
 	"abusefilter-edit-builder-vars-board-id": "Page ID of Structured Discussions board ($1)",
 	"abusefilter-edit-builder-vars-board-namespace": "Namespace of Structured Discussions board ($1)",
@@ -568,5 +572,14 @@
 	"flow-guidedtour-optin-feedback-description": "{{GENDER:$1|You}} can get more information, provide feedback, or disable the new system any time from the Beta features section.",
 	"flow-action-not-page": "Page object is an instance of the wrong class",
 	"flow-action-wrong-title-content-model": "The page is being handled by Structured Discussions, but the Title class indicates that the content model is '$1'. This is a misconfiguration or inconsistent state. For example, this may actually be a non-Structured Discussions page in a Structured Discussions namespace, with <code>rev_content_model</code> not populated.",
-	"flow-preference-visualeditor": "Enable the visual editor and the new wikitext mode in Structured Discussions"
+	"flow-preference-visualeditor": "Enable the visual editor and the new wikitext mode in Structured Discussions",
+	"flow-topic-action-move-topic": "Move topic",
+	"flow-rev-message-move-topic": "$1 {{GENDER:$2|moved}} topic \"[$3 $4]\" from $6 to $5$7",
+	"flow-move-topic-destination-label": "Destination board",
+	"flow-move-topic-reason-label": "Reason (optional)",
+	"flow-move-topic-submit": "Move",
+	"flow-move-topic-missing-destination": "Please enter a destination board.",
+	"flow-move-topic-invalid-destination": "\"$1\" is not a Flow discussion board.",
+	"flow-move-topic-same-board": "The topic is already on that board.",
+	"flow-move-topic-success": "Topic moved to [[$1]]."
 }

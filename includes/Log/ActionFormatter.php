@@ -12,6 +12,7 @@ use Flow\RevisionActionPermissions;
 use Flow\Templating;
 use Flow\UrlGenerator;
 use MediaWiki\Html\Html;
+use MediaWiki\Title\Title;
 use MediaWiki\Logging\LogEntry;
 use MediaWiki\Logging\LogFormatter;
 use MediaWiki\Logging\LogPage;
@@ -136,7 +137,24 @@ class ActionFormatter extends LogFormatter {
 			$message->plaintextParams( $this->templating->getContent( $rootLastRevision, 'topic-title-plaintext' ) );
 		}
 
-		$message->params( $root->getWorkflow()->getOwnerTitle() ); // board title object
+		// $6 (or $3 when topic title not visible): the board this topic belongs to.
+		// For move-topic the topic workflow has already been repointed to the destination, so we
+		// use the stored 'source' param to preserve the source board in the message.
+		if ( isset( $params['source'] ) ) {
+			$sourceTitle = Title::newFromText( $params['source'] );
+			$message->params( $sourceTitle ?? $root->getWorkflow()->getOwnerTitle() );
+		} else {
+			$message->params( $root->getWorkflow()->getOwnerTitle() );
+		}
+
+		// Add destination board as an extra param for actions that record one (e.g. move-topic).
+		// Becomes $7 when topic title is visible, $4 when not visible.
+		if ( isset( $params['destination'] ) ) {
+			$destTitle = Title::newFromText( $params['destination'] );
+			if ( $destTitle ) {
+				$message->params( $destTitle );
+			}
+		}
 
 		$message->parse();
 

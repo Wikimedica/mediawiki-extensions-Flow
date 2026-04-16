@@ -40,7 +40,8 @@
 		"flow-suppress",
 		"flow-edit-post",
 		"flow-edit-title",
-		"flow-create-board"
+		"flow-create-board",
+		"flow-move"
 	],
 	"ContentHandlers": {
 		"flow-board": "Flow\\Content\\BoardContentHandler"
@@ -71,7 +72,8 @@
 			"flow-lock": true,
 			"flow-delete": true,
 			"flow-edit-post": true,
-			"flow-edit-title": true
+			"flow-edit-title": true,
+			"flow-move": true
 		},
 		"suppress": {
 			"flow-suppress": true
@@ -99,6 +101,13 @@
 			"flow-suppress": true
 		}
 	},
+	"LogTypes": [ "flow-move" ],
+	"LogNames": {
+		"flow-move": "log-name-flow-move"
+	},
+	"LogHeaders": {
+		"flow-move": "log-description-flow-move"
+	},
 	"LogActionsHandlers": {
 		"delete/flow-restore-post": "Flow\\Log\\ActionFormatter",
 		"suppress/flow-restore-post": "Flow\\Log\\ActionFormatter",
@@ -110,7 +119,8 @@
 		"delete/flow-delete-topic": "Flow\\Log\\ActionFormatter",
 		"suppress/flow-suppress-post": "Flow\\Log\\ActionFormatter",
 		"suppress/flow-suppress-topic": "Flow\\Log\\ActionFormatter",
-		"lock/flow-lock-topic": "Flow\\Log\\ActionFormatter"
+		"lock/flow-lock-topic": "Flow\\Log\\ActionFormatter",
+		"flow-move/flow-move-topic": "Flow\\Log\\ActionFormatter"
 	},
 	"SpecialPages": {
 		"StructuredDiscussions": "Flow\\Specials\\SpecialStructuredDiscussions",
@@ -167,6 +177,7 @@
 				"handlebars/flow_moderate_post.partial.handlebars",
 				"handlebars/flow_moderate_topic_confirmation.partial.handlebars",
 				"handlebars/flow_moderate_topic.partial.handlebars",
+				"handlebars/flow_topic_move_dialog.partial.handlebars",
 				"handlebars/flow_moderation_actions_list.partial.handlebars",
 				"handlebars/flow_newtopic_form.partial.handlebars",
 				"handlebars/flow_post_actions.partial.handlebars",
@@ -242,6 +253,7 @@
 				"flow-topic-expand-siderail",
 				"flow-show-comments-title",
 				"flow-hide-comments-title",
+				"flow-topic-action-move-topic",
 				"flow-topic-action-hide-topic",
 				"flow-topic-action-lock-topic",
 				"flow-topic-action-delete-topic",
@@ -321,6 +333,13 @@
 				"flow-moderation-confirm-hide-topic",
 				"flow-moderation-confirm-delete-topic",
 				"flow-moderation-confirm-suppress-topic",
+				"flow-move-topic-destination-label",
+				"flow-move-topic-reason-label",
+				"flow-move-topic-submit",
+				"flow-move-topic-missing-destination",
+				"flow-move-topic-invalid-destination",
+				"flow-move-topic-same-board",
+				"flow-move-topic-success",
 				"flow-moderation-confirmation-hide-topic",
 				"flow-moderation-confirmation-delete-topic",
 				"flow-moderation-confirmation-suppress-topic",

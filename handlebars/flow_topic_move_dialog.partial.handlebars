@@ -1,0 +1,43 @@
+<form method="POST" action="{{actions.move.url}}">
+	{{> flow_errors}}
+	<input type="hidden" name="wpEditToken" value="{{@root.editToken}}" />
+	<label for="flow-move-topic-destination">
+		{{~l10n "flow-move-topic-destination-label"~}}
+	</label>
+	<input id="flow-move-topic-destination"
+	       name="flow_destination"
+	       type="text"
+	       class="mw-ui-input"
+	       data-role="content"
+	       required
+	       autofocus
+	       {{~#if @root.submitted.destination~}}
+	         value="{{~@root.submitted.destination~}}"
+	       {{~/if~}}
+	       >
+	<label for="flow-move-topic-reason">
+		{{~l10n "flow-move-topic-reason-label"~}}
+	</label>
+	<input id="flow-move-topic-reason"
+	       name="flow_reason"
+	       type="text"
+	       class="mw-ui-input"
+	       {{~#if @root.submitted.reason~}}
+	         value="{{~@root.submitted.reason~}}"
+	       {{~/if~}}
+	       >
+	<div class="flow-form-actions flow-form-collapsible">
+		<button class="mw-ui-button mw-ui-progressive"
+		        data-flow-interactive-handler="apiRequest"
+		        data-flow-api-handler="moveTopic"
+		        data-role="submit">
+			{{~l10n "flow-move-topic-submit"~}}
+		</button>
+		<a class="mw-ui-button mw-ui-quiet mw-ui-destructive"
+		   href="#"
+		   title="{{l10n "flow-cancel"}}"
+		   data-flow-interactive-handler="cancelForm">
+			{{~l10n "flow-cancel"~}}
+		</a>
+	</div>
+</form>

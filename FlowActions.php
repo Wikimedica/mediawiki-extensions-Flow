@@ -241,7 +241,7 @@ return [
 		],
 		'actions' => [
 			'reply', 'thank', 'edit-title', 'lock-topic', 'hide-topic', 'delete-topic',
-			'suppress-topic', 'edit-topic-summary', 'lock-topic', 'restore-topic'
+			'suppress-topic', 'edit-topic-summary', 'lock-topic', 'restore-topic', 'move-topic'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-edit-title',
@@ -285,7 +285,7 @@ return [
 		],
 		'actions' => [
 			'reply', 'thank', 'edit-title', 'hide-topic', 'delete-topic', 'suppress-topic',
-			'edit-topic-summary', 'lock-topic', 'restore-topic'
+			'edit-topic-summary', 'lock-topic', 'restore-topic', 'move-topic'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-new-post',
@@ -558,6 +558,35 @@ return [
 			],
 			'class' => 'flow-history-suppress-topic',
 		],
+	],
+
+	'move-topic' => [
+		'performs-writes' => true,
+		'log_type' => 'flow-move',
+		'rc_insert' => true,
+		'permissions' => [
+			PostRevision::MODERATED_NONE => 'flow-move',
+		],
+		'links' => [ 'topic', 'topic-history' ],
+		'actions' => [
+			'reply', 'thank', 'edit-title', 'hide-topic', 'delete-topic', 'suppress-topic',
+			'edit-topic-summary', 'restore-topic', 'move-topic',
+		],
+		'history' => [
+			'i18n-message' => 'flow-rev-message-move-topic',
+			'i18n-params' => [
+				'user-links',
+				'user-text',
+				'workflow-url',
+				'topic-of-post-text-from-html',
+				'owner-title',
+				'source-board',
+				'move-reason',
+			],
+			'class' => 'flow-history-move-topic',
+		],
+		'handler-class' => \Flow\Actions\FlowAction::class,
+		'modules' => [],
 	],
 
 	'lock-topic' => [

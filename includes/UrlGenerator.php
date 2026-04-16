@@ -595,6 +595,16 @@ class UrlGenerator {
 	 * @param UUID $workflowId
 	 * @return Anchor
 	 */
+	public function moveTopicAction( ?Title $title, UUID $workflowId ) {
+		return new Anchor(
+			wfMessage( 'flow-topic-action-move-topic' ),
+			$this->resolveTitle( $title, $workflowId ),
+			[
+				'action' => 'move-topic',
+			]
+		);
+	}
+
 	public function lockTopicAction( ?Title $title, UUID $workflowId ) {
 		return new Anchor(
 			wfMessage( 'flow-topic-action-lock-topic' ),

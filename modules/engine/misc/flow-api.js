@@ -9,6 +9,7 @@
 		'moderate-topic': [ 'topic_', 'mt' ],
 		'edit-title': [ 'topic_', 'et' ],
 		'lock-topic': [ 'topic_', 'cot' ],
+		'move-topic': [ 'topic_', 'mt' ],
 		'view-topiclist': [ 'topiclist_', 'vtl' ],
 		'view-post': [ 'topic', 'vp' ],
 		'view-topic': [ 'topic', 'vt' ],

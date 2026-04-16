@@ -30,6 +30,7 @@ class ApiFlow extends ApiBase {
 		'moderate-topic' => \Flow\Api\ApiFlowModerateTopic::class,
 		'edit-title' => \Flow\Api\ApiFlowEditTitle::class,
 		'lock-topic' => \Flow\Api\ApiFlowLockTopic::class,
+		'move-topic' => \Flow\Api\ApiFlowMoveTopic::class,
 		'close-open-topic' => \Flow\Api\ApiFlowLockTopic::class, // BC: has been renamed to lock-topic
 		'undo-edit-header' => \Flow\Api\ApiFlowUndoEditHeader::class,
 		'undo-edit-post' => \Flow\Api\ApiFlowUndoEditPost::class,

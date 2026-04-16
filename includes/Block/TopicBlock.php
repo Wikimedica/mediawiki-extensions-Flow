@@ -3,6 +3,7 @@
 namespace Flow\Block;
 
 use Flow\Container;
+use Flow\Content\BoardContent;
 use Flow\Conversion\Utils;
 use Flow\Data\ManagerGroup;
 use Flow\Data\Pager\HistoryPager;
@@ -19,6 +20,7 @@ use Flow\Formatter\RevisionViewQuery;
 use Flow\Formatter\TopicHistoryQuery;
 use Flow\Model\AbstractRevision;
 use Flow\Model\PostRevision;
+use Flow\Model\TopicListEntry;
 use Flow\Model\UUID;
 use Flow\Model\Workflow;
 use Flow\Notifications\Controller;
@@ -27,9 +29,12 @@ use MediaWiki\Context\RequestContext;
 use MediaWiki\Language\RawMessage;
 use MediaWiki\Logging\LogEventsList;
 use MediaWiki\Logging\LogPage;
+use MediaWiki\Logging\ManualLogEntry;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Revision\SlotRecord;
 use MediaWiki\Message\Message;
 use MediaWiki\Output\OutputPage;
+use MediaWiki\Title\Title;
 
 class TopicBlock extends AbstractBlock {
 
@@ -73,6 +78,8 @@ class TopicBlock extends AbstractBlock {
 		'moderate-post',
 		// lock or unlock topic
 		'lock-topic',
+		// Move topic to another board
+		'move-topic',
 		// Other stuff
 		'edit-title',
 		'undo-edit-post',
@@ -138,6 +145,10 @@ class TopicBlock extends AbstractBlock {
 			case 'moderate-topic':
 			case 'lock-topic':
 				$this->validateModerateTopic();
+				break;
+
+			case 'move-topic':
+				$this->validateMoveTopic();
 				break;
 
 			case 'moderate-post':
@@ -266,6 +277,149 @@ class TopicBlock extends AbstractBlock {
 		}
 
 		$this->doModerate( $root );
+	}
+
+	protected function validateMoveTopic() {
+		$root = $this->loadRootPost();
+		if ( !$root ) {
+			return;
+		}
+
+		if ( !$this->permissions->isAllowed( $root, 'move-topic' ) ) {
+			$this->addError( 'permissions', $this->getDisallowedErrorMessage( $root ) );
+			return;
+		}
+
+		$destination = trim( $this->submitted['destination'] ?? '' );
+		if ( $destination === '' ) {
+			$this->addError( 'destination', $this->context->msg( 'flow-move-topic-missing-destination' ) );
+			return;
+		}
+
+		$destTitle = Title::newFromText( $destination );
+		if ( !$destTitle ) {
+			$this->addError( 'destination', $this->context->msg( 'flow-move-topic-invalid-destination', $destination ) );
+			return;
+		}
+
+		$services = MediaWikiServices::getInstance();
+		/** @var \Flow\OccupationController $occupationController */
+		$occupationController = Container::get( 'occupation_controller' );
+
+		if ( !$destTitle->exists() ) {
+			// Page doesn't exist yet — check if it's a talk namespace configured for
+			// Flow boards, and if so, create the board automatically during commit.
+			$slotRoleRegistry = $services->getSlotRoleRegistry();
+			$defaultModel = $slotRoleRegistry->getRoleHandler( SlotRecord::MAIN )
+				->getDefaultModel( $destTitle );
+
+			if ( $defaultModel !== CONTENT_MODEL_FLOW_BOARD ) {
+				// Also accept the talk page of a non-talk title
+				$talkTitle = $destTitle->getTalkPageIfDefined();
+				if ( $talkTitle !== null ) {
+					if ( !$talkTitle->exists() ) {
+						$talkDefault = $slotRoleRegistry->getRoleHandler( SlotRecord::MAIN )
+							->getDefaultModel( $talkTitle );
+						if ( $talkDefault === CONTENT_MODEL_FLOW_BOARD ) {
+							$destTitle = $talkTitle;
+							$defaultModel = CONTENT_MODEL_FLOW_BOARD;
+						}
+					} elseif ( $talkTitle->getContentModel() === CONTENT_MODEL_FLOW_BOARD ) {
+						// Talk page exists and is already a Flow board — use it
+						$destTitle = $talkTitle;
+						$defaultModel = CONTENT_MODEL_FLOW_BOARD;
+					}
+				}
+				if ( $defaultModel !== CONTENT_MODEL_FLOW_BOARD ) {
+					$this->addError( 'destination', $this->context->msg( 'flow-move-topic-invalid-destination', $destination ) );
+					return;
+				}
+			}
+
+			// Verify the user has permission to create a board here
+			$permStatus = $occupationController->checkIfUserHasPermission( $destTitle, $this->context->getUser() );
+			if ( !$permStatus->isGood() ) {
+				$this->addError( 'destination', $this->context->msg( 'flow-move-topic-invalid-destination', $destination ) );
+				return;
+			}
+
+			// Prevent moving to the same board
+			if ( $destTitle->equals( $this->workflow->getOwnerTitle() ) ) {
+				$this->addError( 'destination', $this->context->msg( 'flow-move-topic-same-board' ) );
+				return;
+			}
+
+			$this->extraCommitMetadata['move-destination-title'] = $destTitle;
+			$this->extraCommitMetadata['move-destination-workflow'] = null; // created at commit time
+			return;
+		}
+
+		if ( $destTitle->getContentModel() !== CONTENT_MODEL_FLOW_BOARD ) {
+			// Not a Flow board — check if its talk page is
+			$talkTitle = $destTitle->getTalkPageIfDefined();
+			if ( $talkTitle !== null ) {
+				if ( $talkTitle->exists() && $talkTitle->getContentModel() === CONTENT_MODEL_FLOW_BOARD ) {
+					// Talk page exists as a Flow board — use it
+					$destTitle = $talkTitle;
+				} elseif ( !$talkTitle->exists() ) {
+					// Talk page doesn't exist yet — check if it's a Flow namespace and auto-create
+					$slotRoleRegistry = $services->getSlotRoleRegistry();
+					$talkDefault = $slotRoleRegistry->getRoleHandler( SlotRecord::MAIN )
+						->getDefaultModel( $talkTitle );
+					if ( $talkDefault === CONTENT_MODEL_FLOW_BOARD ) {
+						$permStatus = $occupationController->checkIfUserHasPermission( $talkTitle, $this->context->getUser() );
+						if ( $permStatus->isGood() ) {
+							$destTitle = $talkTitle;
+							$this->extraCommitMetadata['move-destination-title'] = $destTitle;
+							$this->extraCommitMetadata['move-destination-workflow'] = null;
+							return;
+						}
+					}
+					$this->addError( 'destination', $this->context->msg( 'flow-move-topic-invalid-destination', $destination ) );
+					return;
+				} else {
+					$this->addError( 'destination', $this->context->msg( 'flow-move-topic-invalid-destination', $destination ) );
+					return;
+				}
+			} else {
+				$this->addError( 'destination', $this->context->msg( 'flow-move-topic-invalid-destination', $destination ) );
+				return;
+			}
+		}
+
+		// Load the destination board's workflow via its BoardContent
+		$wikiPage = $services->getWikiPageFactory()->newFromTitle( $destTitle );
+		$content = $wikiPage->getContent();
+		if ( !( $content instanceof BoardContent ) || !$content->getWorkflowId() ) {
+			// Page exists with flow-board content model but has no initialized workflow yet.
+			// Treat it like a non-existent board — auto-create during commit.
+			$permStatus = $occupationController->checkIfUserHasPermission( $destTitle, $this->context->getUser() );
+			if ( !$permStatus->isGood() ) {
+				$this->addError( 'destination', $this->context->msg( 'flow-move-topic-invalid-destination', $destination ) );
+				return;
+			}
+			if ( $destTitle->equals( $this->workflow->getOwnerTitle() ) ) {
+				$this->addError( 'destination', $this->context->msg( 'flow-move-topic-same-board' ) );
+				return;
+			}
+			$this->extraCommitMetadata['move-destination-title'] = $destTitle;
+			$this->extraCommitMetadata['move-destination-workflow'] = null;
+			return;
+		}
+
+		$destWorkflow = Container::get( 'storage.workflow' )->get( $content->getWorkflowId() );
+		if ( !$destWorkflow ) {
+			$this->addError( 'destination', $this->context->msg( 'flow-move-topic-invalid-destination', $destination ) );
+			return;
+		}
+
+		// Prevent moving to the same board
+		if ( $destTitle->equals( $this->workflow->getOwnerTitle() ) ) {
+			$this->addError( 'destination', $this->context->msg( 'flow-move-topic-same-board' ) );
+			return;
+		}
+
+		$this->extraCommitMetadata['move-destination-workflow'] = $destWorkflow;
 	}
 
 	protected function validateModeratePost() {
@@ -429,6 +583,9 @@ class TopicBlock extends AbstractBlock {
 			// pseudo-action does not do anything, only includes data in api response
 				return [];
 
+			case 'move-topic':
+				return $this->commitMoveTopic();
+
 			case 'reply':
 			case 'moderate-topic':
 			case 'lock-topic':
@@ -501,6 +658,126 @@ class TopicBlock extends AbstractBlock {
 			default:
 				throw new InvalidActionException( "Unknown commit action: {$this->action}", 'invalid-action' );
 		}
+	}
+
+	protected function commitMoveTopic(): array {
+		$topicWorkflow = $this->workflow;
+		$user = $this->context->getUser();
+		$reason = trim( $this->submitted['reason'] ?? '' );
+
+		// If the destination board doesn't exist yet, create it now.
+		/** @var Workflow|null $destWorkflow */
+		$destWorkflow = $this->extraCommitMetadata['move-destination-workflow'];
+		if ( $destWorkflow === null ) {
+			$destTitle = $this->extraCommitMetadata['move-destination-title'];
+			/** @var \Flow\OccupationController $occupationController */
+			$occupationController = Container::get( 'occupation_controller' );
+
+			// Allow creation even if the page already exists as an uninitialised stub.
+			// Permissions were already checked during validation.
+			$occupationController->forceAllowCreation( $destTitle );
+
+			// We deliberately do NOT call WorkflowLoader::commit() here because that opens its
+			// own atomic DB section nested inside the outer SubmissionHandler atomic.
+			$services = MediaWikiServices::getInstance();
+			$destWikiPage = $services->getWikiPageFactory()->newFromTitle( $destTitle );
+
+			// If the page already has a BoardContent revision pointing to a valid workflow,
+			// reuse that workflow rather than creating a new one (avoids UUID mismatch).
+			$existingContent = $destWikiPage->getContent();
+			if ( $existingContent instanceof BoardContent && $existingContent->getWorkflowId() ) {
+				$destWorkflow = Container::get( 'storage.workflow' )->get( $existingContent->getWorkflowId() );
+			}
+
+			if ( $destWorkflow === null ) {
+				// No valid existing workflow — create a fresh one and write the board page.
+				// NOTE: doUserEditContent must happen BEFORE storage->put(), because
+				// Workflow::toStorageRow() resolves pageId=0 via READ_LATEST at insert time.
+				$titleForWorkflow = clone $destTitle;
+				$titleForWorkflow->resetArticleID( 0 );
+				$destWorkflow = Workflow::create( 'discussion', $titleForWorkflow );
+
+				// Force-write the BoardContent revision first so the page exists in the DB.
+				// This bypasses ensureFlowRevision's guard (which would short-circuit on any
+				// existing BoardContent revision, even one pointing to a stale/missing workflow).
+				$destWikiPage->doUserEditContent(
+					new BoardContent( CONTENT_MODEL_FLOW_BOARD, $destWorkflow->getId() ),
+					$occupationController->getTalkpageManager(),
+					wfMessage( 'flow-talk-taken-over-comment' )->plain(),
+					EDIT_FORCE_BOT | EDIT_SUPPRESS_RC
+				);
+
+				// Now store the workflow — toStorageRow() will find the real page ID.
+				$this->storage->put( $destWorkflow, [] );
+			}
+		}
+
+		// Capture source board before any mutations (used in the log params and timestamps).
+		$sourceBoardTitle = $topicWorkflow->getOwnerTitle()->getPrefixedText();
+		$destBoardTitle   = $destWorkflow->getArticleTitle()->getPrefixedText();
+
+		// 1. Update flow_topic_list: remove from source board, insert into destination board.
+		// TopicListEntry has a composite PK (topic_list_id, topic_id); query by topic_id alone.
+		$found = $this->storage->find( TopicListEntry::class, [ 'topic_id' => $topicWorkflow->getId() ] );
+		$currentEntry = $found ? reset( $found ) : null;
+		if ( $currentEntry ) {
+			$this->storage->multiRemove( [ $currentEntry ], [] );
+		}
+		$newEntry = TopicListEntry::create( $destWorkflow, $topicWorkflow );
+		$this->storage->put( $newEntry, [] );
+
+		// 2. Update last-updated timestamps on both boards.
+		$now = UUID::create();
+		if ( $currentEntry ) {
+			$srcBoardWorkflow = Container::get( 'storage.workflow' )->get( $currentEntry->getListId() );
+			if ( $srcBoardWorkflow ) {
+				$srcBoardWorkflow->updateLastUpdated( $now );
+				$this->storage->put( $srcBoardWorkflow, [] );
+			}
+		}
+		$destWorkflow->updateLastUpdated( $now );
+		$this->storage->put( $destWorkflow, [] );
+
+		// 3. Repoint the topic workflow to the destination board. This must happen before the
+		// move-topic revision is stored so that the RC entry and history breadcrumbs reference
+		// the destination board, not the source board.
+		$topicWorkflow->setOwnerTitle( $destWorkflow->getArticleTitle() );
+		$this->storage->put( $topicWorkflow, [] );
+
+		// 4. Create a revision on the topic root recording the move in flow_revision.
+		// Using moderate() with MODERATED_NONE so that the changeType is stored without
+		// altering the moderation state. We encode the source board and the user's move
+		// reason as JSON in rev_mod_reason so the history formatter can show both.
+		$root = $this->loadRootPost();
+		$revModReason = json_encode( [ 'src' => $sourceBoardTitle, 'reason' => $reason ] );
+		$moveRevision = $root->moderate( $user, AbstractRevision::MODERATED_NONE, 'move-topic', $revModReason );
+		if ( !$moveRevision ) {
+			throw new FailCommitException( 'Could not create move-topic revision', 'fail-commit' );
+		}
+		$metadata = [
+			'workflow'    => $topicWorkflow,
+			'topic-title' => $root,
+		];
+		$this->storage->put( $moveRevision, $metadata );
+
+		// 5. Write a log entry to Special:Log/move.
+		// Store both source and destination so the log formatter can display "moved from X to Y"
+		// without relying on getOwnerTitle() (which now points to the destination).
+		$logEntry = new ManualLogEntry( 'flow-move', 'flow-move-topic' );
+		$logEntry->setTarget( $topicWorkflow->getArticleTitle() );
+		$logEntry->setPerformer( $user );
+		$logEntry->setParameters( [
+			'topicId'     => $topicWorkflow->getId()->getAlphadecimal(),
+			'source'      => $sourceBoardTitle,
+			'destination' => $destBoardTitle,
+		] );
+		$logEntry->setComment( $reason );
+		$logEntry->insert();
+
+		return [
+			'post-id'          => $root->getPostId(),
+			'post-revision-id' => $moveRevision->getRevisionId(),
+		];
 	}
 
 	public function renderApi( array $options ) {

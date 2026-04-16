@@ -69,6 +69,8 @@
 	"nstab-topic": "Sujet",
 	"flow-talk-taken-over-comment": "/* Cette page a été convertie en flux de Discussions structurées */",
 	"log-name-flow": "Journal d’activité des Discussions structurées",
+	"log-name-flow-move": "Déplacements de sujets des Discussions structurées",
+	"log-description-flow-move": "Journal des sujets déplacés entre des tableaux de Discussions structurées.",
 	"logentry-delete-flow-delete-post": "$1 {{GENDER:$2|a supprimé}} un [$4 message] sur « [[$3|$5]] » sur [[$6]]",
 	"logentry-delete-flow-delete-post-topic-title-not-visible": "$1 {{GENDER:$2|a supprimé}} un message d’un sujet sur [[$3]]",
 	"logentry-delete-flow-restore-post": "$1 {{GENDER:$2|a rétabli}} un [$4 message] sur « [[$3|$5]] » sur [[$6]]",
@@ -89,6 +91,8 @@
 	"logentry-lock-flow-lock-topic-topic-title-not-visible": "$1 {{GENDER:$2|a marqué}} un sujet comme résolu sur [[$3]]",
 	"logentry-lock-flow-restore-topic": "$1 {{GENDER:$2|a rouvert}} le sujet « [[$3|$5]] » sur [[$6]]",
 	"logentry-lock-flow-restore-topic-topic-title-not-visible": "$1 {{GENDER:$2|a rouvert}} un sujet sur [[$3]]",
+	"logentry-flow-move-flow-move-topic": "$1 {{GENDER:$2|a déplacé}} le sujet « [[$3|$5]] » de [[$6]] vers [[$7]]",
+	"logentry-flow-move-flow-move-topic-topic-title-not-visible": "$1 {{GENDER:$2|a déplacé}} un sujet de [[$3]] vers [[$4]]",
 	"logentry-import-lqt-to-flow-topic": "Le sujet [[$1|$2]] de [[$3]] a été importé depuis LiquidThreads vers les Discussions structurées.",
 	"abusefilter-edit-builder-vars-board-id": "Identifiant de la page du flux de Discussions structurées ($1)",
 	"abusefilter-edit-builder-vars-board-namespace": "Espace de noms du flux de Discussions structurées ($1)",
@@ -570,5 +574,14 @@
 	"flow-guidedtour-optin-feedback-description": "{{GENDER:$1|Vous}} pouvez obtenir plus d’informations, donner votre avis ou désactiver le nouveau système n’importe quand depuis la section Fonctionnalités bêta.",
 	"flow-action-not-page": "L’objet associé à la page est une instance de la mauvaise classe",
 	"flow-action-wrong-title-content-model": "La page est gérée par les Discussions structurées, mais la classe du titre indique que le modèle de contenu est « $1 ». C’est un problème de configuration ou un état incohérent. Par exemple, il pourrait s’agir d’une page qui n’est pas une Discussion structurée dans l’espace de noms des Discussions structurées, avec <code>rev_content_model</code> non renseigné.",
-	"flow-preference-visualeditor": "Activer l’éditeur visuel et le nouveau mode wikicode dans les Discussions structurées"
+	"flow-preference-visualeditor": "Activer l’éditeur visuel et le nouveau mode wikicode dans les Discussions structurées",
+	"flow-topic-action-move-topic": "Déplacer le sujet",
+	"flow-rev-message-move-topic": "$1 {{GENDER:$2|a déplacé}} le sujet « [$3 $4] » de $6 vers $5$7",
+	"flow-move-topic-destination-label": "Tableau de discussion de destination",
+	"flow-move-topic-reason-label": "Raison (facultatif)",
+	"flow-move-topic-submit": "Déplacer",
+	"flow-move-topic-missing-destination": "Veuillez entrer un tableau de destination.",
+	"flow-move-topic-invalid-destination": "« $1 » n’est pas un tableau de discussion Flow.",
+	"flow-move-topic-same-board": "Le sujet est déjà sur ce tableau.",
+	"flow-move-topic-success": "Sujet déplacé vers [[$1]]."
 }

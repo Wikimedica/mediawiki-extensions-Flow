@@ -4,6 +4,21 @@
 	margin: 1em 0 0;
 	direction: ltr;
 
+	// Fallback styling when mw-message-box-error is not loaded
+	&.mw-message-box-error {
+		background-color: #fee7e6;
+		border: 1px solid #d33;
+		border-radius: 2px;
+		padding: 0.5em 1em;
+		color: #202122;
+
+		ul {
+			margin: 0;
+			padding: 0;
+			list-style: none;
+		}
+	}
+
 	.mw-warning-with-logexcerpt {
 		border: 0;
 		margin: 0;

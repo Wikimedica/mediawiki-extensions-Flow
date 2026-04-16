@@ -337,6 +337,18 @@ class Workflow {
 	}
 
 	/**
+	 * Update the owner board of this topic workflow (used when moving a topic to a new board).
+	 * Clears the cached ownerTitle so it is recomputed from the new values.
+	 *
+	 * @param Title $newBoard The destination board's article title
+	 */
+	public function setOwnerTitle( Title $newBoard ): void {
+		$this->namespace = $newBoard->getNamespace();
+		$this->titleText = $newBoard->getDBkey();
+		$this->ownerTitle = null;
+	}
+
+	/**
 	 * @return string
 	 */
 	public function getNamespaceName() {

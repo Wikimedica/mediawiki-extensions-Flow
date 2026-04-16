@@ -266,6 +266,41 @@
 		}
 	);
 
+	/**
+	 * Callback from the move topic dialog.
+	 * Removes the topic from the current board and shows a success notice.
+	 */
+	FlowBoardComponentApiEventsMixin.UI.events.apiHandlers.moveTopic = function ( info, data ) {
+		let $form, $target, flowBoard, destination,
+			$this = $( this );
+
+		if ( info.status !== 'done' ) {
+			// Error is displayed automatically by the framework; nothing else to do.
+			return $.Deferred().resolve().promise();
+		}
+
+		$form = $this.closest( 'form' );
+		$target = ( $form.data( 'flow-dialog-owner' ) || $form ).closest( '.flow-topic' );
+		flowBoard = mw.flow.getPrototypeMethod( 'board', 'getInstanceByElement' )( $this );
+
+		// Read destination from the form input so we can link to it in the notice.
+		destination = $form.find( '[name="flow_destination"]' ).val();
+
+		// Close the dialog.
+		flowBoard.emitWithReturn( 'cancelForm', $form );
+
+		// Remove the topic element from this board only after confirmed success.
+		$target.remove();
+
+		// Show a prominent success notification using MediaWiki's standard mechanism.
+		mw.notify(
+			mw.message( 'flow-move-topic-success', destination ).parseDom(),
+			{ type: 'success', autoHideSeconds: 'short' }
+		);
+
+		return $.Deferred().resolve().promise();
+	};
+
 	//
 	// Private functions
 	//
