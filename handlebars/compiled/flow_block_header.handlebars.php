@@ -38,7 +38,8 @@
 '.$sp.'' : '').'';},
 'flow_header_footer' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'<div class="flow-board-header-footer">
 '.$sp.'  <hr />
-'.$sp.'  <p>
+'.$sp.''.((LR::ifvar($cx, (($inary && isset($in['boardNotice'])) ? $in['boardNotice'] : null), false)) ? '  <div class="flow-board-header-notice">'.LR::encq($cx, LR::hbch($cx, 'html', array(array((($inary && isset($in['boardNotice'])) ? $in['boardNotice'] : null)),array()), 'encq', $in)).'</div>
+'.$sp.'' : '').'  <p>
 '.$sp.'    '.LR::encq($cx, LR::hbch($cx, 'html', array(array((($inary && isset($in['copyrightMessage'])) ? $in['copyrightMessage'] : null)),array()), 'encq', $in)).'
 '.$sp.'  </p>
 '.$sp.'</div>

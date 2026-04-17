@@ -56,6 +56,7 @@
 	"abusefilter-edit-builder-vars-board-title": "Title (without namespace) of Structured Discussions board ($1)",
 	"abusefilter-edit-builder-vars-board-prefixedtitle": "Full title of Structured Discussions board ($1)",
 	"flow-user-moderated": "Moderated user",
+	"flow-board-header-notice": "",
 	"flow-board-header-browse-topics-link": "Browse topics",
 	"flow-board-header": "About this board",
 	"flow-board-description-can-not-edit": "Not editable",

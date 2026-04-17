@@ -343,6 +343,9 @@ class HeaderBlock extends AbstractBlock {
 
 		$output['copyrightMessage'] = $this->context->getSkin()->getCopyright();
 
+		$noticeMsg = $this->context->msg( 'flow-board-header-notice' );
+		$output['boardNotice'] = $noticeMsg->isDisabled() ? '' : $noticeMsg->parse();
+
 		return $output;
 	}
 

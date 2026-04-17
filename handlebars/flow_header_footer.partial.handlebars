@@ -1,5 +1,8 @@
 <div class="flow-board-header-footer">
   <hr />
+  {{#if boardNotice}}
+  <div class="flow-board-header-notice">{{html boardNotice}}</div>
+  {{/if}}
   <p>
     {{html copyrightMessage}}
   </p>

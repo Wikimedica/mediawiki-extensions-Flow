@@ -99,6 +99,7 @@
 	"abusefilter-edit-builder-vars-board-title": "Titre (sans l’espace de noms) du flux de Discussions structurées ($1)",
 	"abusefilter-edit-builder-vars-board-prefixedtitle": "Titre complet du flux de Discussions structurées ($1)",
 	"flow-user-moderated": "Utilisateur modéré",
+	"flow-board-header-notice": "",
 	"flow-board-header-browse-topics-link": "Parcourir les sujets",
 	"flow-board-header": "À propos de ce flux de discussion",
 	"flow-board-description-can-not-edit": "Non modifiable",
