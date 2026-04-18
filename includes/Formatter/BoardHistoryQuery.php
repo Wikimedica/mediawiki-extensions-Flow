@@ -6,6 +6,9 @@ use Flow\Data\Utils\SortRevisionsByRevisionId;
 use Flow\Exception\FlowException;
 use Flow\Model\UUID;
 use MediaWiki\Exception\MWExceptionHandler;
+use MediaWiki\MediaWikiServices;
+use Wikimedia\Rdbms\IExpression;
+use Wikimedia\Rdbms\LikeValue;
 
 class BoardHistoryQuery extends HistoryQuery {
 	/**
@@ -21,8 +24,9 @@ class BoardHistoryQuery extends HistoryQuery {
 		$headerHistory = $this->getHeaderResults( $boardWorkflowId, $options ) ?: [];
 		$topicListHistory = $this->getTopicListResults( $boardWorkflowId, $options ) ?: [];
 		$topicSummaryHistory = $this->getTopicSummaryResults( $boardWorkflowId, $options ) ?: [];
+		$departureHistory = $this->getDepartureResults( $boardWorkflowId ) ?: [];
 
-		$history = array_merge( $headerHistory, $topicListHistory, $topicSummaryHistory );
+		$history = array_merge( $headerHistory, $topicListHistory, $topicSummaryHistory, $departureHistory );
 		usort( $history, new SortRevisionsByRevisionId( $options['order'] ) );
 
 		if ( isset( $options['limit'] ) ) {
@@ -86,5 +90,45 @@ class BoardHistoryQuery extends HistoryQuery {
 			],
 			$options
 		);
+	}
+
+	/**
+	 * Find move-topic revisions where this board is the source (i.e. topics that
+	 * were moved *away* from this board). These are identified by the JSON-encoded
+	 * src_id stored in rev_mod_reason during commitMoveTopic().
+	 *
+	 * @param UUID $boardWorkflowId
+	 * @return array PostRevision objects
+	 */
+	protected function getDepartureResults( UUID $boardWorkflowId ) {
+		$dbr = MediaWikiServices::getInstance()->getConnectionProvider()->getReplicaDatabase();
+
+		// Search for move-topic revisions where rev_mod_reason JSON contains this board's ID
+		// as the source. The JSON field is: {"src":"...","src_id":"<alphadecimal>","reason":"..."}
+		$boardId = $boardWorkflowId->getAlphadecimal();
+		$res = $dbr->newSelectQueryBuilder()
+			->select( 'rev_id' )
+			->from( 'flow_revision' )
+			->where( [
+				'rev_type'        => 'post',
+				'rev_change_type' => 'move-topic',
+			] )
+			->andWhere( $dbr->expr( 'rev_mod_reason', IExpression::LIKE,
+				new LikeValue( $dbr->anyString(), '"src_id":"' . $boardId . '"', $dbr->anyString() )
+			) )
+			->caller( __METHOD__ )
+			->fetchResultSet();
+
+		$revIds = [];
+		foreach ( $res as $row ) {
+			$revIds[] = UUID::create( $row->rev_id );
+		}
+
+		if ( !$revIds ) {
+			return [];
+		}
+
+		$revisions = $this->storage->getMulti( 'PostRevision', $revIds );
+		return array_values( $revisions ?: [] );
 	}
 }

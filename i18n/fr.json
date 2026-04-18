@@ -584,5 +584,6 @@
 	"flow-move-topic-missing-destination": "Veuillez entrer un tableau de destination.",
 	"flow-move-topic-invalid-destination": "« $1 » n’est pas un tableau de discussion Flow.",
 	"flow-move-topic-same-board": "Le sujet est déjà sur ce tableau.",
-	"flow-move-topic-success": "Sujet déplacé vers [[$1]]."
+	"flow-move-topic-success": "Sujet déplacé vers [[$1]].",
+	"flow-move-topic-no-reason": "aucune raison fournie"
 }

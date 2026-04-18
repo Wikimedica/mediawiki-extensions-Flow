@@ -1120,12 +1120,12 @@ class RevisionFormatter {
 
 			case 'move-reason':
 				// For move-topic: rev_mod_reason holds JSON {"src":..., "reason":...}.
-				// Returns " (<i>reason</i>)" or empty string when no reason was provided.
+				// Returns " (<i>reason</i>)" or " (<i>no reason given</i>)".
 				$moveData = json_decode( $revision->getModeratedReason() ?? '', true );
-				if ( is_array( $moveData ) && !empty( $moveData['reason'] ) ) {
-					return Message::rawParam( ' (<i>' . htmlspecialchars( $moveData['reason'] ) . '</i>)' );
-				}
-				return '';
+				$reasonText = ( is_array( $moveData ) && !empty( $moveData['reason'] ) )
+					? htmlspecialchars( $moveData['reason'] )
+					: wfMessage( 'flow-move-topic-no-reason' )->inContentLanguage()->escaped();
+				return Message::rawParam( ' (<i>' . $reasonText . '</i>)' );
 
 			case 'bundle-count':
 				return Message::numParam( count( $revision ) );

@@ -761,7 +761,12 @@ class TopicBlock extends AbstractBlock {
 		// the history formatter can display both.
 		$root = $this->loadRootPost();
 		$originalModerationState = $root->getModerationState();
-		$revModReason = json_encode( [ 'src' => $sourceBoardTitle, 'reason' => $reason ] );
+		$srcWorkflowId = $currentEntry ? $currentEntry->getListId()->getAlphadecimal() : null;
+		$revModReason = json_encode( [
+			'src'    => $sourceBoardTitle,
+			'src_id' => $srcWorkflowId,
+			'reason' => $reason,
+		] );
 		$moveRevision = $root->moderate( $user, $originalModerationState, 'move-topic', $revModReason );
 		if ( !$moveRevision ) {
 			throw new FailCommitException( 'Could not create move-topic revision', 'fail-commit' );

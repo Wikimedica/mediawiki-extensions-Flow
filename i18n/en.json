@@ -582,5 +582,6 @@
 	"flow-move-topic-missing-destination": "Please enter a destination board.",
 	"flow-move-topic-invalid-destination": "\"$1\" is not a Flow discussion board.",
 	"flow-move-topic-same-board": "The topic is already on that board.",
-	"flow-move-topic-success": "Topic moved to [[$1]]."
+	"flow-move-topic-success": "Topic moved to [[$1]].",
+	"flow-move-topic-no-reason": "no reason given"
 }
