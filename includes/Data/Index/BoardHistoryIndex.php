@@ -77,6 +77,17 @@ abstract class BoardHistoryIndex extends TopKIndex {
 	}
 
 	/**
+	 * Purge the cached board history for a given board workflow ID.
+	 * Used when a topic is moved between boards to invalidate both the
+	 * source and destination board caches.
+	 *
+	 * @param UUID $boardWorkflowId
+	 */
+	public function purgeBoard( UUID $boardWorkflowId ): void {
+		$this->removeFromIndex( [ 'topic_list_id' => $boardWorkflowId->getAlphadecimal() ], [] );
+	}
+
+	/**
 	 * @param PostSummary|PostRevision $object
 	 * @param string[] $new
 	 * @param array $metadata

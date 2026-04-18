@@ -726,6 +726,17 @@ class TopicBlock extends AbstractBlock {
 		$newEntry = TopicListEntry::create( $destWorkflow, $topicWorkflow );
 		$this->storage->put( $newEntry, [] );
 
+		// Purge the board history cache for both source and destination so that
+		// neither shows stale entries after the move.
+		if ( $currentEntry ) {
+			$postBoardHistoryIndex = Container::get( 'storage.post_board_history.indexes.primary' );
+			$summaryBoardHistoryIndex = Container::get( 'storage.post_summary_board_history.indexes.primary' );
+			$postBoardHistoryIndex->purgeBoard( $currentEntry->getListId() );
+			$summaryBoardHistoryIndex->purgeBoard( $currentEntry->getListId() );
+			$postBoardHistoryIndex->purgeBoard( $destWorkflow->getId() );
+			$summaryBoardHistoryIndex->purgeBoard( $destWorkflow->getId() );
+		}
+
 		// 2. Update last-updated timestamps on both boards.
 		$now = UUID::create();
 		if ( $currentEntry ) {
