@@ -1597,7 +1597,13 @@ class Hooks implements
 	 *  to name
 	 */
 	public function onSearchableNamespaces( &$namespaces ) {
+		/* Wikimedica: keep NS_TOPIC searchable. CirrusSearch indexes topic pages
+		 * (BoardContentHandler renders the posts into the indexed ParserOutput),
+		 * so discussions are searchable by ticking the Sujet namespace on the
+		 * search page. It stays out of $wgNamespacesToBeSearchedDefault, so
+		 * default search and autocompletion are unaffected.
 		unset( $namespaces[NS_TOPIC] );
+		*/
 	}
 
 	/**
