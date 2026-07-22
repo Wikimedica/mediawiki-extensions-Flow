@@ -118,7 +118,7 @@ abstract class FlowPresentationModel extends EchoEventPresentationModel {
 	protected function getBoardByNewestTopicUrl() {
 		/** @var UrlGenerator $urlGenerator */
 		$urlGenerator = Container::get( 'url_generator' );
-		return $urlGenerator->boardLink( $this->event->getTitle(), 'newest' )->getFullURL();
+		return $urlGenerator->boardLink( $this->getNotificationTarget(), 'newest' )->getFullURL();
 	}
 
 	protected function getViewTopicLink() {
@@ -135,7 +135,7 @@ abstract class FlowPresentationModel extends EchoEventPresentationModel {
 	protected function getBoardLink( $sortBy = null ) {
 		$query = $sortBy ? [ 'topiclist_sortby' => $sortBy ] : [];
 		return $this->getPageLink(
-			$this->event->getTitle(), '', true, $query
+			$this->getNotificationTarget(), '', true, $query
 		);
 	}
 
