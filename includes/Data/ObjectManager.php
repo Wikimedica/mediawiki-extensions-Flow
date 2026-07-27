@@ -305,7 +305,9 @@ class ObjectManager extends ObjectLocator {
 	 */
 	protected function load( array $row ) {
 		$object = parent::load( $row );
-		$this->loaded[$object] = $row;
+		if ( $object !== null ) {
+			$this->loaded[$object] = $row;
+		}
 		return $object;
 	}
 

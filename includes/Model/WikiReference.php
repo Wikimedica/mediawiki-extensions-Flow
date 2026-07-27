@@ -3,6 +3,7 @@
 namespace Flow\Model;
 
 use Flow\Exception\InvalidInputException;
+use Flow\Exception\InvalidReferenceException;
 use MediaWiki\Title\Title;
 use MediaWiki\WikiMap\WikiMap;
 
@@ -65,6 +66,8 @@ class WikiReference extends Reference {
 	 *
 	 * @param array $row
 	 * @return WikiReference
+	 * @throws InvalidReferenceException When a stored title can no longer be
+	 *  parsed into a valid Title (e.g. its namespace has been unregistered).
 	 */
 	public static function fromStorageRow( $row ) {
 		// TODO: Remove this UUID::create() call when the field is populated
@@ -77,6 +80,14 @@ class WikiReference extends Reference {
 		$targetTitle = self::makeTitle( $row['ref_target_namespace'], $row['ref_target_title'] );
 		$type = $row['ref_type'];
 		$wiki = $row['ref_src_wiki'];
+
+		if ( $srcTitle === null || $targetTitle === null ) {
+			throw new InvalidReferenceException(
+				'Invalid title in flow_wiki_ref row: ' .
+					"src={$row['ref_src_namespace']}:{$row['ref_src_title']} " .
+					"target={$row['ref_target_namespace']}:{$row['ref_target_title']}"
+			);
+		}
 
 		return new WikiReference(
 			$id, $wiki, $workflow, $srcTitle, $objectType, $objectId, $type, $targetTitle

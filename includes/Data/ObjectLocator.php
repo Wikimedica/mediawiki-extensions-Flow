@@ -3,6 +3,7 @@
 namespace Flow\Data;
 
 use Flow\DbFactory;
+use Flow\Exception\InvalidReferenceException;
 use Flow\Exception\NoIndexException;
 use Flow\Model\UUID;
 use MediaWiki\Exception\MWExceptionHandler;
@@ -116,7 +117,10 @@ class ObjectLocator {
 		foreach ( $res as $index => $queryOutput ) {
 			foreach ( $queryOutput as $k => $v ) {
 				if ( $v ) {
-					$output[$index][$k] = $this->load( $v );
+					$object = $this->load( $v );
+					if ( $object !== null ) {
+						$output[$index][$k] = $object;
+					}
 				}
 			}
 		}
@@ -311,8 +315,19 @@ class ObjectLocator {
 		return $current;
 	}
 
+	/**
+	 * @param array $row
+	 * @return object|null Null when the row is no longer valid (e.g. a
+	 *  reference whose stored title cannot be parsed anymore) and must be
+	 *  skipped instead of fataling every load of its containing board.
+	 */
 	protected function load( array $row ) {
-		$object = $this->mapper->fromStorageRow( $row );
+		try {
+			$object = $this->mapper->fromStorageRow( $row );
+		} catch ( InvalidReferenceException $e ) {
+			wfDebugLog( 'Flow', __METHOD__ . ': Skipping invalid row: ' . $e->getDebugMessage() );
+			return null;
+		}
 		foreach ( $this->lifecycleHandlers as $handler ) {
 			$handler->onAfterLoad( $object, $row );
 		}
