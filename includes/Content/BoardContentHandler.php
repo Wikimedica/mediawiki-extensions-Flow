@@ -14,6 +14,7 @@ use InvalidArgumentException;
 use MediaWiki\Content\Content;
 use MediaWiki\Content\ContentHandler;
 use MediaWiki\Content\Renderer\ContentParseParams;
+use MediaWiki\Content\WikiTextStructure;
 use MediaWiki\Context\DerivativeContext;
 use MediaWiki\Context\IContextSource;
 use MediaWiki\Context\RequestContext;
@@ -21,10 +22,14 @@ use MediaWiki\Json\FormatJson;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Page\Article;
+use MediaWiki\Page\WikiPage;
 use MediaWiki\Parser\ParserOutput;
+use MediaWiki\Parser\Sanitizer;
+use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Request\FauxRequest;
 use MediaWiki\Title\Title;
 use MediaWiki\User\User;
+use SearchEngine;
 
 class BoardContentHandler extends ContentHandler {
 	public function __construct( $modelId ) {
@@ -213,6 +218,51 @@ class BoardContentHandler extends ContentHandler {
 		/** @var LinksTableUpdater $updater */
 		$updater = Container::get( 'reference.updater.links-tables' );
 		$updater->mutateParserOutput( $title, $output );
+	}
+
+	/**
+	 * Index the rendered board/topic HTML as the document text.
+	 *
+	 * The parent implementation takes the text from
+	 * Content::getTextForSearchIndex(), which BoardContent hardcodes to '',
+	 * leaving board and topic documents with no searchable text at all.
+	 *
+	 * @param WikiPage $page
+	 * @param ParserOutput $output
+	 * @param SearchEngine $engine
+	 * @param RevisionRecord|null $revision
+	 * @return array
+	 */
+	public function getDataForSearchIndex(
+		WikiPage $page,
+		ParserOutput $output,
+		SearchEngine $engine,
+		?RevisionRecord $revision = null
+	) {
+		$fields = parent::getDataForSearchIndex( $page, $output, $engine, $revision );
+
+		$structure = new WikiTextStructure( $output );
+		$fields['text'] = $structure->getMainText();
+
+		// WikiTextStructure::headings() reads TOC data, which the board view
+		// does not produce; extract topic titles from the rendered heading
+		// elements instead (heading elements are excluded from the text field).
+		$fields['heading'] = [];
+		if ( preg_match_all( '!<h[1-6][^>]*>(.*?)</h[1-6]>!s', $output->getRawText(), $matches ) ) {
+			foreach ( $matches[1] as $heading ) {
+				$heading = trim( Sanitizer::stripAllTags( $heading ) );
+				if ( $heading !== '' ) {
+					$fields['heading'][] = $heading;
+				}
+			}
+		}
+		// Boards have no wikitext source; index the extracted text instead.
+		$fields['source_text'] = $fields['text'];
+		$fields['text_bytes'] = strlen( $fields['text'] );
+		$fields['opening_text'] = $structure->getOpeningText();
+		$fields['auxiliary_text'] = $structure->getAuxiliaryText();
+
+		return $fields;
 	}
 
 	/**
