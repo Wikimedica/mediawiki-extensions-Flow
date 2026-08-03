@@ -262,7 +262,67 @@ class BoardContentHandler extends ContentHandler {
 		$fields['opening_text'] = $structure->getOpeningText();
 		$fields['auxiliary_text'] = $structure->getAuxiliaryText();
 
+		// Let topics be found through their parent board: index the board's
+		// namespace (queried by the boardns: keyword, see
+		// BoardNamespaceFeature) and inherit its categories so incategory:
+		// covers the board's discussions.
+		$title = $page->getTitle();
+		if ( $title->inNamespace( NS_TOPIC ) ) {
+			$boardTitle = $this->getBoardTitle( $title );
+			if ( $boardTitle ) {
+				$fields['board_namespace'] = $boardTitle->getNamespace();
+				$fields['category'] = array_values( array_unique( array_merge(
+					$fields['category'] ?? [],
+					$this->getCategories( $boardTitle )
+				) ) );
+			}
+		} else {
+			$fields['board_namespace'] = $title->getNamespace();
+		}
+
 		return $fields;
+	}
+
+	/**
+	 * Resolve the board a topic belongs to.
+	 *
+	 * @param Title $topicTitle
+	 * @return Title|null
+	 */
+	private function getBoardTitle( Title $topicTitle ) {
+		try {
+			$storage = Container::get( 'storage' );
+			$found = $storage->find( 'TopicListEntry', [
+				'topic_id' => UUID::create( strtolower( $topicTitle->getDBkey() ) ),
+			] );
+			if ( !$found ) {
+				return null;
+			}
+			/** @var \Flow\Model\TopicListEntry $entry */
+			$entry = reset( $found );
+			$boardWorkflow = $storage->get( 'Workflow', $entry->getListId() );
+
+			return $boardWorkflow ? $boardWorkflow->getArticleTitle() : null;
+		} catch ( \Exception ) {
+			return null;
+		}
+	}
+
+	/**
+	 * @param Title $title
+	 * @return string[] The page's categories, in the text form the category
+	 *  search index field uses.
+	 */
+	private function getCategories( Title $title ) {
+		$categories = [];
+		foreach ( $title->getParentCategories() as $category => $_ ) {
+			$categoryTitle = Title::newFromText( $category );
+			if ( $categoryTitle ) {
+				$categories[] = $categoryTitle->getText();
+			}
+		}
+
+		return $categories;
 	}
 
 	/**

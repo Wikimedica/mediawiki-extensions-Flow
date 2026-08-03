@@ -2295,4 +2295,32 @@ class Hooks implements
 			$text = str_replace( $placeholder, $boardDiv, $text );
 		}
 	}
+
+	/**
+	 * Register the board_namespace search index field, holding the namespace
+	 * of a topic's parent board (populated by
+	 * BoardContentHandler::getDataForSearchIndex()).
+	 *
+	 * @param \SearchIndexField[] &$fields
+	 * @param \SearchEngine $engine
+	 */
+	public static function onSearchIndexFields( array &$fields, \SearchEngine $engine ) {
+		$fields['board_namespace'] = $engine->makeSearchFieldMapping(
+			'board_namespace',
+			\SearchIndexField::INDEX_TYPE_INTEGER
+		);
+	}
+
+	/**
+	 * Register the boardns: keyword (see BoardNamespaceFeature).
+	 *
+	 * Static and free of CirrusSearch type hints so Flow keeps loading when
+	 * CirrusSearch is not installed.
+	 *
+	 * @param \CirrusSearch\SearchConfig $config
+	 * @param \CirrusSearch\Query\KeywordFeature[] &$extraFeatures
+	 */
+	public static function onCirrusSearchAddQueryFeatures( $config, array &$extraFeatures ) {
+		$extraFeatures[] = new \Flow\Search\BoardNamespaceFeature();
+	}
 }

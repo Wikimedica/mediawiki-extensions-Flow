@@ -766,6 +766,8 @@
 		"ContributionsLineEnding": "main",
 		"DeletedContributionsLineEnding": "main",
 		"ApiFeedContributions::feedItem": "main",
+		"SearchIndexFields": "Flow\\Hooks::onSearchIndexFields",
+		"CirrusSearchAddQueryFeatures": "Flow\\Hooks::onCirrusSearchAddQueryFeatures",
 		"AbuseFilter-builder": "Flow\\Hooks::onAbuseFilterBuilder",
 		"AbuseFilter-deprecatedVariables": "Flow\\Hooks::onAbuseFilterDeprecatedVariables",
 		"AbuseFilter-computeVariable": "Flow\\Hooks::onAbuseFilterComputeVariable",
