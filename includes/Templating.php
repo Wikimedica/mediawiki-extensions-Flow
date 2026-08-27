@@ -8,7 +8,9 @@ use Flow\Exception\PermissionException;
 use Flow\Model\AbstractRevision;
 use Flow\Model\PostRevision;
 use Flow\Parsoid\ContentFixer;
+use Flow\Parsoid\Fixer\AttachmentFixer;
 use Flow\Repository\UserNameBatch;
+use MediaWiki\Context\RequestContext;
 use MediaWiki\Linker\Linker;
 use MediaWiki\WikiMap\WikiMap;
 
@@ -130,6 +132,13 @@ class Templating {
 			$content = $this->contentFixer->getContent( $revision );
 		} else {
 			$content = $revision->getContent( $format );
+			// In fixed-html the AttachmentFixer replaces attachment
+			// references with a placeholder for anonymous viewers; raw
+			// formats expose the stored source, so scrub the references
+			// (file names included) there too
+			if ( !RequestContext::getMain()->getUser()->isRegistered() ) {
+				$content = AttachmentFixer::scrubForAnonymous( $content );
+			}
 		}
 
 		return $content;

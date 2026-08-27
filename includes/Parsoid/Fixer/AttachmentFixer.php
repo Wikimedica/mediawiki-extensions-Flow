@@ -143,6 +143,50 @@ class AttachmentFixer implements Fixer {
 		$node->parentNode->replaceChild( $link, $node );
 	}
 
+	/**
+	 * Remove attachment references from raw (wikitext or HTML) content so
+	 * that anonymous consumers of the API see neither the file name nor the
+	 * URL. The fixed-html render path handles this in apply(); this covers
+	 * the stored source formats, where the reference is an external link
+	 * (or a leftover <img>/<a>) whose URL and label contain the file name.
+	 *
+	 * @param string $content Raw wikitext or HTML content
+	 * @return string Content with attachment references replaced by a
+	 *  placeholder message
+	 */
+	public static function scrubForAnonymous( string $content ): string {
+		if ( strpos( $content, 'FlowAttachment/' ) === false ) {
+			return $content;
+		}
+
+		$id = '[0-9a-z]{16,19}';
+		$placeholder = wfMessage( 'flow-attachment-restricted' )->text();
+
+		// HTML forms: whole anchors (label = file name) and images
+		$content = preg_replace(
+			'~<a\b[^>]*FlowAttachment/' . $id . '[^>]*>.*?</a>~is',
+			htmlspecialchars( $placeholder ),
+			$content
+		);
+		$content = preg_replace(
+			'~<img\b[^>]*FlowAttachment/' . $id . '[^>]*/?>~i',
+			htmlspecialchars( $placeholder ),
+			$content
+		);
+		// Wikitext external link with label: [url name]
+		$content = preg_replace(
+			'~\[\S*FlowAttachment/' . $id . '\S*(?:\s[^\]]*)?\]~i',
+			$placeholder,
+			$content
+		);
+		// Bare URLs (autolinked in wikitext, or any other leftover)
+		return preg_replace(
+			'~\S*FlowAttachment/' . $id . '\S*~i',
+			$placeholder,
+			$content
+		);
+	}
+
 	private function lookup( string $alnumId ): ?TopicAttachment {
 		if ( !array_key_exists( $alnumId, $this->cache ) ) {
 			$this->cache[$alnumId] = $this->store->getById( UUID::create( $alnumId ) );

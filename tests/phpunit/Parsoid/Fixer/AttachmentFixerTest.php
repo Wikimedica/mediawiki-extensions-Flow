@@ -164,6 +164,32 @@ class AttachmentFixerTest extends FlowTestCase {
 		$this->assertStringNotContainsString( '<a', $result );
 	}
 
+	public static function provideScrubForAnonymous() {
+		$url = 'http://example.org/wiki/Sp%C3%A9cial:FlowAttachment/zk9abc0123456789/secret-report.pdf';
+		return [
+			'html anchor' => [ '<p>voir <a rel="mw:ExtLink" href="' . $url . '">secret-report.pdf</a> ici</p>' ],
+			'html img' => [ '<p>voir <img src="' . $url . '?w=240&h=180" alt="secret-report.pdf"></p>' ],
+			'wikitext labelled link' => [ 'voir [' . $url . ' secret-report.pdf] ici' ],
+			'wikitext bare url' => [ 'voir ' . $url . '?w=240&h=180 ici' ],
+		];
+	}
+
+	/**
+	 * @dataProvider provideScrubForAnonymous
+	 */
+	public function testScrubForAnonymous( string $content ) {
+		$scrubbed = AttachmentFixer::scrubForAnonymous( $content );
+
+		$this->assertStringNotContainsString( 'secret-report.pdf', $scrubbed );
+		$this->assertStringNotContainsString( 'FlowAttachment', $scrubbed );
+		$this->assertStringContainsString( 'voir', $scrubbed );
+	}
+
+	public function testScrubForAnonymousLeavesOtherContentAlone() {
+		$content = 'voir [http://example.org/page une page] et du texte';
+		$this->assertSame( $content, AttachmentFixer::scrubForAnonymous( $content ) );
+	}
+
 	public function testUnrelatedLinksUntouched() {
 		$html = '<p><a rel="mw:ExtLink" href="http://example.org/some/page">a link</a></p>';
 
