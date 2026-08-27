@@ -450,5 +450,64 @@
 			}
 		],
 		"pk": [ "ref_id" ]
+	},
+	{
+		"name": "flow_topic_attachment",
+		"comment": "Files uploaded to a Flow topic. The file contents live in the flow-attachments FileBackend; this table holds the metadata. Attachments are scoped to a topic workflow and served through Special:FlowAttachment with permission checks.",
+		"columns": [
+			{
+				"name": "fa_id",
+				"comment": "Flow UUID of the attachment; also encodes the upload timestamp",
+				"type": "binary",
+				"options": { "notnull": true, "length": 11, "fixed": true }
+			},
+			{
+				"name": "fa_workflow_id",
+				"comment": "Workflow the attachment belongs to: the topic workflow, or the board workflow while a new-topic upload is not yet committed",
+				"type": "binary",
+				"options": { "notnull": true, "length": 11, "fixed": true }
+			},
+			{
+				"name": "fa_post_id",
+				"comment": "First post whose content references this attachment; null until the referencing post is saved",
+				"type": "binary",
+				"options": { "notnull": false, "length": 11, "fixed": true }
+			},
+			{
+				"name": "fa_user_id",
+				"comment": "User id of the uploader; attachments can only be uploaded by registered users",
+				"type": "bigint",
+				"options": { "notnull": true, "unsigned": true }
+			},
+			{
+				"name": "fa_name",
+				"comment": "Sanitized original file name, including extension",
+				"type": "binary",
+				"options": { "notnull": true, "length": 255 }
+			},
+			{
+				"name": "fa_size",
+				"type": "integer",
+				"options": { "notnull": true, "unsigned": true }
+			},
+			{
+				"name": "fa_mime",
+				"type": "binary",
+				"options": { "notnull": true, "length": 255 }
+			},
+			{
+				"name": "fa_sha1",
+				"type": "binary",
+				"options": { "notnull": true, "length": 32 }
+			}
+		],
+		"indexes": [
+			{
+				"name": "flow_topic_attachment_workflow",
+				"columns": [ "fa_workflow_id", "fa_id" ],
+				"unique": false
+			}
+		],
+		"pk": [ "fa_id" ]
 	}
 ]

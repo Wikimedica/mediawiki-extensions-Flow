@@ -1,0 +1,94 @@
+// Rendered attachment references inside post content.
+// The server (AttachmentFixer) turns links to Special:FlowAttachment into
+// either an inline image or a download card with these classes.
+
+.flow-attachment-image {
+	display: inline-block;
+	max-width: 100%;
+
+	img {
+		max-width: 100%;
+		// Preserves the aspect ratio when max-width kicks in, using the
+		// intrinsic or author-chosen width attribute
+		height: auto;
+		border: 1px solid #c8ccd1;
+		border-radius: 2px;
+	}
+
+	// Only cap the height of images the author did not size explicitly
+	img:not( [ width ] ) {
+		max-height: 30em;
+	}
+}
+
+.flow-attachment-card {
+	display: inline-flex;
+	align-items: center;
+	max-width: 100%;
+	margin: 0.25em 0;
+	padding: 0.5em 0.75em;
+	border: 1px solid #c8ccd1;
+	border-radius: 2px;
+	background-color: #f8f9fa;
+	text-decoration: none;
+	color: #202122;
+
+	&:hover {
+		background-color: #eaecf0;
+		text-decoration: none;
+	}
+
+	.flow-attachment-card-icon {
+		flex: 0 0 auto;
+		margin-right: 0.5em;
+
+		&::before {
+			content: '\1F4CE'; // 📎 paperclip
+			font-size: 1.25em;
+		}
+	}
+
+	.flow-attachment-card-info {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
+	.flow-attachment-card-name {
+		font-weight: bold;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.flow-attachment-card-size {
+		color: #54595d;
+		font-size: 0.875em;
+	}
+}
+
+.flow-attachment-missing {
+	color: #d33;
+	text-decoration: line-through;
+}
+
+.flow-attachment-placeholder {
+	display: inline-flex;
+	align-items: center;
+	margin: 0.25em 0;
+	padding: 0.5em 0.75em;
+	border: 1px dashed #c8ccd1;
+	border-radius: 2px;
+	background-color: #f8f9fa;
+	color: #72777d;
+	font-style: italic;
+
+	.flow-attachment-card-icon {
+		margin-right: 0.5em;
+
+		&::before {
+			content: '\1F4CE'; // 📎 paperclip
+			font-size: 1.25em;
+		}
+	}
+}

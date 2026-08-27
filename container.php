@@ -344,6 +344,9 @@ $c['storage.post_summary'] = static function ( $c ) {
 		'storage.post_summary_board_history.indexes.primary' => $c['storage.post_summary_board_history.indexes.primary'],
 		'listener.editcount' => $c['listener.editcount'],
 		'reference.recorder' => $c['reference.recorder'],
+		'storage.post_summary.listeners.attachments' => new Flow\Data\Listener\AttachmentListener(
+			MediaWikiServices::getInstance()->getService( 'FlowAttachmentStore' )
+		),
 	];
 	return new ObjectManager(
 		$c['storage.post_summary.mapper'],
@@ -435,6 +438,9 @@ $c['storage.post'] = static function ( $c ) {
 		'collection.cache' => $c['collection.cache'],
 		'storage.post.listeners.username' => $userNameListener,
 		'storage.post.listeners.watch_topic' => $watchTopicListener,
+		'storage.post.listeners.attachments' => new Flow\Data\Listener\AttachmentListener(
+			MediaWikiServices::getInstance()->getService( 'FlowAttachmentStore' )
+		),
 		'listeners.notification' => $c['listeners.notification'],
 		'storage.post.listeners.moderation_logging' => $c['storage.post.listeners.moderation_logging'],
 		'listener.recentchanges' => $c['listener.recentchanges'],

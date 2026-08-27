@@ -53,6 +53,21 @@
 				{{~noop~}}
 			</li>
 		{{~/if~}}
+		{{~#ifAnonymous~}}
+		{{~else~}}
+			{{!-- Attachments are only available to registered users --}}
+			<li>
+				{{~noop~}}
+				<a class="{{moderationMwUiClass}} mw-ui-quiet flow-ui-topic-attachments-link"
+				   href="javascript:void(0);"
+				   data-flow-interactive-handler="topicAttachments">
+				   {{~#if moderationIcons}}<span class="mw-ui-icon mw-ui-icon-before mw-ui-icon-attachment"><span>{{/if~}}
+					{{~l10n (concat "flow-topic-action-attachments")~}}
+				   {{~#if moderationIcons}}</span></span>{{/if~}}
+				</a>
+				{{~noop~}}
+			</li>
+		{{~/ifAnonymous~}}
 	{{~/ifCond~}}
 
 

@@ -27,6 +27,7 @@ class SchemaHooks implements LoadExtensionSchemaUpdatesHook {
 		$dir = dirname( __DIR__ ) . '/sql';
 		$dbType = $updater->getDB()->getType();
 		$updater->addExtensionTable( 'flow_revision', "$dir/$dbType/tables-generated.sql" );
+		$updater->addExtensionTable( 'flow_topic_attachment', "$dir/$dbType/patch-flow_topic_attachment.sql" );
 
 		if ( $dbType === 'mysql' ) {
 			// 1.35 (backported to 1.34)

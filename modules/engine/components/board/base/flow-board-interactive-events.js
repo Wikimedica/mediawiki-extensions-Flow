@@ -64,6 +64,39 @@
 		return $deferred.resolve().promise();
 	};
 
+	/**
+	 * Toggles the topic's attached files panel, from the "Attached files"
+	 * entry in the topic context menu.
+	 *
+	 * @param {Event} event
+	 * @return {jQuery.Promise}
+	 */
+	FlowBoardComponentInteractiveEventsMixin.UI.events.interactiveHandlers.topicAttachments = function ( event ) {
+		const $topic = $( this ).closest( '.flow-topic' ),
+			topicId = $topic.data( 'flow-id' ),
+			$titlebar = $topic.find( '.flow-topic-titlebar' ).first(),
+			$deferred = $.Deferred();
+
+		event.preventDefault();
+
+		if ( !topicId || !$titlebar.length ) {
+			return $deferred.resolve().promise();
+		}
+
+		mw.loader.using( 'ext.flow.ui' ).then( () => {
+			let widget = $titlebar.data( 'flowAttachmentListWidget' );
+			if ( !widget ) {
+				widget = new mw.flow.ui.AttachmentListWidget( topicId );
+				$titlebar.append( widget.$element );
+				$titlebar.data( 'flowAttachmentListWidget', widget );
+			}
+			widget.togglePanel();
+			$deferred.resolve();
+		} );
+
+		return $deferred.promise();
+	};
+
 	// @todo remove these data-flow handler forwarder callbacks when data-mwui handlers are implemented
 	$( [ 'close', 'prevOrClose', 'nextOrSubmit', 'prev', 'next' ] ).each( ( i, fn ) => {
 		// Assigns each handler with the prefix 'modal', eg. 'close' becomes 'modalClose'

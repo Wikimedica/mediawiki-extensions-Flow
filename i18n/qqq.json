@@ -588,5 +588,19 @@
 	"flow-guidedtour-optin-feedback-description": "Description of the 'feedback' step in the flow opt-in guided tour that launches after the user chose to convert their talk page to a Structured Discussions board. It appears under the 'beta' personal tool link, suggesting to the users that they can send the Structured Discussions developers feedback on their experience.",
 	"flow-action-not-page": "Error displayed in the main page area if a bug or misconfiguration causes an inconsistent state.",
 	"flow-action-wrong-title-content-model": "Error displayed if the page has the wrong content model.  Parameters:\n* $1 - The actual content model as reported by the Title class",
-	"flow-preference-visualeditor": "Used in [[Special:Preferences]].\n\nUsed as label for the checkbox to enable the visual editor and the new wikitext mode for writing and editing Flow comments."
+	"flow-preference-visualeditor": "Used in [[Special:Preferences]].\n\nUsed as label for the checkbox to enable the visual editor and the new wikitext mode for writing and editing Flow comments.",
+	"flowattachment": "{{doc-special|FlowAttachment}} Serves files attached to Flow topics.",
+	"flow-error-attachment-login-required": "Error shown on Special:FlowAttachment when an anonymous user tries to download an attachment. Attachments are only available to registered users.",
+	"flow-error-attachment-not-found": "Error shown on Special:FlowAttachment when the requested attachment does not exist or the user is not allowed to see it (deliberately identical in both cases).",
+	"flow-error-attachment-bad-name": "API error shown when the uploaded file name contains no usable characters.",
+	"flow-attachment-upload-button": "Label of the button in the Flow editor toolbar that opens a file picker to attach a file to the post being written.",
+	"flow-attachment-uploading": "Progress notice shown in the Flow editor while an attachment is uploading. Parameters:\n* $1 - the file name",
+	"flow-attachment-upload-error": "Error shown in the Flow editor when uploading an attachment failed. Parameters:\n* $1 - the error message returned by the API",
+	"flow-attachment-upload-error-generic": "Error shown in the Flow editor when uploading an attachment failed and no reason is known.",
+	"flow-attachments-heading": "Heading of the attachment list panel shown at the top of a Flow topic.",
+	"flow-attachments-none": "Shown in the attachment list panel of a Flow topic that has no attachments.",
+	"flow-attachments-toggle-title": "Tooltip of the paperclip button in the Flow topic title bar that expands the list of attached files.",
+	"flow-attachment-restricted": "Placeholder shown in place of an attachment (file name and link hidden) when the viewer is not logged in. Attachments are only served to registered users.",
+	"flow-attachment-missing": "Shown in place of an inline attachment image whose file has been deleted.",
+	"flow-topic-action-attachments": "Entry in the topic context menu (ellipsis menu in the topic title bar) that toggles the list of files attached to the topic. Only shown to registered users."
 }

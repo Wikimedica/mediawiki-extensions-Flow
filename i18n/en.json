@@ -583,5 +583,19 @@
 	"flow-move-topic-invalid-destination": "\"$1\" is not a Flow discussion board.",
 	"flow-move-topic-same-board": "The topic is already on that board.",
 	"flow-move-topic-success": "Topic moved to [[$1]].",
-	"flow-move-topic-no-reason": "no reason given"
+	"flow-move-topic-no-reason": "no reason given",
+	"flowattachment": "Flow attachment",
+	"flow-error-attachment-login-required": "You must be logged in to view files attached to discussions.",
+	"flow-error-attachment-not-found": "The requested attachment does not exist or you are not allowed to view it.",
+	"flow-error-attachment-bad-name": "The file name is not valid.",
+	"flow-attachment-upload-button": "Attach a file",
+	"flow-attachment-uploading": "Uploading $1…",
+	"flow-attachment-upload-error": "The file could not be uploaded: $1",
+	"flow-attachment-upload-error-generic": "The file could not be uploaded.",
+	"flow-attachments-heading": "Attached files",
+	"flow-attachments-none": "No files are attached to this topic.",
+	"flow-attachments-toggle-title": "Show the files attached to this topic",
+	"flow-attachment-restricted": "Attached file — log in to view it",
+	"flow-attachment-missing": "Deleted attachment",
+	"flow-topic-action-attachments": "Attached files"
 }

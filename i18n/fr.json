@@ -585,5 +585,19 @@
 	"flow-move-topic-invalid-destination": "« $1 » n’est pas un tableau de discussion Flow.",
 	"flow-move-topic-same-board": "Le sujet est déjà sur ce tableau.",
 	"flow-move-topic-success": "Sujet déplacé vers [[$1]].",
-	"flow-move-topic-no-reason": "aucune raison fournie"
+	"flow-move-topic-no-reason": "aucune raison fournie",
+	"flowattachment": "Fichier joint Flow",
+	"flow-error-attachment-login-required": "Vous devez être connecté pour voir les fichiers joints aux discussions.",
+	"flow-error-attachment-not-found": "Le fichier joint demandé n’existe pas ou vous n’êtes pas autorisé à le voir.",
+	"flow-error-attachment-bad-name": "Le nom du fichier n’est pas valide.",
+	"flow-attachment-upload-button": "Joindre un fichier",
+	"flow-attachment-uploading": "Téléversement de $1…",
+	"flow-attachment-upload-error": "Le fichier n’a pas pu être téléversé : $1",
+	"flow-attachment-upload-error-generic": "Le fichier n’a pas pu être téléversé.",
+	"flow-attachments-heading": "Fichiers joints",
+	"flow-attachments-none": "Aucun fichier n’est joint à ce sujet.",
+	"flow-attachments-toggle-title": "Afficher les fichiers joints à ce sujet",
+	"flow-attachment-restricted": "Fichier joint — connectez-vous pour y accéder",
+	"flow-attachment-missing": "Fichier joint supprimé",
+	"flow-topic-action-attachments": "Fichiers joints"
 }

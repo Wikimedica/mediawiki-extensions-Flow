@@ -41,6 +41,17 @@
 			classes: [ 'flow-ui-editorControlsWidget-cancelButton' ]
 		} );
 
+		this.attachButton = new OO.ui.ButtonWidget( {
+			framed: false,
+			icon: 'attachment',
+			title: mw.msg( 'flow-attachment-upload-button' ),
+			label: mw.msg( 'flow-attachment-upload-button' ),
+			invisibleLabel: true,
+			classes: [ 'flow-ui-editorControlsWidget-attachButton' ]
+		} );
+		// Only shown for registered users; toggled on by EditorWidget
+		this.attachButton.toggle( false );
+
 		// Keyboard shortcut messages are provided by VE, so only do this when VE is installed
 		if ( mw.loader.getState( 'ext.visualEditor.mwcore' ) ) {
 			mw.loader.using( 'ext.visualEditor.mwcore' ).then( () => {
@@ -58,6 +69,7 @@
 		}
 
 		$buttons.append(
+			this.attachButton.$element,
 			this.cancelButton.$element,
 			this.saveButton.$element
 		);
@@ -65,6 +77,7 @@
 		// Events
 		this.saveButton.connect( this, { click: [ 'emit', 'save' ] } );
 		this.cancelButton.connect( this, { click: [ 'emit', 'cancel' ] } );
+		this.attachButton.connect( this, { click: [ 'emit', 'attach' ] } );
 
 		// Initialize
 		this.toggleSaveable( config.saveable !== undefined ? config.saveable : true );
@@ -108,6 +121,7 @@
 		if ( this.cancelButton && this.saveButton ) {
 			this.cancelButton.setDisabled( this.isDisabled() );
 			this.saveButton.setDisabled( this.isDisabled() || !this.saveable );
+			this.attachButton.setDisabled( this.isDisabled() );
 		}
 	};
 

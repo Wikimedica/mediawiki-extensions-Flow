@@ -107,8 +107,15 @@
 		// Events
 		this.editorControlsWidget.connect( this, {
 			cancel: 'onEditorControlsWidgetCancel',
-			save: 'onEditorControlsWidgetSave'
+			save: 'onEditorControlsWidgetSave',
+			attach: 'onAttachButtonClick'
 		} );
+
+		// File attachments: registered users can attach files to their post
+		// with the paperclip button, drag & drop, or paste.
+		if ( !mw.user.isAnon() ) {
+			this.setupAttachmentUpload();
+		}
 
 		this.$element.on( 'keydown', ( e ) => {
 			if ( e.which === OO.ui.Keys.ESCAPE ) {
@@ -160,6 +167,36 @@
 			mw.user.options.get( 'flow-visualeditor' ) &&
 			window.VisualEditorSupportCheck && VisualEditorSupportCheck()
 		);
+	};
+
+	/**
+	 * Convert links to Special:FlowAttachment that point at an image file
+	 * into <img> elements, so the image is displayed while editing. Links to
+	 * non-image attachments are left untouched.
+	 *
+	 * @param {string} html HTML content
+	 * @return {string} HTML content with attachment image links upgraded
+	 */
+	mw.flow.ui.EditorWidget.static.upgradeAttachmentLinks = function ( html ) {
+		if ( html.indexOf( 'FlowAttachment/' ) === -1 ) {
+			return html;
+		}
+		// Stored content may be a full document with an <html>/<head> wrapper
+		// (e.g. a <base> tag); preserve it in that case
+		const hasDocWrapper = /<html[\s>]|<head[\s>]|<body[\s>]/i.test( html );
+		const doc = new DOMParser().parseFromString( html, 'text/html' );
+		doc.querySelectorAll( 'a[href*="FlowAttachment/"]' ).forEach( ( link ) => {
+			const href = link.getAttribute( 'href' );
+			// The URL may carry the display size as a ?w=&h= query
+			if ( !/\.(png|jpe?g|gif|webp)(\?[^#]*)?$/i.test( href ) ) {
+				return;
+			}
+			const img = doc.createElement( 'img' );
+			img.setAttribute( 'src', href );
+			img.setAttribute( 'alt', link.textContent );
+			link.replaceWith( img );
+		} );
+		return hasDocWrapper ? doc.documentElement.outerHTML : doc.body.innerHTML;
 	};
 
 	/**
@@ -275,6 +312,11 @@
 		} else {
 			contentToLoad = '';
 			contentFormat = this.getPreferredFormat();
+		}
+		if ( contentFormat === 'html' && contentToLoad ) {
+			// Posts saved before inline attachment images existed store the
+			// image as a link; upgrade it so it displays while editing
+			contentToLoad = this.constructor.static.upgradeAttachmentLinks( contentToLoad );
 		}
 		this.target.setDefaultMode( contentFormat === 'html' ? 'visual' : 'source' );
 		this.target.loadContent( contentToLoad );
@@ -411,6 +453,234 @@
 		} else {
 			this.unbindBeforeUnloadHandler();
 			this.emit( 'cancel' );
+		}
+	};
+
+	/**
+	 * Wire up the paperclip button, the hidden file input, and capture-phase
+	 * drop/paste listeners. Capture phase is used so that files are handled
+	 * here in every editor mode, before VisualEditor's own data transfer
+	 * handlers (which would route images to the wiki-upload media dialog).
+	 *
+	 * @private
+	 */
+	mw.flow.ui.EditorWidget.prototype.setupAttachmentUpload = function () {
+		const element = this.$element[ 0 ];
+
+		// With VisualEditor, the attach button lives in the toolbar's
+		// "Insert" menu (mw.flow.ve.ui.AttachmentTool), which finds this
+		// widget through the DOM; the controls-row paperclip is only for the
+		// plain textarea editor.
+		this.$element.data( 'flowEditorWidget', this );
+		this.editorControlsWidget.attachButton.toggle( !this.useVE );
+
+		this.$fileInput = $( '<input>' )
+			.attr( { type: 'file', multiple: 'multiple' } )
+			.addClass( 'flow-ui-editorWidget-fileInput' )
+			.css( 'display', 'none' )
+			.on( 'change', this.onFileInputChange.bind( this ) );
+		this.$element.append( this.$fileInput );
+
+		element.addEventListener( 'dragover', this.onEditorDragOver.bind( this ), true );
+		element.addEventListener( 'drop', this.onEditorDrop.bind( this ), true );
+		element.addEventListener( 'paste', this.onEditorPaste.bind( this ), true );
+	};
+
+	/**
+	 * @private
+	 */
+	mw.flow.ui.EditorWidget.prototype.onAttachButtonClick = function () {
+		this.$fileInput.trigger( 'click' );
+	};
+
+	/**
+	 * @private
+	 */
+	mw.flow.ui.EditorWidget.prototype.onFileInputChange = function () {
+		const files = this.$fileInput[ 0 ].files;
+		if ( files && files.length ) {
+			this.uploadAttachments( Array.prototype.slice.call( files ) );
+		}
+		this.$fileInput.val( '' );
+	};
+
+	/**
+	 * @private
+	 * @param {DragEvent} e
+	 */
+	mw.flow.ui.EditorWidget.prototype.onEditorDragOver = function ( e ) {
+		const types = e.dataTransfer && e.dataTransfer.types;
+		if ( types && Array.prototype.indexOf.call( types, 'Files' ) !== -1 ) {
+			e.preventDefault();
+			e.stopPropagation();
+			e.dataTransfer.dropEffect = 'copy';
+		}
+	};
+
+	/**
+	 * @private
+	 * @param {DragEvent} e
+	 */
+	mw.flow.ui.EditorWidget.prototype.onEditorDrop = function ( e ) {
+		const files = e.dataTransfer && e.dataTransfer.files;
+		if ( files && files.length ) {
+			e.preventDefault();
+			e.stopPropagation();
+			this.uploadAttachments( Array.prototype.slice.call( files ) );
+		}
+	};
+
+	/**
+	 * @private
+	 * @param {ClipboardEvent} e
+	 */
+	mw.flow.ui.EditorWidget.prototype.onEditorPaste = function ( e ) {
+		const files = e.clipboardData && e.clipboardData.files;
+		if ( files && files.length ) {
+			e.preventDefault();
+			e.stopPropagation();
+			this.uploadAttachments( Array.prototype.slice.call( files ) );
+		}
+	};
+
+	/**
+	 * Upload files one after the other, inserting a link into the content
+	 * for each successful upload.
+	 *
+	 * @private
+	 * @param {File[]} files
+	 */
+	mw.flow.ui.EditorWidget.prototype.uploadAttachments = function ( files ) {
+		const widget = this;
+
+		this.error.toggle( false );
+		// Note: do NOT pushPending() here — pending disables the editor, and
+		// a disabled VE surface is read-only, which would silently reject the
+		// insertion of the uploaded attachment's link.
+		this.editorControlsWidget.attachButton.setDisabled( true );
+
+		files.reduce(
+			( promise, file ) => promise.then( () => widget.uploadAttachment( file ).then(
+				( attachment ) => {
+					widget.insertAttachment( attachment );
+				},
+				( errorMsg ) => {
+					widget.error.setLabel(
+						errorMsg ?
+							mw.msg( 'flow-attachment-upload-error', errorMsg ) :
+							mw.msg( 'flow-attachment-upload-error-generic' )
+					);
+					widget.error.toggle( true );
+				}
+			) ),
+			$.Deferred().resolve().promise()
+		).always( () => {
+			widget.editorControlsWidget.attachButton.setDisabled( false );
+		} );
+	};
+
+	/**
+	 * Upload a single file through the flow-attachment-upload API.
+	 *
+	 * @private
+	 * @param {File} file
+	 * @return {jQuery.Promise} Resolves with the attachment data returned by
+	 *  the API ({id, name, url, isImage, ...}), rejects with an error message.
+	 */
+	mw.flow.ui.EditorWidget.prototype.uploadAttachment = function ( file ) {
+		return new mw.Api().getToken( 'csrf' )
+			.then( ( token ) => {
+				const data = new FormData();
+				data.append( 'action', 'flow-attachment-upload' );
+				data.append( 'format', 'json' );
+				data.append( 'formatversion', '2' );
+				data.append( 'errorformat', 'plaintext' );
+				data.append( 'page', mw.config.get( 'wgPageName' ) );
+				data.append( 'name', file.name || 'file' );
+				data.append( 'file', file );
+				data.append( 'token', token );
+				return $.ajax( {
+					url: mw.util.wikiScript( 'api' ),
+					method: 'POST',
+					data: data,
+					processData: false,
+					contentType: false
+				} );
+			} )
+			.then( ( response ) => {
+				if ( !response || response.errors || !response[ 'flow-attachment-upload' ] ) {
+					const error = response && response.errors && response.errors[ 0 ];
+					return $.Deferred().reject( error && ( error.text || error.code ) ).promise();
+				}
+				return response[ 'flow-attachment-upload' ];
+			}, () => $.Deferred().reject().promise() );
+	};
+
+	/**
+	 * Insert a link to an uploaded attachment at the cursor. The link target
+	 * is Special:FlowAttachment; the server upgrades it at render time to an
+	 * inline image or an attachment card.
+	 *
+	 * @private
+	 * @param {Object} attachment Attachment data from the API
+	 */
+	mw.flow.ui.EditorWidget.prototype.insertAttachment = function ( attachment ) {
+		const wikitext = '[' + attachment.url + ' ' + attachment.name + ']';
+
+		if ( !this.useVE ) {
+			this.input.insertContent( ' ' + wikitext + ' ' );
+			return;
+		}
+
+		const surface = this.target && this.target.getSurface();
+		if ( !surface ) {
+			return;
+		}
+
+		// A drop or paste can arrive while the editor was never focused, in
+		// which case there is no selection to insert at: go to the end.
+		if ( surface.getModel().getSelection().isNull() ) {
+			surface.getView().selectLastSelectableContentOffset();
+		}
+
+		if ( surface.getMode() === 'source' ) {
+			surface.getModel().getFragment()
+				.insertContent( ' ' + wikitext + ' ' )
+				.collapseToEnd()
+				.select();
+		} else if ( attachment.isImage ) {
+			// Insert the actual image so it displays while editing. It is
+			// stored as a plain <img> and upgraded at render time by the
+			// server-side AttachmentFixer.
+			surface.getModel().getFragment()
+				.insertContent( [
+					{
+						type: 'flowAttachmentImage',
+						attributes: {
+							src: attachment.url,
+							alt: attachment.name
+						}
+					},
+					{ type: '/flowAttachmentImage' },
+					' '
+				] )
+				.collapseToEnd()
+				.select();
+		} else {
+			// Insert the file name as text pre-annotated with an external
+			// link to the attachment, followed by a plain space
+			const surfaceModel = surface.getModel();
+			const annotation = ve.dm.annotationFactory.createFromElement( {
+				type: 'link/mwExternal',
+				attributes: { href: attachment.url }
+			} );
+			const hash = surfaceModel.getDocument().getStore().hash( annotation );
+			const content = attachment.name.split( '' ).map( ( char ) => [ char, [ hash ] ] );
+			content.push( ' ' );
+			surfaceModel.getFragment()
+				.insertContent( content )
+				.collapseToEnd()
+				.select();
 		}
 	};
 

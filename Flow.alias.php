@@ -11,6 +11,7 @@ $specialPageAliases = [];
 $specialPageAliases['en'] = [
 	'StructuredDiscussions' => [ 'StructuredDiscussions', 'Flow' ],
 	'EnableStructuredDiscussions' => [ 'EnableStructuredDiscussions', 'EnableFlow' ],
+	'FlowAttachment' => [ 'FlowAttachment' ],
 ];
 
 /** Arabic (العربية) */

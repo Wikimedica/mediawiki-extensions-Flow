@@ -28,7 +28,9 @@
 	"callback": "Flow\\Hooks::registerExtension",
 	"APIModules": {
 		"flow-parsoid-utils": "Flow\\Api\\ApiParsoidUtilsFlow",
-		"flow": "Flow\\Api\\ApiFlow"
+		"flow": "Flow\\Api\\ApiFlow",
+		"flow-attachment-upload": "Flow\\Api\\ApiFlowAttachmentUpload",
+		"flow-attachment-list": "Flow\\Api\\ApiFlowAttachmentList"
 	},
 	"APIPropModules": {
 		"flowinfo": "Flow\\Api\\ApiQueryPropFlowInfo"
@@ -124,7 +126,8 @@
 	},
 	"SpecialPages": {
 		"StructuredDiscussions": "Flow\\Specials\\SpecialStructuredDiscussions",
-		"EnableStructuredDiscussions": "Flow\\Specials\\SpecialEnableStructuredDiscussions"
+		"EnableStructuredDiscussions": "Flow\\Specials\\SpecialEnableStructuredDiscussions",
+		"FlowAttachment": "Flow\\Specials\\SpecialFlowAttachment"
 	},
 	"MessagesDirs": {
 		"Flow": [
@@ -262,6 +265,7 @@
 				"flow-topic-action-history",
 				"flow-topic-action-resummarize-topic",
 				"flow-topic-action-summarize-topic",
+				"flow-topic-action-attachments",
 				"flow-topic-action-update-topic-summary",
 				"flow-topic-action-unlock-topic",
 				"flow-topic-action-suppress-topic",
@@ -386,7 +390,8 @@
 				"styles/board/topic/meta.less",
 				"styles/board/topic/post.less",
 				"styles/board/topic/summary.less",
-				"styles/board/topic/watchlist.less"
+				"styles/board/topic/watchlist.less",
+				"styles/board/attachments.less"
 			]
 		},
 		"mediawiki.template.handlebars": {
@@ -449,6 +454,7 @@
 				"flow/ui/widgets/mw.flow.ui.EditPostWidget.js",
 				"flow/ui/widgets/mw.flow.ui.EditTopicSummaryWidget.js",
 				"flow/ui/widgets/mw.flow.ui.SidebarExpandWidget.js",
+				"flow/ui/widgets/mw.flow.ui.AttachmentListWidget.js",
 				"flow/ui/widgets/mw.flow.ui.NewTopicWidget.js",
 				"flow/ui/widgets/mw.flow.ui.TopicTitleWidget.js",
 				"flow/ui/widgets/editor/mw.flow.ui.AnonWarningWidget.js",
@@ -465,6 +471,7 @@
 				"styles/flow/widgets/mw.flow.ui.ReorderTopicsWidget.less",
 				"styles/flow/widgets/mw.flow.ui.ReplyWidget.less",
 				"styles/flow/widgets/mw.flow.ui.SidebarExpandWidget.less",
+				"styles/flow/widgets/mw.flow.ui.AttachmentListWidget.less",
 				"styles/flow/widgets/mw.flow.ui.NewTopicWidget.less",
 				"styles/flow/widgets/editor/mw.flow.ui.AnonWarningWidget.less",
 				"styles/flow/widgets/editor/mw.flow.ui.CanNotEditWidget.less",
@@ -501,6 +508,13 @@
 				"flow-dialog-cancelconfirm-discard",
 				"flow-spam-confirmedit-using-failure",
 				"flow-cancel-warning",
+				"flow-attachment-upload-button",
+				"flow-attachment-uploading",
+				"flow-attachment-upload-error",
+				"flow-attachment-upload-error-generic",
+				"flow-attachments-heading",
+				"flow-attachments-none",
+				"flow-attachments-toggle-title",
 				"red-link-title",
 				"pagecategories",
 				"colon-separator"
@@ -578,9 +592,12 @@
 			"scripts": [
 				"editor/editors/visualeditor/mw.flow.ve.Target.js",
 				"editor/editors/visualeditor/mw.flow.ve.UserCache.js",
+				"editor/editors/visualeditor/mw.flow.ve.dm.AttachmentImageNode.js",
+				"editor/editors/visualeditor/mw.flow.ve.ce.AttachmentImageNode.js",
 				"editor/editors/visualeditor/ui/inspectors/mw.flow.ve.ui.MentionInspector.js",
 				"editor/editors/visualeditor/ui/tools/mw.flow.ve.ui.MentionInspectorTool.js",
 				"editor/editors/visualeditor/ui/tools/mw.flow.ve.ui.MWEditModeTool.js",
+				"editor/editors/visualeditor/ui/tools/mw.flow.ve.ui.AttachmentTool.js",
 				"editor/editors/visualeditor/ui/contextitem/mw.flow.ve.ui.MentionContextItem.js",
 				"editor/editors/visualeditor/ui/widgets/mw.flow.ve.ui.MentionTargetInputWidget.js",
 				"editor/editors/visualeditor/mw.flow.ve.CommandRegistry.js",
@@ -610,7 +627,8 @@
 				"flow-ve-mention-inspector-remove-label",
 				"flow-ve-mention-inspector-invalid-user",
 				"flow-ve-mention-placeholder",
-				"flow-ve-mention-tool-title"
+				"flow-ve-mention-tool-title",
+				"flow-attachment-upload-button"
 			],
 			"targets": [
 				"mobile"
@@ -620,9 +638,12 @@
 			"scripts": [
 				"editor/editors/visualeditor/mw.flow.ve.Target.js",
 				"editor/editors/visualeditor/mw.flow.ve.UserCache.js",
+				"editor/editors/visualeditor/mw.flow.ve.dm.AttachmentImageNode.js",
+				"editor/editors/visualeditor/mw.flow.ve.ce.AttachmentImageNode.js",
 				"editor/editors/visualeditor/ui/inspectors/mw.flow.ve.ui.MentionInspector.js",
 				"editor/editors/visualeditor/ui/tools/mw.flow.ve.ui.MentionInspectorTool.js",
 				"editor/editors/visualeditor/ui/tools/mw.flow.ve.ui.MWEditModeTool.js",
+				"editor/editors/visualeditor/ui/tools/mw.flow.ve.ui.AttachmentTool.js",
 				"editor/editors/visualeditor/ui/contextitem/mw.flow.ve.ui.MentionContextItem.js",
 				"editor/editors/visualeditor/ui/widgets/mw.flow.ve.ui.MentionTargetInputWidget.js",
 				"editor/editors/visualeditor/mw.flow.ve.CommandRegistry.js",
@@ -652,7 +673,8 @@
 				"flow-ve-mention-inspector-remove-label",
 				"flow-ve-mention-inspector-invalid-user",
 				"flow-ve-mention-placeholder",
-				"flow-ve-mention-tool-title"
+				"flow-ve-mention-tool-title",
+				"flow-attachment-upload-button"
 			]
 		},
 		"ext.flow.visualEditor.icons": {
@@ -923,6 +945,10 @@
 		},
 		"FlowReadOnly": {
 			"value": false
+		},
+		"FlowAttachmentBackend": {
+			"value": null,
+			"description": "Name of a $wgFileBackends backend to store Flow topic attachments in. When null, a private FSFileBackend under $wgUploadDirectory/flow_attachments is used. The storage location must not be directly web-accessible: files are only served through Special:FlowAttachment."
 		}
 	},
 	"load_composer_autoloader": true,

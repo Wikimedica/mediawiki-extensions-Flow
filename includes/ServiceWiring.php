@@ -1,5 +1,6 @@
 <?php
 
+use Flow\Attachment\AttachmentStore;
 use Flow\Data\FlowObjectCache;
 use Flow\Data\Index\TopKIndex;
 use Flow\Data\Index\UniqueFeatureIndex;
@@ -31,6 +32,7 @@ use Flow\Import\OptInController;
 use Flow\Notifications\Controller as NotificationsController;
 use Flow\OccupationController;
 use Flow\Parsoid\ContentFixer;
+use Flow\Parsoid\Fixer\AttachmentFixer;
 use Flow\Parsoid\Fixer\BadImageRemover;
 use Flow\Parsoid\Fixer\BaseHrefFixer;
 use Flow\Parsoid\Fixer\ExtLinkFixer;
@@ -71,6 +73,33 @@ return [
 		// Flow configuration
 		return new FlowActions(
 			require __DIR__ . '/../FlowActions.php'
+		);
+	},
+
+	'FlowAttachmentStore' => static function ( MediaWikiServices $services ): AttachmentStore {
+		$config = $services->getMainConfig();
+		$backendName = $config->get( 'FlowAttachmentBackend' );
+		if ( $backendName ) {
+			$backend = $services->getFileBackendGroup()->get( $backendName );
+		} else {
+			// Default: a private FS backend below the upload directory. The
+			// directory is protected with .htaccess (see AttachmentStore::insert)
+			// but should also be excluded from web serving at the server level.
+			$backend = new \Wikimedia\FileBackend\FSFileBackend( [
+				'name' => 'flow-attachments-backend',
+				'wikiId' => \MediaWiki\WikiMap\WikiMap::getCurrentWikiId(),
+				'containerPaths' => [
+					AttachmentStore::CONTAINER =>
+						$config->get( 'UploadDirectory' ) . '/flow_attachments',
+				],
+				'fileMode' => 0644,
+				'obResetFunc' => 'wfResetOutputBuffers',
+			] );
+		}
+
+		return new AttachmentStore(
+			$services->getService( 'FlowDbFactory' ),
+			$backend
 		);
 	},
 
@@ -467,7 +496,8 @@ return [
 			$wikiLinkFixer,
 			$badImageRemover,
 			new BaseHrefFixer( $wgArticlePath, $services->getUrlUtils() ),
-			new ExtLinkFixer( $services->getUrlUtils() )
+			new ExtLinkFixer( $services->getUrlUtils() ),
+			new AttachmentFixer( $services->getService( 'FlowAttachmentStore' ) )
 		);
 
 		return new Templating(

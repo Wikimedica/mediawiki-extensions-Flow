@@ -119,5 +119,11 @@
 	"apihelp-flow+undo-edit-topic-summary-param-endId": "Revision ID to end undo at.",
 	"apihelp-flow+undo-edit-topic-summary-example-1": "Fetch information about undoing a topic summary edit in a specific topic",
 	"apierror-flow-safeallowcreationfailed": "Page provided does not have Structured Discussions enabled and safeAllowCreation failed with: $1",
-	"apierror-flow-notenabled": "Page provided does not have Structured Discussions enabled."
+	"apierror-flow-notenabled": "Page provided does not have Structured Discussions enabled.",
+	"apihelp-flow-attachment-upload-summary": "Upload a file attached to a Structured Discussions topic. The file is scoped to the topic and served only through Special:FlowAttachment.",
+	"apihelp-flow-attachment-upload-param-page": "Topic to attach the file to (e.g. a Topic:… page), or the board page while composing a new topic.",
+	"apihelp-flow-attachment-upload-param-name": "File name to store; defaults to the name of the uploaded file.",
+	"apihelp-flow-attachment-upload-param-file": "File contents, posted as multipart/form-data.",
+	"apihelp-flow-attachment-list-summary": "List the files attached to a Structured Discussions topic.",
+	"apihelp-flow-attachment-list-param-page": "The Topic:… page to list attachments for."
 }
