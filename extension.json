@@ -946,6 +946,10 @@
 		"FlowReadOnly": {
 			"value": false
 		},
+		"FlowAttachmentOrphanAge": {
+			"value": 604800,
+			"description": "Age in seconds after which an attachment that was uploaded but never referenced by a saved post is deleted by the opportunistic cleanup. Should be generous: editor drafts are kept in the browser and may be saved days after their attachments were uploaded."
+		},
 		"FlowAttachmentBackend": {
 			"value": null,
 			"description": "Name of a $wgFileBackends backend to store Flow topic attachments in. When null, a private FSFileBackend under $wgUploadDirectory/flow_attachments is used. The storage location must not be directly web-accessible: files are only served through Special:FlowAttachment."

@@ -24,6 +24,12 @@ use Wikimedia\ParamValidator\ParamValidator;
  */
 class ApiFlowAttachmentUpload extends ApiBase {
 
+	/**
+	 * One out of this many uploads schedules a deferred cleanup of orphaned
+	 * attachments (uploads whose draft was abandoned before saving).
+	 */
+	private const ORPHAN_CLEANUP_CHANCE = 50;
+
 	public function __construct( ApiMain $main, string $action ) {
 		parent::__construct( $main, $action );
 	}
@@ -123,6 +129,19 @@ class ApiFlowAttachmentUpload extends ApiBase {
 		}
 
 		$this->getResult()->addValue( null, $this->getModuleName(), $attachment->toApiArray() );
+
+		// Opportunistic garbage collection: once in a while, clean up old
+		// orphaned uploads after the response has been sent. The age
+		// threshold is generous because drafts (kept in the browser) may be
+		// resumed and saved days after their attachments were uploaded.
+		if ( mt_rand( 1, self::ORPHAN_CLEANUP_CHANCE ) === 1 ) {
+			$maxAge = (int)$config->get( 'FlowAttachmentOrphanAge' );
+			\MediaWiki\Deferred\DeferredUpdates::addCallableUpdate( static function () use ( $maxAge ) {
+				/** @var \Flow\Attachment\AttachmentStore $store */
+				$store = MediaWikiServices::getInstance()->getService( 'FlowAttachmentStore' );
+				$store->deleteOrphansBefore( wfTimestamp( TS_MW, time() - $maxAge ) );
+			} );
+		}
 	}
 
 	/**

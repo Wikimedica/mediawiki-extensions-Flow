@@ -156,6 +156,39 @@ class AttachmentStore {
 	}
 
 	/**
+	 * Delete a batch of orphaned attachments: uploads that were never bound
+	 * to a saved post and are older than the given timestamp (i.e. their
+	 * draft was abandoned). Called opportunistically from a deferred update
+	 * scheduled by a random fraction of uploads.
+	 *
+	 * @param string $timestamp Delete orphans uploaded before this timestamp
+	 *  (any format accepted by wfTimestamp)
+	 * @param int $limit Maximum number of attachments to delete in this batch
+	 * @return int Number of attachments deleted
+	 */
+	public function deleteOrphansBefore( string $timestamp, int $limit = 50 ): int {
+		$res = $this->dbFactory->getDB( DB_REPLICA )->newSelectQueryBuilder()
+			->select( '*' )
+			->from( 'flow_topic_attachment' )
+			->where( [
+				'fa_post_id' => null,
+				$this->dbFactory->getDB( DB_REPLICA )->expr(
+					'fa_id', '<', UUID::getComparisonUUID( $timestamp )->getBinary()
+				),
+			] )
+			->limit( $limit )
+			->caller( __METHOD__ )
+			->fetchResultSet();
+
+		$deleted = 0;
+		foreach ( $res as $row ) {
+			$this->delete( TopicAttachment::fromStorageRow( $row ) );
+			$deleted++;
+		}
+		return $deleted;
+	}
+
+	/**
 	 * Permanently remove an attachment: the file and its metadata row.
 	 */
 	public function delete( TopicAttachment $attachment ): void {

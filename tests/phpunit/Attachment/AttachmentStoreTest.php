@@ -114,6 +114,29 @@ class AttachmentStoreTest extends FlowTestCase {
 		$this->assertTrue( true );
 	}
 
+	public function testDeleteOrphansBefore() {
+		$store = $this->newStore();
+
+		$orphan = $this->newAttachment();
+		$store->insert( $orphan, $this->makeTempFile() );
+
+		$bound = $this->newAttachment();
+		$store->insert( $bound, $this->makeTempFile() );
+		$store->associateWithPost( [ $bound->getId() ], UUID::create(), $bound->getWorkflowId() );
+
+		// A cutoff in the past deletes nothing
+		$this->assertSame( 0, $store->deleteOrphansBefore( wfTimestamp( TS_MW, time() - 3600 ) ) );
+		$this->assertNotNull( $store->getById( $orphan->getId() ) );
+
+		// A cutoff in the future deletes the orphan but not the bound one
+		$this->assertSame( 1, $store->deleteOrphansBefore( wfTimestamp( TS_MW, time() + 3600 ) ) );
+		$this->assertNull( $store->getById( $orphan->getId() ) );
+		$this->assertNotNull( $store->getById( $bound->getId() ) );
+		$this->assertFalse(
+			$store->getBackend()->fileExists( [ 'src' => $store->getStoragePath( $orphan ) ] )
+		);
+	}
+
 	public function testDelete() {
 		$store = $this->newStore();
 		$attachment = $this->newAttachment();
