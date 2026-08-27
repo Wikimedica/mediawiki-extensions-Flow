@@ -271,9 +271,19 @@ class BoardContentHandler extends ContentHandler {
 			$boardTitle = $this->getBoardTitle( $title );
 			if ( $boardTitle ) {
 				$fields['board_namespace'] = $boardTitle->getNamespace();
+				$inherited = $this->getCategories( $boardTitle );
+				// A board on a talk page holds the discussions of its subject
+				// page, and that is where the categories are: inherit them so
+				// incategory: on the subject's categories reaches the topics.
+				if ( $boardTitle->isTalkPage() ) {
+					$inherited = array_merge(
+						$inherited,
+						$this->getCategories( $boardTitle->getSubjectPage() )
+					);
+				}
 				$fields['category'] = array_values( array_unique( array_merge(
 					$fields['category'] ?? [],
-					$this->getCategories( $boardTitle )
+					$inherited
 				) ) );
 			}
 		} else {
