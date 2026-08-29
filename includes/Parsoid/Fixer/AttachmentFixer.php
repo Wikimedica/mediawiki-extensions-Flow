@@ -58,7 +58,10 @@ class AttachmentFixer implements Fixer {
 		if ( !RequestContext::getMain()->getUser()->isRegistered() ) {
 			$doc = $node->ownerDocument;
 			$placeholder = $doc->createElement( 'span' );
-			$placeholder->setAttribute( 'class', 'flow-attachment flow-attachment-placeholder' );
+			// navigation-not-searchable: attachment chrome is not post text,
+			// keep it out of the search index (see WikiTextStructure)
+			$placeholder->setAttribute( 'class',
+				'flow-attachment flow-attachment-placeholder navigation-not-searchable' );
 
 			$icon = $doc->createElement( 'span' );
 			$icon->setAttribute( 'class', 'flow-attachment-card-icon' );
@@ -77,7 +80,7 @@ class AttachmentFixer implements Fixer {
 			// <img> so no broken image is shown
 			$doc = $node->ownerDocument;
 			$missing = $doc->createElement( 'span' );
-			$missing->setAttribute( 'class', 'flow-attachment-missing' );
+			$missing->setAttribute( 'class', 'flow-attachment-missing navigation-not-searchable' );
 			$missing->appendChild( $doc->createTextNode(
 				$node->nodeName === 'img' ?
 					wfMessage( 'flow-attachment-missing' )->text() :
@@ -95,7 +98,8 @@ class AttachmentFixer implements Fixer {
 		$link->setAttribute( 'rel', 'noreferrer noopener' );
 
 		if ( $attachment->isInlineImage() ) {
-			$link->setAttribute( 'class', 'flow-attachment flow-attachment-image' );
+			$link->setAttribute( 'class',
+				'flow-attachment flow-attachment-image navigation-not-searchable' );
 			$link->setAttribute( 'target', '_blank' );
 			$link->setAttribute( 'title', $attachment->getName() );
 			$img = $doc->createElement( 'img' );
@@ -117,7 +121,8 @@ class AttachmentFixer implements Fixer {
 			$link->appendChild( $img );
 		} else {
 			$lang = RequestContext::getMain()->getLanguage();
-			$link->setAttribute( 'class', 'flow-attachment flow-attachment-card' );
+			$link->setAttribute( 'class',
+				'flow-attachment flow-attachment-card navigation-not-searchable' );
 			$link->setAttribute( 'download', $attachment->getName() );
 
 			$icon = $doc->createElement( 'span' );
