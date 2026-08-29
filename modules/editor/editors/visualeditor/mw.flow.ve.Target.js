@@ -86,6 +86,13 @@
 		var toolBar = ve.init.mw.Target.static.toolbarGroups;
 		toolBar.shift(); // Remove the undo/redo buttons to save space.
 
+		// Show "Joindre un fichier" first in the Insert menu
+		toolBar.forEach( function ( group ) {
+			if ( group.name === 'insert' ) {
+				group.promote = [ 'flowAttachment' ].concat( group.promote || [] );
+			}
+		} );
+
 	        mw.flow.ve.Target.static.toolbarGroups = [{name: 'flowMention', include: ['flowMention']}].concat(toolBar).concat([{
                         "name": "editMode",
                         "align": "after",
