@@ -86,10 +86,12 @@
 		var toolBar = ve.init.mw.Target.static.toolbarGroups;
 		toolBar.shift(); // Remove the undo/redo buttons to save space.
 
-		// Show "Joindre un fichier" first in the Insert menu
+		// Show "Joindre un fichier" first in the Insert menu, and keep it
+		// visible when the list is collapsed behind "More"
 		toolBar.forEach( function ( group ) {
 			if ( group.name === 'insert' ) {
 				group.promote = [ 'flowAttachment' ].concat( group.promote || [] );
+				group.forceExpand = [ 'flowAttachment' ].concat( group.forceExpand || [] );
 			}
 		} );
 
