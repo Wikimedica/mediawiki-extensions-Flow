@@ -189,7 +189,7 @@
 	 * @return {jQuery.Promise} Promise that is resolved with the id of the workflow
 	 *  that this reply belongs to
 	 */
-	mw.flow.dm.APIHandler.prototype.saveReply = function ( topicId, replyTo, content, format, captcha ) {
+	mw.flow.dm.APIHandler.prototype.saveReply = function ( topicId, replyTo, content, format, captcha, isPrivate ) {
 		let api = new mw.Api(),
 			params = {
 				action: 'flow',
@@ -199,6 +199,11 @@
 				repcontent: content,
 				repformat: format
 			};
+
+		if ( isPrivate ) {
+			// Start a restricted (private) branch with this reply
+			params.repprivate = 1;
+		}
 
 		params = api.assertCurrentUser( params );
 		this.addCaptcha( params, captcha );
@@ -216,7 +221,7 @@
 	 * @param {Object} [captcha] CAPTCHA information
 	 * @return {jQuery.Promise} Promise that is resolved with the new topic id
 	 */
-	mw.flow.dm.APIHandler.prototype.saveNewTopic = function ( title, content, format, captcha ) {
+	mw.flow.dm.APIHandler.prototype.saveNewTopic = function ( title, content, format, captcha, isPrivate ) {
 		let api = new mw.Api(),
 			params = {
 				submodule: 'new-topic',
@@ -225,6 +230,11 @@
 				ntcontent: content,
 				ntformat: format
 			};
+
+		if ( isPrivate ) {
+			// Create the topic born restricted (private conversation)
+			params.ntprivate = 1;
+		}
 
 		params = api.assertCurrentUser( params );
 		this.addCaptcha( params, captcha );

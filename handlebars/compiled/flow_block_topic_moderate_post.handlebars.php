@@ -46,6 +46,31 @@
 '.$sp.'	</div>
 '.$sp.'</form>
 ';},
+'flow_anon_warning' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'<div class="flow-anon-warning">
+'.$sp.'	<div class="flow-anon-warning-mobile">
+'.$sp.''.LR::hbbch($cx, 'tooltip', array(array(),array('positionClass'=>'down','contextClass'=>'progressive','extraClass'=>'flow-form-collapsible','isBlock'=>true)), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::encq($cx, LR::hbch($cx, 'l10nParse', array(array('flow-anon-warning',LR::hbch($cx, 'linkWithReturnTo', array(array('Special:UserLogin'),array()), 'raw', $in),LR::hbch($cx, 'linkWithReturnTo', array(array('Special:UserLogin/signup'),array()), 'raw', $in)),array()), 'encq', $in)).'';}).'	</div>
+'.$sp.'
+'.$sp.''.LR::hbbch($cx, 'progressiveEnhancement', array(array(),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return '		<div class="flow-anon-warning-desktop">
+'.$sp.''.LR::hbbch($cx, 'tooltip', array(array(),array('positionClass'=>'left','contextClass'=>'progressive','extraClass'=>'flow-form-collapsible','isBlock'=>true)), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::encq($cx, LR::hbch($cx, 'l10nParse', array(array('flow-anon-warning',LR::hbch($cx, 'linkWithReturnTo', array(array('Special:UserLogin'),array()), 'raw', $in),LR::hbch($cx, 'linkWithReturnTo', array(array('Special:UserLogin/signup'),array()), 'raw', $in)),array()), 'encq', $in)).'';}).'		</div>
+'.$sp.'';}).'</div>
+';},
+'flow_edit_post' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'<form class="flow-edit-post-form"
+'.$sp.'	method="POST"
+'.$sp.'	action="'.LR::encq($cx, ((isset($in['actions']['edit']) && is_array($in['actions']['edit']) && isset($in['actions']['edit']['url'])) ? $in['actions']['edit']['url'] : null)).'"
+'.$sp.'>
+'.$sp.''.LR::p($cx, 'flow_errors', array(array($in),array()),0, '	').'	<input type="hidden" name="wpEditToken" value="'.LR::encq($cx, (isset($cx['sp_vars']['root']['rootBlock']['editToken']) ? $cx['sp_vars']['root']['rootBlock']['editToken'] : null)).'" />
+'.$sp.'	<input type="hidden" name="topic_prev_revision" value="'.LR::encq($cx, (($inary && isset($in['revisionId'])) ? $in['revisionId'] : null)).'" />
+'.$sp.''.LR::hbbch($cx, 'ifAnonymous', array(array(),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_anon_warning', array(array($in),array()),0, '		').'';}).'
+'.$sp.'	<div class="flow-editor">
+'.$sp.'		<textarea name="topic_content" class="mw-ui-input flow-form-collapsible mw-editfont-'.LR::encq($cx, (isset($cx['sp_vars']['root']['rootBlock']['editFont']) ? $cx['sp_vars']['root']['rootBlock']['editFont'] : null)).'" data-role="content">'.((LR::ifvar($cx, (isset($cx['sp_vars']['root']['rootBlock']['submitted']['content']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['content'] : null), false)) ? ''.LR::encq($cx, (isset($cx['sp_vars']['root']['rootBlock']['submitted']['content']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['content'] : null)).'' : ''.LR::encq($cx, ((isset($in['content']) && is_array($in['content']) && isset($in['content']['content'])) ? $in['content']['content'] : null)).'').'</textarea>
+'.$sp.'	</div>
+'.$sp.'
+'.$sp.'	<div class="flow-form-actions flow-form-collapsible">
+'.$sp.'		<button class="mw-ui-button mw-ui-progressive">'.LR::encq($cx, LR::hbch($cx, 'getSaveOrPublishMessage', array(array(),array('save'=>'flow-post-action-edit-post-submit','publish'=>'flow-post-action-edit-post-submit-publish')), 'encq', $in)).'</button>
+'.$sp.'		<small class="flow-terms-of-use plainlinks">'.LR::encq($cx, LR::hbch($cx, 'l10nParseFlowTermsOfUse', array(array('edit'),array()), 'encq', $in)).'</small>
+'.$sp.'	</div>
+'.$sp.'</form>
+';},
 'flow_post_author' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'<span class="flow-author">
 '.$sp.''.((LR::ifvar($cx, (($inary && isset($in['links'])) ? $in['links'] : null), false)) ? ''.((LR::ifvar($cx, ((isset($in['links']) && is_array($in['links']) && isset($in['links']['userpage'])) ? $in['links']['userpage'] : null), false)) ? '			<a href="'.LR::encq($cx, ((isset($in['links']['userpage']) && is_array($in['links']['userpage']) && isset($in['links']['userpage']['url'])) ? $in['links']['userpage']['url'] : null)).'"
 '.$sp.'			   '.((!LR::ifvar($cx, (($inary && isset($in['name'])) ? $in['name'] : null), false)) ? 'title="'.LR::encq($cx, ((isset($in['links']['userpage']) && is_array($in['links']['userpage']) && isset($in['links']['userpage']['title'])) ? $in['links']['userpage']['title'] : null)).'"' : '').'
@@ -139,7 +164,15 @@
 '.$sp.'			   href="'.LR::encq($cx, ((isset($in['actions']['unsuppress']) && is_array($in['actions']['unsuppress']) && isset($in['actions']['unsuppress']['url'])) ? $in['actions']['unsuppress']['url'] : null)).'"
 '.$sp.'			   data-flow-interactive-handler="moderationDialog"
 '.$sp.'			   data-flow-template="flow_moderate_'.LR::encq($cx, (($inary && isset($in['moderationTemplate'])) ? $in['moderationTemplate'] : null)).'.partial"
-'.$sp.'			   data-role="unsuppress">'.((LR::ifvar($cx, (($inary && isset($in['moderationIcons'])) ? $in['moderationIcons'] : null), false)) ? '<span class="mw-ui-icon mw-ui-icon-before mw-ui-icon-block"><span>' : '').''.LR::encq($cx, LR::hbch($cx, 'l10n', array(array(LR::hbch($cx, 'concat', array(array('flow-',(($inary && isset($in['moderationType'])) ? $in['moderationType'] : null),'-action-unsuppress-',(($inary && isset($in['moderationTemplate'])) ? $in['moderationTemplate'] : null)),array()), 'raw', $in)),array()), 'encq', $in)).''.((LR::ifvar($cx, (($inary && isset($in['moderationIcons'])) ? $in['moderationIcons'] : null), false)) ? '</span></span>' : '').'</a>'.LR::encq($cx, (($inary && isset($in['noop'])) ? $in['noop'] : null)).'</li>' : '').'</section>
+'.$sp.'			   data-role="unsuppress">'.((LR::ifvar($cx, (($inary && isset($in['moderationIcons'])) ? $in['moderationIcons'] : null), false)) ? '<span class="mw-ui-icon mw-ui-icon-before mw-ui-icon-block"><span>' : '').''.LR::encq($cx, LR::hbch($cx, 'l10n', array(array(LR::hbch($cx, 'concat', array(array('flow-',(($inary && isset($in['moderationType'])) ? $in['moderationType'] : null),'-action-unsuppress-',(($inary && isset($in['moderationTemplate'])) ? $in['moderationTemplate'] : null)),array()), 'raw', $in)),array()), 'encq', $in)).''.((LR::ifvar($cx, (($inary && isset($in['moderationIcons'])) ? $in['moderationIcons'] : null), false)) ? '</span></span>' : '').'</a>'.LR::encq($cx, (($inary && isset($in['noop'])) ? $in['noop'] : null)).'</li>' : '').''.((LR::ifvar($cx, ((isset($in['actions']) && is_array($in['actions']) && isset($in['actions']['restrict'])) ? $in['actions']['restrict'] : null), false)) ? '<li>'.LR::encq($cx, (($inary && isset($in['noop'])) ? $in['noop'] : null)).'<a class="'.LR::encq($cx, (($inary && isset($in['moderationMwUiClass'])) ? $in['moderationMwUiClass'] : null)).' mw-ui-quiet"
+'.$sp.'			   href="'.LR::encq($cx, ((isset($in['actions']['restrict']) && is_array($in['actions']['restrict']) && isset($in['actions']['restrict']['url'])) ? $in['actions']['restrict']['url'] : null)).'"
+'.$sp.'			   data-flow-interactive-handler="moderationDialog"
+'.$sp.'			   data-flow-template="flow_moderate_'.LR::encq($cx, (($inary && isset($in['moderationTemplate'])) ? $in['moderationTemplate'] : null)).'.partial"
+'.$sp.'			   data-role="restrict">'.((LR::ifvar($cx, (($inary && isset($in['moderationIcons'])) ? $in['moderationIcons'] : null), false)) ? '<span class="mw-ui-icon mw-ui-icon-before mw-ui-icon-lock"><span>' : '').''.LR::encq($cx, LR::hbch($cx, 'l10n', array(array(LR::hbch($cx, 'concat', array(array('flow-',(($inary && isset($in['moderationType'])) ? $in['moderationType'] : null),'-action-restrict-',(($inary && isset($in['moderationTemplate'])) ? $in['moderationTemplate'] : null)),array()), 'raw', $in)),array()), 'encq', $in)).''.((LR::ifvar($cx, (($inary && isset($in['moderationIcons'])) ? $in['moderationIcons'] : null), false)) ? '</span></span>' : '').'</a>'.LR::encq($cx, (($inary && isset($in['noop'])) ? $in['noop'] : null)).'</li>' : '').''.((LR::ifvar($cx, ((isset($in['actions']) && is_array($in['actions']) && isset($in['actions']['unrestrict'])) ? $in['actions']['unrestrict'] : null), false)) ? '<li>'.LR::encq($cx, (($inary && isset($in['noop'])) ? $in['noop'] : null)).'<a class="'.LR::encq($cx, (($inary && isset($in['moderationMwUiClass'])) ? $in['moderationMwUiClass'] : null)).' mw-ui-quiet"
+'.$sp.'			   href="'.LR::encq($cx, ((isset($in['actions']['unrestrict']) && is_array($in['actions']['unrestrict']) && isset($in['actions']['unrestrict']['url'])) ? $in['actions']['unrestrict']['url'] : null)).'"
+'.$sp.'			   data-flow-interactive-handler="moderationDialog"
+'.$sp.'			   data-flow-template="flow_moderate_'.LR::encq($cx, (($inary && isset($in['moderationTemplate'])) ? $in['moderationTemplate'] : null)).'.partial"
+'.$sp.'			   data-role="unrestrict">'.((LR::ifvar($cx, (($inary && isset($in['moderationIcons'])) ? $in['moderationIcons'] : null), false)) ? '<span class="mw-ui-icon mw-ui-icon-before mw-ui-icon-unLock"><span>' : '').''.LR::encq($cx, LR::hbch($cx, 'l10n', array(array(LR::hbch($cx, 'concat', array(array('flow-',(($inary && isset($in['moderationType'])) ? $in['moderationType'] : null),'-action-unrestrict-',(($inary && isset($in['moderationTemplate'])) ? $in['moderationTemplate'] : null)),array()), 'raw', $in)),array()), 'encq', $in)).''.((LR::ifvar($cx, (($inary && isset($in['moderationIcons'])) ? $in['moderationIcons'] : null), false)) ? '</span></span>' : '').'</a>'.LR::encq($cx, (($inary && isset($in['noop'])) ? $in['noop'] : null)).'</li>' : '').'</section>
 ';},
 'flow_post_actions' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'<div class="flow-menu flow-menu-hoverable">
 '.$sp.'	<div class="flow-menu-js-drop"><a href="javascript:void(0);"><span class="mw-ui-icon mw-ui-icon-before mw-ui-icon-only mw-ui-icon-ellipsis" aria-label="'.LR::encq($cx, LR::hbch($cx, 'l10n', array(array('flow-post-action-menu-accessibility-name'),array()), 'encq', $in)).'"></span></a></div>
@@ -156,31 +189,6 @@
 '.$sp.'	<article class="flow-post-content mw-parser-output">'.LR::encq($cx, LR::hbch($cx, 'escapeContent', array(array(((isset($in['content']) && is_array($in['content']) && isset($in['content']['format'])) ? $in['content']['format'] : null),((isset($in['content']) && is_array($in['content']) && isset($in['content']['content'])) ? $in['content']['content'] : null)),array()), 'encq', $in)).'</article>
 '.$sp.'
 '.$sp.''.LR::p($cx, 'flow_post_meta_actions', array(array($in),array()),0, '	').''.LR::p($cx, 'flow_post_actions', array(array($in),array()),0, '	').'</div>
-';},
-'flow_anon_warning' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'<div class="flow-anon-warning">
-'.$sp.'	<div class="flow-anon-warning-mobile">
-'.$sp.''.LR::hbbch($cx, 'tooltip', array(array(),array('positionClass'=>'down','contextClass'=>'progressive','extraClass'=>'flow-form-collapsible','isBlock'=>true)), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::encq($cx, LR::hbch($cx, 'l10nParse', array(array('flow-anon-warning',LR::hbch($cx, 'linkWithReturnTo', array(array('Special:UserLogin'),array()), 'raw', $in),LR::hbch($cx, 'linkWithReturnTo', array(array('Special:UserLogin/signup'),array()), 'raw', $in)),array()), 'encq', $in)).'';}).'	</div>
-'.$sp.'
-'.$sp.''.LR::hbbch($cx, 'progressiveEnhancement', array(array(),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return '		<div class="flow-anon-warning-desktop">
-'.$sp.''.LR::hbbch($cx, 'tooltip', array(array(),array('positionClass'=>'left','contextClass'=>'progressive','extraClass'=>'flow-form-collapsible','isBlock'=>true)), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::encq($cx, LR::hbch($cx, 'l10nParse', array(array('flow-anon-warning',LR::hbch($cx, 'linkWithReturnTo', array(array('Special:UserLogin'),array()), 'raw', $in),LR::hbch($cx, 'linkWithReturnTo', array(array('Special:UserLogin/signup'),array()), 'raw', $in)),array()), 'encq', $in)).'';}).'		</div>
-'.$sp.'';}).'</div>
-';},
-'flow_edit_post' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.'<form class="flow-edit-post-form"
-'.$sp.'	method="POST"
-'.$sp.'	action="'.LR::encq($cx, ((isset($in['actions']['edit']) && is_array($in['actions']['edit']) && isset($in['actions']['edit']['url'])) ? $in['actions']['edit']['url'] : null)).'"
-'.$sp.'>
-'.$sp.''.LR::p($cx, 'flow_errors', array(array($in),array()),0, '	').'	<input type="hidden" name="wpEditToken" value="'.LR::encq($cx, (isset($cx['sp_vars']['root']['rootBlock']['editToken']) ? $cx['sp_vars']['root']['rootBlock']['editToken'] : null)).'" />
-'.$sp.'	<input type="hidden" name="topic_prev_revision" value="'.LR::encq($cx, (($inary && isset($in['revisionId'])) ? $in['revisionId'] : null)).'" />
-'.$sp.''.LR::hbbch($cx, 'ifAnonymous', array(array(),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_anon_warning', array(array($in),array()),0, '		').'';}).'
-'.$sp.'	<div class="flow-editor">
-'.$sp.'		<textarea name="topic_content" class="mw-ui-input flow-form-collapsible mw-editfont-'.LR::encq($cx, (isset($cx['sp_vars']['root']['rootBlock']['editFont']) ? $cx['sp_vars']['root']['rootBlock']['editFont'] : null)).'" data-role="content">'.((LR::ifvar($cx, (isset($cx['sp_vars']['root']['rootBlock']['submitted']['content']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['content'] : null), false)) ? ''.LR::encq($cx, (isset($cx['sp_vars']['root']['rootBlock']['submitted']['content']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['content'] : null)).'' : ''.LR::encq($cx, ((isset($in['content']) && is_array($in['content']) && isset($in['content']['content'])) ? $in['content']['content'] : null)).'').'</textarea>
-'.$sp.'	</div>
-'.$sp.'
-'.$sp.'	<div class="flow-form-actions flow-form-collapsible">
-'.$sp.'		<button class="mw-ui-button mw-ui-progressive">'.LR::encq($cx, LR::hbch($cx, 'getSaveOrPublishMessage', array(array(),array('save'=>'flow-post-action-edit-post-submit','publish'=>'flow-post-action-edit-post-submit-publish')), 'encq', $in)).'</button>
-'.$sp.'		<small class="flow-terms-of-use plainlinks">'.LR::encq($cx, LR::hbch($cx, 'l10nParseFlowTermsOfUse', array(array('edit'),array()), 'encq', $in)).'</small>
-'.$sp.'	</div>
-'.$sp.'</form>
 ';},
 'flow_reply_form' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.''.((!LR::ifvar($cx, ((isset($in['actions']) && is_array($in['actions']) && isset($in['actions']['unlock'])) ? $in['actions']['unlock'] : null), false)) ? '
 '.$sp.'<form class="flow-post flow-reply-form"
@@ -203,7 +211,11 @@
 '.$sp.'		>'.((LR::ifvar($cx, (isset($cx['sp_vars']['root']['submitted']) ? $cx['sp_vars']['root']['submitted'] : null), false)) ? ''.LR::hbbch($cx, 'ifCond', array(array((isset($cx['sp_vars']['root']['submitted']['postId']) ? $cx['sp_vars']['root']['submitted']['postId'] : null),'===',(($inary && isset($in['postId'])) ? $in['postId'] : null)),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::encq($cx, (isset($cx['sp_vars']['root']['submitted']['content']) ? $cx['sp_vars']['root']['submitted']['content'] : null)).'';}).'' : '').'</textarea>
 '.$sp.'	</div>
 '.$sp.'
-'.$sp.'	<div class="flow-form-actions flow-form-collapsible">
+'.$sp.''.((LR::ifvar($cx, ((isset($in['actions']) && is_array($in['actions']) && isset($in['actions']['restrict'])) ? $in['actions']['restrict'] : null), false)) ? '		<div class="flow-reply-private-checkbox">
+'.$sp.'			<label>
+'.$sp.'				<input type="checkbox" name="topic_private" value="1" />'.LR::encq($cx, LR::hbch($cx, 'l10n', array(array('flow-reply-restricted-link'),array()), 'encq', $in)).'</label>
+'.$sp.'		</div>
+'.$sp.'' : '').'	<div class="flow-form-actions flow-form-collapsible">
 '.$sp.'		<button data-role="submit"
 '.$sp.'		        class="mw-ui-button mw-ui-progressive"
 '.$sp.'		>'.LR::encq($cx, LR::hbch($cx, 'l10n', array(array('flow-reply-link'),array()), 'encq', $in)).'</button>
@@ -217,14 +229,14 @@
 '.$sp.'';}).'';}).''.LR::hbbch($cx, 'ifCond', array(array((isset($cx['sp_vars']['root']['rootBlock']['submitted']['postId']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['postId'] : null),'===',(($inary && isset($in['postId'])) ? $in['postId'] : null)),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::hbbch($cx, 'ifCond', array(array((isset($cx['sp_vars']['root']['rootBlock']['submitted']['action']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['action'] : null),'===','reply'),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_reply_form', array(array($in),array()),0, '			').'';}).'';}).'</div>
 ';},
 'flow_post_partial' => function ($cx, $in, $sp) {$inary=is_array($in);return ''.$sp.''.LR::wi($cx, (($inary && isset($in['revision'])) ? $in['revision'] : null), null, $in, function($cx, $in)use($sp){$inary=is_array($in);return '	<div id="flow-post-'.LR::encq($cx, (($inary && isset($in['postId'])) ? $in['postId'] : null)).'"
-'.$sp.'	     class="flow-post'.((LR::ifvar($cx, (($inary && isset($in['isMaxThreadingDepth'])) ? $in['isMaxThreadingDepth'] : null), false)) ? ' flow-post-max-depth' : '').'"
+'.$sp.'	     class="flow-post'.((LR::ifvar($cx, (($inary && isset($in['isMaxThreadingDepth'])) ? $in['isMaxThreadingDepth'] : null), false)) ? ' flow-post-max-depth' : '').''.((LR::ifvar($cx, (($inary && isset($in['isRestricted'])) ? $in['isRestricted'] : null), false)) ? ' flow-post-restricted' : '').'"
 '.$sp.'	     data-flow-id="'.LR::encq($cx, (($inary && isset($in['postId'])) ? $in['postId'] : null)).'"
 '.$sp.'	>
-'.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isModerated'])) ? $in['isModerated'] : null), false)) ? ''.LR::hbbch($cx, 'ifCond', array(array((isset($cx['sp_vars']['root']['rootBlock']['submitted']['showPostId']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['showPostId'] : null),'===',(($inary && isset($in['postId'])) ? $in['postId'] : null)),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_post_inner', array(array($in),array()),0, '				').'';}, function($cx, $in)use($sp){$inary=is_array($in);return '				<div class="flow-post-main flow-post-moderated">
+'.$sp.''.((LR::ifvar($cx, (($inary && isset($in['isRestricted'])) ? $in['isRestricted'] : null), false)) ? ''.LR::hbbch($cx, 'ifCond', array(array((isset($cx['sp_vars']['root']['rootBlock']['submitted']['action']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['action'] : null),'===','edit-post'),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::hbbch($cx, 'ifCond', array(array((isset($cx['sp_vars']['root']['rootBlock']['submitted']['postId']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['postId'] : null),'===',(($inary && isset($in['postId'])) ? $in['postId'] : null)),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_edit_post', array(array($in),array()),0, '					').'';}, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_post_inner', array(array($in),array()),0, '					').'';}).'';}, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_post_inner', array(array($in),array()),0, '				').'';}).'' : ''.((LR::ifvar($cx, (($inary && isset($in['isModerated'])) ? $in['isModerated'] : null), false)) ? ''.LR::hbbch($cx, 'ifCond', array(array((isset($cx['sp_vars']['root']['rootBlock']['submitted']['showPostId']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['showPostId'] : null),'===',(($inary && isset($in['postId'])) ? $in['postId'] : null)),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_post_inner', array(array($in),array()),0, '				').'';}, function($cx, $in)use($sp){$inary=is_array($in);return '				<div class="flow-post-main flow-post-moderated">
 '.$sp.'					<span class="flow-moderated-post-content">
 '.$sp.''.LR::p($cx, 'flow_post_moderation_state', array(array($in),array()),0, '						').'					</span>
 '.$sp.'				</div>
-'.$sp.'';}).'' : ''.LR::hbbch($cx, 'ifCond', array(array((isset($cx['sp_vars']['root']['rootBlock']['submitted']['action']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['action'] : null),'===','edit-post'),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::hbbch($cx, 'ifCond', array(array((isset($cx['sp_vars']['root']['rootBlock']['submitted']['postId']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['postId'] : null),'===',(($inary && isset($in['postId'])) ? $in['postId'] : null)),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_edit_post', array(array($in),array()),0, '					').'';}, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_post_inner', array(array($in),array()),0, '					').'';}).'';}, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_post_inner', array(array($in),array()),0, '				').'';}).'').'
+'.$sp.'';}).'' : ''.LR::hbbch($cx, 'ifCond', array(array((isset($cx['sp_vars']['root']['rootBlock']['submitted']['action']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['action'] : null),'===','edit-post'),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::hbbch($cx, 'ifCond', array(array((isset($cx['sp_vars']['root']['rootBlock']['submitted']['postId']) ? $cx['sp_vars']['root']['rootBlock']['submitted']['postId'] : null),'===',(($inary && isset($in['postId'])) ? $in['postId'] : null)),array()), $in, false, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_edit_post', array(array($in),array()),0, '					').'';}, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_post_inner', array(array($in),array()),0, '					').'';}).'';}, function($cx, $in)use($sp){$inary=is_array($in);return ''.LR::p($cx, 'flow_post_inner', array(array($in),array()),0, '				').'';}).'').'').'
 '.$sp.''.LR::p($cx, 'flow_post_replies', array(array($in),array()),0, '		').'	</div>
 '.$sp.'';}).'';});
     $cx = array(

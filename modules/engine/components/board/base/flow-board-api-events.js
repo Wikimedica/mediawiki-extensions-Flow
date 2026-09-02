@@ -223,7 +223,10 @@
 		( flowBoard, revision ) => {
 			let $replacement, $target;
 
-			if ( !revision.isModerated ) {
+			// Restricted (masked) topics stay visible to the current user;
+			// the refreshed topic already shows the masked state, don't
+			// replace it with a confirmation stub
+			if ( !revision.isModerated || revision.isRestricted ) {
 				return;
 			}
 
@@ -250,7 +253,9 @@
 		( flowBoard, revision ) => {
 			let $replacement, $target;
 
-			if ( !revision.isModerated ) {
+			// Restricted (masked) posts stay visible to the current user;
+			// the refreshed topic already shows the masked state
+			if ( !revision.isModerated || revision.isRestricted ) {
 				return;
 			}
 

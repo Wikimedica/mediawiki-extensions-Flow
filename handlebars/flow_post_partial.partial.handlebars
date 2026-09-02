@@ -1,8 +1,21 @@
 {{#with revision}}
 	<div id="flow-post-{{postId}}"
-	     class="flow-post{{#if isMaxThreadingDepth}} flow-post-max-depth{{/if}}"
+	     class="flow-post{{#if isMaxThreadingDepth}} flow-post-max-depth{{/if}}{{#if isRestricted}} flow-post-restricted{{/if}}"
 	     data-flow-id="{{postId}}"
 	>
+		{{#if isRestricted}}
+			{{!-- Restricted (private) posts render in full for those who may
+			      view them; unauthorized viewers never receive them at all --}}
+			{{#ifCond @root.rootBlock.submitted.action "===" "edit-post"}}
+				{{#ifCond @root.rootBlock.submitted.postId "===" postId}}
+					{{> flow_edit_post}}
+				{{else}}
+					{{> flow_post_inner}}
+				{{/ifCond}}
+			{{else}}
+				{{> flow_post_inner}}
+			{{/ifCond}}
+		{{else}}
 		{{#if isModerated}}
 			{{!-- TODO: T133133: This should show all posts newer than showPostId, for bundling --}}
 			{{#ifCond @root.rootBlock.submitted.showPostId "===" postId}}
@@ -24,6 +37,7 @@
 			{{else}}
 				{{> flow_post_inner}}
 			{{/ifCond}}
+		{{/if}}
 		{{/if}}
 
 		{{> flow_post_replies}}

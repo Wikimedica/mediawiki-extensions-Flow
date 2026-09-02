@@ -263,6 +263,19 @@ class TopicBlock extends AbstractBlock {
 			// default to wikitext when not specified, for old API requests
 			$this->submitted['format'] ?? 'wikitext'
 		);
+
+		// Wikimedica: start a restricted (private) branch. The reply is born
+		// restricted so it never reaches recentchanges or notifications.
+		// Replies within an already-restricted branch inherit the state and
+		// don't need the flag.
+		if ( !empty( $this->submitted['private'] ) && !$this->newRevision->isRestricted() ) {
+			if ( !$this->permissions->isAllowed( $post, 'restrict-post' ) ) {
+				$this->addError( 'permissions', $this->getDisallowedErrorMessage( $post ) );
+				return;
+			}
+			$this->newRevision->markRestricted( $this->context->getUser() );
+		}
+
 		if ( !$this->checkSpamFilters( null, $this->newRevision ) ) {
 			return;
 		}
@@ -474,7 +487,9 @@ class TopicBlock extends AbstractBlock {
 		$moderationState = str_replace( array_keys( $bc ), array_values( $bc ), $moderationState );
 
 		// these all just mean set to no moderation, it returns a post to unmoderated status
-		$allowedRestoreAliases = [ 'unlock', 'unhide', 'undelete', 'unsuppress', /* BC for unlock: */ 'reopen' ];
+		$allowedRestoreAliases = [
+			'unlock', 'unhide', 'undelete', 'unsuppress', 'unrestrict', /* BC for unlock: */ 'reopen'
+		];
 		if ( in_array( $moderationState, $allowedRestoreAliases ) ) {
 			$moderationState = 'restore';
 		}

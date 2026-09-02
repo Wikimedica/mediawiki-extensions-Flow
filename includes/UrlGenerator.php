@@ -793,6 +793,44 @@ class UrlGenerator {
 	}
 
 	/**
+	 * Restrict (make private) the specified topic workflow
+	 *
+	 * @param Title|null $title
+	 * @param UUID $workflowId
+	 * @return Anchor
+	 */
+	public function restrictTopicAction( ?Title $title, UUID $workflowId ) {
+		return new Anchor(
+			wfMessage( 'flow-topic-action-restrict-topic' ),
+			$this->resolveTitle( $title, $workflowId ),
+			[
+				'action' => 'moderate-topic',
+				'topic_moderationState' => AbstractRevision::MODERATED_RESTRICTED,
+			]
+		);
+	}
+
+	/**
+	 * Restrict (make private) the specified post within the specified workflow
+	 *
+	 * @param Title|null $title
+	 * @param UUID $workflowId
+	 * @param UUID $postId
+	 * @return Anchor
+	 */
+	public function restrictPostAction( ?Title $title, UUID $workflowId, UUID $postId ) {
+		return new Anchor(
+			wfMessage( 'flow-post-action-restrict-post' ),
+			$this->resolveTitle( $title, $workflowId ),
+			[
+				'action' => 'moderate-post',
+				'topic_postId' => $postId->getAlphadecimal(),
+				'topic_moderationState' => AbstractRevision::MODERATED_RESTRICTED,
+			]
+		);
+	}
+
+	/**
 	 * Delete the specified topic workflow
 	 *
 	 * @param Title|null $title

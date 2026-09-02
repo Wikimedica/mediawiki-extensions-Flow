@@ -20,6 +20,9 @@ abstract class AbstractRevision {
 	public const MODERATED_DELETED = 'delete';
 	public const MODERATED_SUPPRESSED = 'suppress';
 	public const MODERATED_LOCKED = 'lock';
+	// Wikimedica: content restricted to a privileged group (e.g. private
+	// editor-in-chief <-> AI agent branches) until explicitly published.
+	public const MODERATED_RESTRICTED = 'restrict';
 
 	/**
 	 * List of available permission levels.
@@ -32,6 +35,7 @@ abstract class AbstractRevision {
 		self::MODERATED_DELETED,
 		self::MODERATED_SUPPRESSED,
 		self::MODERATED_LOCKED,
+		self::MODERATED_RESTRICTED,
 	];
 
 	/**
@@ -313,8 +317,10 @@ abstract class AbstractRevision {
 			$obj->moderationTimestamp = $obj->revId->getTimestamp();
 		}
 
-		// all moderation levels past lock report a size of 0
-		if ( $obj->isModerated() && !$obj->isLocked() ) {
+		// all moderation levels past lock report a size of 0; restricted
+		// content keeps its real size (it is private, not removed, and its
+		// history entries are permission-pruned anyway)
+		if ( $obj->isModerated() && !$obj->isLocked() && !$obj->isRestricted() ) {
 			$obj->contentLength = 0;
 		} else {
 			// reset content length (we may be restoring, in which case $obj's
@@ -323,6 +329,21 @@ abstract class AbstractRevision {
 		}
 
 		return $obj;
+	}
+
+	/**
+	 * Mark a freshly created (not yet stored) revision as restricted, so it is
+	 * born private instead of going through a public creation + moderation
+	 * cycle (which would leak to recentchanges and notifications).
+	 *
+	 * @param User $user
+	 * @param string|null $reason
+	 */
+	public function markRestricted( User $user, $reason = null ) {
+		$this->moderationState = self::MODERATED_RESTRICTED;
+		$this->moderatedBy = UserTuple::newFromUser( $user );
+		$this->moderationTimestamp = $this->revId->getTimestamp();
+		$this->moderatedReason = $reason;
 	}
 
 	/**
@@ -529,7 +550,11 @@ abstract class AbstractRevision {
 	 * @throws DataModelException
 	 */
 	protected function setContent( $content, $format, ?Title $title = null ) {
-		if ( $this->moderationState !== self::MODERATED_NONE ) {
+		// Restricted (private-branch) revisions stay editable by users who can
+		// see them; permission gating happens through the 'edit-post' action.
+		if ( $this->moderationState !== self::MODERATED_NONE
+			&& $this->moderationState !== self::MODERATED_RESTRICTED
+		) {
 			throw new DataModelException( 'TODO: Cannot change content of restricted revision',
 				'process-data' );
 		}
@@ -624,7 +649,9 @@ abstract class AbstractRevision {
 	 * @throws DataModelException
 	 */
 	protected function setNextContent( User $user, $content, $format, ?Title $title = null ) {
-		if ( $this->moderationState !== self::MODERATED_NONE ) {
+		if ( $this->moderationState !== self::MODERATED_NONE
+			&& $this->moderationState !== self::MODERATED_RESTRICTED
+		) {
 			throw new DataModelException( 'Cannot change content of restricted revision', 'process-data' );
 		}
 
@@ -717,6 +744,13 @@ abstract class AbstractRevision {
 	 */
 	public function isLocked() {
 		return $this->moderationState === self::MODERATED_LOCKED;
+	}
+
+	/**
+	 * @return bool
+	 */
+	public function isRestricted() {
+		return $this->moderationState === self::MODERATED_RESTRICTED;
 	}
 
 	/**

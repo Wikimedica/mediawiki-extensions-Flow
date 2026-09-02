@@ -88,11 +88,12 @@ abstract class ApiFlowBase extends ApiBase {
 			AbstractRevision::MODERATED_DELETED,
 			AbstractRevision::MODERATED_HIDDEN,
 			AbstractRevision::MODERATED_SUPPRESSED,
+			AbstractRevision::MODERATED_RESTRICTED,
 		];
 
 		if ( $addAliases ) {
 			// aliases for AbstractRevision::MODERATED_NONE
-			return [ ...$states, 'restore', 'unhide', 'undelete', 'unsuppress' ];
+			return [ ...$states, 'restore', 'unhide', 'undelete', 'unsuppress', 'unrestrict' ];
 		}
 
 		return $states;

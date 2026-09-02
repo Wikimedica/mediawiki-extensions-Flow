@@ -34,6 +34,11 @@ class ApiFlowNewTopic extends ApiFlowBasePost {
 				ParamValidator::PARAM_DEFAULT => 'wikitext',
 				ParamValidator::PARAM_TYPE => [ 'html', 'wikitext' ],
 			],
+			// Wikimedica: create the topic born restricted (private conversation)
+			'private' => [
+				ParamValidator::PARAM_DEFAULT => false,
+				ParamValidator::PARAM_TYPE => 'boolean',
+			],
 		] + parent::getAllowedParams();
 	}
 

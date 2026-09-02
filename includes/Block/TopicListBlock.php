@@ -102,6 +102,16 @@ class TopicListBlock extends AbstractBlock {
 			return;
 		}
 
+		// Wikimedica: creating a restricted (private) topic requires the
+		// flow-restrict right
+		if ( !empty( $this->submitted['private'] ) &&
+			!MediaWikiServices::getInstance()->getPermissionManager()
+				->userHasRight( $this->context->getUser(), 'flow-restrict' )
+		) {
+			$this->addError( 'permissions', $this->context->msg( 'flow-error-not-allowed' ) );
+			return;
+		}
+
 		// creates Workflow, Revision & TopicListEntry objects to be inserted into storage
 		[ $this->topicWorkflow, $this->topicListEntry, $this->topicTitle, $this->firstPost ] = $this->create();
 
@@ -133,6 +143,13 @@ class TopicListBlock extends AbstractBlock {
 			// @phan-suppress-next-line PhanTypeArraySuspiciousNullable
 			$this->submitted['topic']
 		);
+
+		// Wikimedica: private conversation — the topic title is born
+		// restricted; posts inside are governed by the root's state, so
+		// publishing later is a single restore action on the title.
+		if ( !empty( $this->submitted['private'] ) ) {
+			$topicTitle->markRestricted( $user );
+		}
 
 		$firstPost = null;
 		if ( !empty( $this->submitted['content'] ) ) {
@@ -468,8 +485,9 @@ class TopicListBlock extends AbstractBlock {
 
 		// Work around lack of $this in closures until we can use PHP 5.4+ features.
 		$topicRootRevisionCache =& $this->topicRootRevisionCache;
+		$permissions = $this->permissions;
 
-		return $pager->getPage( static function ( array $found ) use ( $postStorage, &$topicRootRevisionCache ) {
+		return $pager->getPage( static function ( array $found ) use ( $postStorage, &$topicRootRevisionCache, $permissions ) {
 			$queries = [];
 			/** @var TopicListEntry[] $found */
 			foreach ( $found as $entry ) {
@@ -483,7 +501,11 @@ class TopicListBlock extends AbstractBlock {
 			$allowed = [];
 			foreach ( $posts as $queryResult ) {
 				$post = reset( $queryResult );
-				if ( !$post->isModerated() || $post->isLocked() ) {
+				if ( !$post->isModerated() || $post->isLocked()
+					// Restricted (private) topics stay listed for those who
+					// may view them
+					|| ( $post->isRestricted() && $permissions->isAllowed( $post, 'view' ) )
+				) {
 					$allowed[$post->getPostId()->getAlphadecimal()] = $post;
 				}
 			}

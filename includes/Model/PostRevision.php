@@ -184,6 +184,18 @@ class PostRevision extends AbstractRevision {
 		$reply->setDepth( $this->getDepth() + 1 );
 		$reply->rootPost = $this->rootPost;
 
+		// Replies inside a restricted branch are born restricted, so every
+		// revision of the branch is self-describing for permission checks (RC,
+		// history, contributions, API). Topic titles are excluded: posts in a
+		// fully-restricted topic are governed by the root's state, so that
+		// publishing the topic is a single restore action on its title.
+		if ( !$this->isTopicTitle() && $this->isRestricted() ) {
+			$reply->moderationState = self::MODERATED_RESTRICTED;
+			$reply->moderatedBy = $this->moderatedBy ?: $reply->user;
+			$reply->moderationTimestamp = $reply->revId->getTimestamp();
+			$reply->moderatedReason = $this->moderatedReason;
+		}
+
 		return $reply;
 	}
 

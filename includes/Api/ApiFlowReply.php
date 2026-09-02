@@ -33,6 +33,11 @@ class ApiFlowReply extends ApiFlowBasePost {
 				ParamValidator::PARAM_DEFAULT => 'wikitext',
 				ParamValidator::PARAM_TYPE => [ 'html', 'wikitext' ],
 			],
+			// Wikimedica: start a restricted (private) branch with this reply
+			'private' => [
+				ParamValidator::PARAM_DEFAULT => false,
+				ParamValidator::PARAM_TYPE => 'boolean',
+			],
 		] + parent::getAllowedParams();
 	}
 

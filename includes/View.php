@@ -309,6 +309,10 @@ class View extends ContextSource {
 		$out->addJsConfigVars( 'wgFlowData', $jsonBlobResponse );
 		$out->addJsConfigVars( 'wgEditSubmitButtonLabelPublish',
 			$config->get( 'EditSubmitButtonLabelPublish' ) );
+		// Wikimedica: whether the user may start restricted (private) conversations
+		$out->addJsConfigVars( 'wgFlowCanRestrict',
+			MediaWikiServices::getInstance()->getPermissionManager()
+				->userHasRight( $this->getUser(), 'flow-restrict' ) );
 
 		$renderedBlocks = [];
 		foreach ( $apiResponse['blocks'] as $block ) {

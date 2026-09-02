@@ -2,6 +2,7 @@
 
 namespace Flow\Data\Listener;
 
+use Flow\Container;
 use Flow\Exception\InvalidDataException;
 use Flow\Model\AbstractRevision;
 use Flow\Model\PostRevision;
@@ -27,6 +28,25 @@ class NotificationListener extends AbstractListener {
 
 		if ( isset( $metadata['imported'] ) && $metadata['imported'] ) {
 			// Don't send any notifications by default for imports
+			return;
+		}
+
+		// Restricted (masked) content: replies notify only the users allowed
+		// to view them (the event is flagged 'masked' and recipients are
+		// filtered by the flow-restrict right); everything else masked stays
+		// silent so nothing leaks to regular watchers.
+		$masked = false;
+		if ( $object->isRestricted() ) {
+			$masked = true;
+		} elseif ( $object->isModerated() && !$object->isLocked() ) {
+			// born moderated in some other state: never notify
+			return;
+		} elseif ( $object instanceof PostRevision && !$object->isTopicTitle() ) {
+			// normal revision living inside a fully-restricted topic
+			$root = $object->getCollection()->getRoot()->getLastRevision();
+			$masked = $root->isRestricted();
+		}
+		if ( $masked && $row['rev_change_type'] !== 'reply' ) {
 			return;
 		}
 
@@ -57,7 +77,8 @@ class NotificationListener extends AbstractListener {
 
 			case 'reply':
 				// @phan-suppress-next-line PhanTypeMismatchArgumentSuperType
-				$this->notifyPostChange( 'flow-post-reply', $object, $metadata );
+				$this->notifyPostChange( 'flow-post-reply', $object, $metadata,
+					$masked ? [ 'extra-data' => [ 'masked' => true ] ] : [] );
 				break;
 
 			case 'edit-post':
@@ -86,6 +107,31 @@ class NotificationListener extends AbstractListener {
 						'topic-workflow' => $metadata['workflow'],
 						'topic-title' => $metadata['topic-title'],
 					] );
+				} elseif ( $previousRevision->isRestricted() ) {
+					// Publishing (unmasking) a restricted conversation: this is
+					// the moment it becomes public, notify as a new topic
+					// @phan-suppress-next-line PhanTypeMismatchArgument
+					$boardWorkflow = Container::get( 'factory.loader.workflow' )
+						->createWorkflowLoader( $metadata['workflow']->getOwnerTitle() )
+						->getWorkflow();
+					$this->notificationController->notifyNewTopic( [
+						'board-workflow' => $boardWorkflow,
+						'topic-workflow' => $metadata['workflow'],
+						'topic-title' => $object,
+						'first-post' => null,
+					] );
+				}
+				break;
+
+			case 'restore-post':
+				// Publishing (unmasking) a restricted post: notify watchers as
+				// if it had just been posted. Other restores (unhide etc.)
+				// bring back content that was already notified once.
+				$post = $object->getCollection();
+				$previousRevision = $post->getPrevRevision( $object );
+				if ( $previousRevision && $previousRevision->isRestricted() ) {
+					// @phan-suppress-next-line PhanTypeMismatchArgumentSuperType
+					$this->notifyPostChange( 'flow-post-reply', $object, $metadata );
 				}
 				break;
 

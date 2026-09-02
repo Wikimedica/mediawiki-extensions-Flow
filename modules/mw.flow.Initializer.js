@@ -466,6 +466,11 @@
 				replyTo = $( this ).find( 'input[name="topic_replyTo"]' ).val(),
 				replyWidget = new mw.flow.ui.ReplyWidget( $topic.data( 'flowId' ), replyTo, {
 					placeholder: placeholder,
+					// Offer the private-branch checkbox unless the reply
+					// already lives in restricted (private) content
+					showPrivateCheckbox: !!mw.config.get( 'wgFlowCanRestrict' ) &&
+						!$( this ).closest( '.flow-post-restricted' ).length &&
+						!$( this ).closest( '.flow-topic' ).hasClass( 'flow-topic-moderatestate-restrict' ),
 					editor: {
 						confirmLeave: !!mw.user.options.get( 'useeditwarning' )
 					}
@@ -721,6 +726,12 @@
 			replyWidget = new mw.flow.ui.ReplyWidget( $topic.data( 'flowId' ), replyTo, {
 				placeholder: placeholder,
 				expandable: false,
+				// Offer the private-branch checkbox unless the reply already
+				// lives in restricted (private) content, where the state is
+				// inherited anyway
+				showPrivateCheckbox: !!mw.config.get( 'wgFlowCanRestrict' ) &&
+					!$targetContainer.closest( '.flow-post-restricted' ).length &&
+					!$topic.hasClass( 'flow-topic-moderatestate-restrict' ),
 				editor: {
 					confirmLeave: !!mw.user.options.get( 'useeditwarning' )
 				}

@@ -240,6 +240,7 @@ class RevisionFormatter {
 			ApiResult::META_BC_BOOLS => [
 				'isOriginalContent',
 				'isModerated',
+				'isRestricted',
 				'isLocked',
 				'isModeratedNotLocked',
 			],
@@ -253,6 +254,9 @@ class RevisionFormatter {
 			'properties' => $this->buildProperties( $row->workflow->getId(), $row->revision, $ctx, $row ),
 			'isOriginalContent' => $row->revision->isOriginalContent(),
 			'isModerated' => $moderatedRevision->isModerated(),
+			// Wikimedica: restricted (private) content is rendered in full for
+			// authorized viewers, unlike other moderated content
+			'isRestricted' => $moderatedRevision->isRestricted(),
 			// These are read urls
 			'links' => $this->buildLinks( $row ),
 			// These are write urls
@@ -657,6 +661,21 @@ class RevisionFormatter {
 					$links['suppress'] = $this->urlGenerator->suppressPostAction( $title, $workflowId, $postId );
 					break;
 
+				case 'restrict-topic':
+					// topic-level link, only relevant on the topic title
+					if ( !$revision instanceof PostRevision || !$revision->isTopicTitle() ) {
+						break;
+					}
+					$links['restrict'] = $this->urlGenerator->restrictTopicAction( $title, $workflowId );
+					break;
+
+				case 'restrict-post':
+					if ( !$postId ) {
+						throw new FlowException( "$type called without \$postId" );
+					}
+					$links['restrict'] = $this->urlGenerator->restrictPostAction( $title, $workflowId, $postId );
+					break;
+
 				case 'move-topic':
 					// move topic link is only available to topics
 					if ( !$revision instanceof PostRevision || !$revision->isTopicTitle() ) {
@@ -676,6 +695,13 @@ class RevisionFormatter {
 					break;
 
 				case 'restore-topic':
+					// restore-topic acts on the topic title; posts born
+					// moderated (e.g. restricted replies) list this action
+					// type through their change type but must not get a
+					// topic-level link
+					if ( !$revision instanceof PostRevision || !$revision->isTopicTitle() ) {
+						break;
+					}
 					$moderateAction = $flowAction = null;
 					switch ( $revision->getModerationState() ) {
 						case AbstractRevision::MODERATED_LOCKED:
@@ -685,6 +711,7 @@ class RevisionFormatter {
 						case AbstractRevision::MODERATED_HIDDEN:
 						case AbstractRevision::MODERATED_DELETED:
 						case AbstractRevision::MODERATED_SUPPRESSED:
+						case AbstractRevision::MODERATED_RESTRICTED:
 							$moderateAction = 'un' . $revision->getModerationState();
 							$flowAction = 'moderate-topic';
 							break;
@@ -704,6 +731,7 @@ class RevisionFormatter {
 						case AbstractRevision::MODERATED_HIDDEN:
 						case AbstractRevision::MODERATED_DELETED:
 						case AbstractRevision::MODERATED_SUPPRESSED:
+						case AbstractRevision::MODERATED_RESTRICTED:
 							$moderateAction = 'un' . $revision->getModerationState();
 							$flowAction = 'moderate-post';
 							break;

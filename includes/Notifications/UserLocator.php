@@ -47,7 +47,33 @@ class UserLocator extends \MediaWiki\Extension\Notifications\UserLocator {
 		// reset original title
 		$event->setTitle( $originalTitle );
 
+		// Masked (restricted) content only notifies users allowed to view it.
+		// The parent locator may return a lazy iterator; materialize it so it
+		// can be filtered (Flow already requires the Echo job queue here).
+		if ( $event->getExtraParam( 'masked' ) ) {
+			$users = self::filterMaskViewers(
+				is_array( $users ) ? $users : iterator_to_array( $users, true )
+			);
+		}
+
 		return $users;
+	}
+
+	/**
+	 * Keep only the users who are allowed to view masked (restricted)
+	 * conversations, i.e. holders of the flow-restrict right.
+	 *
+	 * @param array $users User objects or user ids
+	 * @return array Same shape as $users, filtered
+	 */
+	public static function filterMaskViewers( array $users ) {
+		$permissionManager = \MediaWiki\MediaWikiServices::getInstance()->getPermissionManager();
+		return array_filter( $users, static function ( $user ) use ( $permissionManager ) {
+			if ( !$user instanceof User ) {
+				$user = User::newFromId( (int)$user );
+			}
+			return $permissionManager->userHasRight( $user, 'flow-restrict' );
+		} );
 	}
 
 	/**

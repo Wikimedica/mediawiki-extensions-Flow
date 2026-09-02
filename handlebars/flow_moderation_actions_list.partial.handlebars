@@ -283,4 +283,34 @@
 			{{~noop~}}
 		</li>
 	{{~/if~}}
+	{{~#if actions.restrict~}}
+		<li>
+			{{~noop~}}
+			<a class="{{moderationMwUiClass}} mw-ui-quiet"
+			   href="{{actions.restrict.url}}"
+			   data-flow-interactive-handler="moderationDialog"
+			   data-flow-template="flow_moderate_{{moderationTemplate}}.partial"
+			   data-role="restrict">
+			   {{~#if moderationIcons}}<span class="mw-ui-icon mw-ui-icon-before mw-ui-icon-lock"><span>{{/if~}}
+				{{~l10n (concat "flow-" moderationType "-action-restrict-" moderationTemplate)~}}
+				{{~#if moderationIcons}}</span></span>{{/if~}}
+			</a>
+			{{~noop~}}
+		</li>
+	{{~/if~}}
+	{{~#if actions.unrestrict~}}
+		<li>
+			{{~noop~}}
+			<a class="{{moderationMwUiClass}} mw-ui-quiet"
+			   href="{{actions.unrestrict.url}}"
+			   data-flow-interactive-handler="moderationDialog"
+			   data-flow-template="flow_moderate_{{moderationTemplate}}.partial"
+			   data-role="unrestrict">
+			   {{~#if moderationIcons}}<span class="mw-ui-icon mw-ui-icon-before mw-ui-icon-unLock"><span>{{/if~}}
+				{{~l10n (concat "flow-" moderationType "-action-unrestrict-" moderationTemplate)~}}
+				{{~#if moderationIcons}}</span></span>{{/if~}}
+			</a>
+			{{~noop~}}
+		</li>
+	{{~/if~}}
 </section>

@@ -11,6 +11,9 @@
 	 * @param {Object} [config] Configuration object
 	 * @param {boolean} [config.expandable=true] Initialize the widget with a trigger input. Otherwise,
 	 *   the widget will be initialized with the editor already open.
+	 * @param {boolean} [config.showPrivateCheckbox=false] Offer a checkbox that makes the
+	 *   reply start a restricted (private) conversation branch, visible only to users
+	 *   with the flow-restrict right. Its state is remembered per topic.
 	 * @param {Object} [config.editor] Config options to pass to mw.flow.ui.EditorWidget
 	 */
 	mw.flow.ui.ReplyWidget = function mwFlowUiReplyWidget( topicId, replyTo, config ) {
@@ -18,6 +21,9 @@
 
 		this.replyTo = replyTo;
 		this.topicId = topicId;
+		this.showPrivateCheckbox = !!config.showPrivateCheckbox;
+		this.privateCheckbox = null;
+		this.privateStorageKey = 'flow-private-reply/' + topicId;
 		this.expandable = config.expandable === undefined ? true : config.expandable;
 		this.expanded = !this.expandable;
 		this.placeholder = config.placeholder;
@@ -143,7 +149,8 @@
 		this.error.setLabel( '' );
 		this.error.toggle( false );
 		this.editor.pushPending();
-		this.api.saveReply( this.topicId, this.replyTo, content, format, captchaResponse )
+		this.api.saveReply( this.topicId, this.replyTo, content, format, captchaResponse,
+			this.privateCheckbox && this.privateCheckbox.isSelected() )
 			.then( ( workflow ) => {
 				widget.captchaWidget.toggle( false );
 
@@ -192,6 +199,28 @@
 				saveContent: 'onEditorSaveContent',
 				cancel: 'onEditorCancel'
 			} );
+
+			// Restricted (private) conversation checkbox, shown above the
+			// terms-of-use notice. Its state is remembered per topic.
+			if ( this.showPrivateCheckbox ) {
+				const widget = this;
+				this.privateCheckbox = new OO.ui.CheckboxInputWidget( {
+					selected: mw.storage.get( this.privateStorageKey ) === '1'
+				} );
+				this.privateLayout = new OO.ui.FieldLayout( this.privateCheckbox, {
+					label: mw.msg( 'flow-reply-restricted-link' ),
+					align: 'inline',
+					classes: [ 'flow-ui-replyWidget-privateCheckbox' ]
+				} );
+				this.privateCheckbox.on( 'change', ( selected ) => {
+					mw.storage.set( widget.privateStorageKey, selected ? '1' : '0' );
+					widget.$element.toggleClass( 'flow-ui-replyWidget-private', selected );
+				} );
+				this.$element.toggleClass( 'flow-ui-replyWidget-private',
+					this.privateCheckbox.isSelected() );
+				this.editor.editorControlsWidget.termsLabel.$element
+					.before( this.privateLayout.$element );
+			}
 		}
 	};
 

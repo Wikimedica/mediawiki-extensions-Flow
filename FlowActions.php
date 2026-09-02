@@ -48,6 +48,23 @@ use Flow\RevisionActionPermissions;
  * * moduleStyles: Style modules to insert with RL to html page for this action instead of the defaults
  * * hasUserGeneratedContent: Whether this action renders a page consisting of user-generated content
  */
+
+/**
+ * Wikimedica: restricted (private) content must never reach recentchanges.
+ * A revision is restricted either directly (its own moderation state) or
+ * because it lives inside a fully-restricted topic (root governance).
+ */
+$rcInsertUnlessRestricted = static function ( AbstractRevision $revision ) {
+	if ( $revision->isRestricted() ) {
+		return false;
+	}
+	if ( $revision instanceof PostRevision && !$revision->isTopicTitle() ) {
+		$root = $revision->getCollection()->getRoot()->getLastRevision();
+		return !$root->isRestricted();
+	}
+	return true;
+};
+
 return [
 	'create-header' => [
 		'performs-writes' => true,
@@ -227,21 +244,23 @@ return [
 	'edit-title' => [
 		'performs-writes' => true,
 		'log_type' => false,
-		'rc_insert' => true,
+		'rc_insert' => $rcInsertUnlessRestricted,
 		'permissions' => [
 			// no permissions needed for own posts
 			PostRevision::MODERATED_NONE => static function (
 				PostRevision $post, RevisionActionPermissions $permissions
 			) {
 				return $post->isCreator( $permissions->getUser() ) ? '' : 'flow-edit-title';
-			}
+			},
+			// Renaming a restricted (private) topic
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 		],
 		'links' => [
 			'topic', 'topic-history', 'diff-post', 'topic-revision', 'watch-topic', 'unwatch-topic'
 		],
 		'actions' => [
 			'reply', 'thank', 'edit-title', 'lock-topic', 'hide-topic', 'delete-topic',
-			'suppress-topic', 'edit-topic-summary', 'lock-topic', 'restore-topic', 'move-topic'
+			'suppress-topic', 'restrict-topic', 'edit-topic-summary', 'lock-topic', 'restore-topic', 'move-topic'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-edit-title',
@@ -266,7 +285,6 @@ return [
 		'performs-writes' => true,
 		'log_type' => false,
 		'rc_title' => 'owner',
-		'rc_insert' => true,
 		'exclude_from_contributions' => true,
 
 		// If you add exclude_from_history to new change types, you *must* update
@@ -277,15 +295,18 @@ return [
 		// exclude_from_recentchanges only refers to the actual Special:RecentChanges.
 		// It does not affect Special:Watchlist.
 		'exclude_from_recentchanges' => true,
+		'rc_insert' => $rcInsertUnlessRestricted,
 		'permissions' => [
 			PostRevision::MODERATED_NONE => '',
+			// Topics born restricted (private conversations)
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 		],
 		'links' => [
 			'topic-history', 'topic', 'post', 'topic-revision', 'watch-topic', 'unwatch-topic'
 		],
 		'actions' => [
 			'reply', 'thank', 'edit-title', 'hide-topic', 'delete-topic', 'suppress-topic',
-			'edit-topic-summary', 'lock-topic', 'restore-topic', 'move-topic'
+			'restrict-topic', 'edit-topic-summary', 'lock-topic', 'restore-topic', 'move-topic'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-new-post',
@@ -308,22 +329,25 @@ return [
 	'edit-post' => [
 		'performs-writes' => true,
 		'log_type' => false,
-		'rc_insert' => true,
+		'rc_insert' => $rcInsertUnlessRestricted,
 		'permissions' => [
 			// no permissions needed for own posts
 			PostRevision::MODERATED_NONE => static function (
 				PostRevision $post, RevisionActionPermissions $permissions
 			) {
 				return $post->isCreator( $permissions->getUser() ) ? '' : 'flow-edit-post';
-			}
+			},
+			// Restricted (private-branch) posts stay editable by the group
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 		],
 		'root-permissions' => [
 			PostRevision::MODERATED_NONE => '',
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 		],
 		'links' => [ 'post-history', 'topic-history', 'topic', 'post', 'diff-post', 'post-revision' ],
 		'actions' => [
 			'reply', 'thank', 'edit-post', 'restore-post', 'hide-post', 'delete-post',
-			'suppress-post', 'undo-edit-post'
+			'suppress-post', 'restrict-post', 'undo-edit-post'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-edit-post',
@@ -362,7 +386,7 @@ return [
 		'links' => [ 'post-history', 'topic-history', 'topic', 'post', 'diff-post', 'post-revision' ],
 		'actions' => [
 			'reply', 'thank', 'edit-post', 'restore-post', 'hide-post', 'delete-post',
-			'suppress-post', 'undo-edit-post'
+			'suppress-post', 'restrict-post', 'undo-edit-post'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-edit-post',
@@ -405,7 +429,8 @@ return [
 		],
 		'links' => [ 'topic', 'post', 'post-history', 'topic-history', 'post-revision' ],
 		'actions' => [
-			'reply', 'thank', 'edit-post', 'restore-post', 'hide-post', 'delete-post', 'suppress-post'
+			'reply', 'thank', 'edit-post', 'restore-post', 'hide-post', 'delete-post', 'suppress-post',
+			'restrict-post'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-hid-post',
@@ -460,7 +485,8 @@ return [
 			'topic', 'post', 'post-history', 'topic-history', 'post-revision', 'watch-topic', 'unwatch-topic'
 		],
 		'actions' => [
-			'reply', 'thank', 'edit-post', 'restore-post', 'hide-post', 'delete-post', 'suppress-post'
+			'reply', 'thank', 'edit-post', 'restore-post', 'hide-post', 'delete-post', 'suppress-post',
+			'restrict-post'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-deleted-post',
@@ -488,7 +514,7 @@ return [
 		'links' => [ 'topic', 'topic-history', 'topic-revision', 'watch-topic', 'unwatch-topic' ],
 		'actions' => [
 			'reply', 'thank', 'edit-title', 'hide-topic', 'delete-topic', 'suppress-topic',
-			'edit-topic-summary', 'lock-topic', 'restore-topic'
+			'restrict-topic', 'edit-topic-summary', 'lock-topic', 'restore-topic'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-deleted-topic',
@@ -515,7 +541,8 @@ return [
 		],
 		'links' => [ 'topic', 'post', 'topic-history', 'post-revision' ],
 		'actions' => [
-			'reply', 'thank', 'edit-post', 'restore-post', 'hide-post', 'delete-post', 'suppress-post'
+			'reply', 'thank', 'edit-post', 'restore-post', 'hide-post', 'delete-post', 'suppress-post',
+			'restrict-post'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-suppressed-post',
@@ -544,7 +571,7 @@ return [
 		'links' => [ 'topic', 'topic-history', 'topic-revision', 'watch-topic', 'unwatch-topic' ],
 		'actions' => [
 			'reply', 'thank', 'edit-title', 'hide-topic', 'delete-topic', 'suppress-topic',
-			'edit-topic-summary', 'lock-topic', 'restore-topic'
+			'restrict-topic', 'edit-topic-summary', 'lock-topic', 'restore-topic'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-suppressed-topic',
@@ -557,6 +584,65 @@ return [
 				'topic-of-post-text-from-html',
 			],
 			'class' => 'flow-history-suppress-topic',
+		],
+	],
+
+	// Wikimedica: make a post (and, through born-restricted replies, the branch
+	// under it) visible only to users with the flow-restrict right, until it is
+	// published via restore-post ('unrestrict').
+	'restrict-post' => [
+		'performs-writes' => true,
+		'log_type' => false,
+		'rc_insert' => false,
+		'permissions' => [
+			PostRevision::MODERATED_NONE => 'flow-restrict',
+		],
+		'root-permissions' => [
+			PostRevision::MODERATED_NONE => '',
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
+		],
+		'links' => [ 'topic', 'post', 'topic-history', 'post-revision' ],
+		'actions' => [
+			'reply', 'edit-post', 'restore-post', 'restrict-post'
+		],
+		'history' => [
+			'i18n-message' => 'flow-rev-message-restricted-post',
+			'i18n-params' => [
+				'user-links',
+				'user-text',
+				'creator-text',
+				'post-url',
+				'moderated-reason',
+				'topic-of-post-text-from-html',
+			],
+			'class' => 'flow-history-restrict-post',
+		],
+	],
+
+	// Wikimedica: a fully private topic; the root's state governs the whole
+	// topic (list pruning, view cascade), so publishing is a single restore.
+	'restrict-topic' => [
+		'performs-writes' => true,
+		'log_type' => false,
+		'rc_insert' => false,
+		'permissions' => [
+			PostRevision::MODERATED_NONE => 'flow-restrict',
+		],
+		'links' => [ 'topic', 'topic-history', 'topic-revision', 'watch-topic', 'unwatch-topic' ],
+		'actions' => [
+			'reply', 'edit-title', 'restore-topic', 'restrict-topic', 'edit-topic-summary'
+		],
+		'history' => [
+			'i18n-message' => 'flow-rev-message-restricted-topic',
+			'i18n-params' => [
+				'user-links',
+				'user-text',
+				'creator-text',
+				'workflow-url',
+				'moderated-reason',
+				'topic-of-post-text-from-html',
+			],
+			'class' => 'flow-history-restrict-topic',
 		],
 	],
 
@@ -622,6 +708,11 @@ return [
 			$post = $revision->getCollection();
 			$previousRevision = $post->getPrevRevision( $revision );
 			if ( $previousRevision ) {
+				// Publishing restricted content is not logged (no 'restrict'
+				// log type is registered)
+				if ( $previousRevision->getModerationState() === AbstractRevision::MODERATED_RESTRICTED ) {
+					return '';
+				}
 				// Kind of log depends on the previous change type:
 				// * if post was deleted, restore should go to deletion log
 				// * if post was suppressed, restore should go to suppression log
@@ -645,10 +736,13 @@ return [
 			PostRevision::MODERATED_HIDDEN => [ 'flow-hide', 'flow-delete', 'flow-suppress' ],
 			PostRevision::MODERATED_DELETED => [ 'flow-delete', 'flow-suppress' ],
 			PostRevision::MODERATED_SUPPRESSED => 'flow-suppress',
+			// Publishing a restricted (private) post
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 		],
 		'links' => [ 'topic', 'post', 'post-history', 'post-revision' ],
 		'actions' => [
-			'reply', 'thank', 'edit-post', 'restore-post', 'hide-post', 'delete-post', 'suppress-post'
+			'reply', 'thank', 'edit-post', 'restore-post', 'hide-post', 'delete-post', 'suppress-post',
+			'restrict-post'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-restored-post',
@@ -676,6 +770,11 @@ return [
 			$post = $revision->getCollection();
 			$previousRevision = $post->getPrevRevision( $revision );
 			if ( $previousRevision ) {
+				// Publishing restricted content is not logged (no 'restrict'
+				// log type is registered)
+				if ( $previousRevision->getModerationState() === AbstractRevision::MODERATED_RESTRICTED ) {
+					return '';
+				}
 				// Kind of log depends on the previous change type:
 				// * if topic was deleted, restore should go to deletion log
 				// * if topic was suppressed, restore should go to suppression log
@@ -700,11 +799,13 @@ return [
 			PostRevision::MODERATED_HIDDEN => [ 'flow-hide', 'flow-delete', 'flow-suppress' ],
 			PostRevision::MODERATED_DELETED => [ 'flow-delete', 'flow-suppress' ],
 			PostRevision::MODERATED_SUPPRESSED => 'flow-suppress',
+			// Publishing a restricted (private) topic
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 		],
 		'links' => [ 'topic', 'topic-history', 'topic-revision', 'watch-topic', 'unwatch-topic' ],
 		'actions' => [
 			'reply', 'thank', 'edit-title', 'hide-topic', 'delete-topic', 'suppress-topic',
-			'edit-topic-summary', 'lock-topic', 'restore-topic'
+			'restrict-topic', 'edit-topic-summary', 'lock-topic', 'restore-topic'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-restored-topic',
@@ -739,6 +840,7 @@ return [
 			PostRevision::MODERATED_LOCKED => '',
 			PostRevision::MODERATED_DELETED => [ 'flow-delete', 'flow-suppress' ],
 			PostRevision::MODERATED_SUPPRESSED => 'flow-suppress',
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 		],
 		'core-delete-permissions' => [ 'deletedtext' ],
 		'links' => [], // @todo
@@ -750,17 +852,22 @@ return [
 	'reply' => [
 		'performs-writes' => true,
 		'log_type' => false,
-		'rc_insert' => true,
+		'rc_insert' => $rcInsertUnlessRestricted,
 		'permissions' => [
 			PostRevision::MODERATED_NONE => '',
+			// Replying inside a restricted (private) branch
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 		],
 		'root-permissions' => [
 			PostRevision::MODERATED_NONE => '',
+			// Replying inside a restricted (private) topic
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 		],
 		'links' => [ 'topic-history', 'topic', 'post', 'post-revision', 'watch-topic', 'unwatch-topic' ],
 		'actions' => [
 			'reply', 'thank', 'edit-post', 'hide-post', 'delete-post', 'suppress-post',
-			'edit-topic-summary', 'lock-topic', 'restore-topic'
+			// restore-post so replies born restricted offer an unmask link
+			'restrict-post', 'restore-post', 'edit-topic-summary', 'lock-topic', 'restore-topic'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-reply',
@@ -856,11 +963,13 @@ return [
 			PostRevision::MODERATED_LOCKED => '',
 			PostRevision::MODERATED_DELETED => '',
 			PostRevision::MODERATED_SUPPRESSED => 'flow-suppress',
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 		],
 		'root-permissions' => [
 			PostRevision::MODERATED_NONE => '',
 			PostRevision::MODERATED_LOCKED => '',
 			PostRevision::MODERATED_HIDDEN => '',
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 			// No data should be shown for other moderation levels: if a topic
 			// has been deleted, we don't want a bunch of irrelevant
 			// "new reply", "edit", ... spam in there.
@@ -933,6 +1042,7 @@ return [
 			PostRevision::MODERATED_LOCKED => '',
 			PostRevision::MODERATED_DELETED => '',
 			PostRevision::MODERATED_SUPPRESSED => 'flow-suppress',
+			PostRevision::MODERATED_RESTRICTED => 'flow-restrict',
 		],
 		'core-delete-permissions' => [ 'deletedtext' ],
 		'links' => [], // @todo

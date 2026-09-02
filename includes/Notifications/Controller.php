@@ -201,6 +201,11 @@ class Controller {
 
 		$user = $revision->getUser();
 		[ $mentionedUsers, $mentionsSkipped ] = $this->getMentionedUsersAndSkipState( $revision );
+		if ( !empty( $extraData['masked'] ) ) {
+			// Masked (restricted) content: mentions must not leak to users
+			// who may not view it
+			$mentionedUsers = UserLocator::filterMaskViewers( $mentionedUsers );
+		}
 		$title = $topicWorkflow->getOwnerTitle();
 
 		$extraData['revision-id'] = $revision->getRevisionId();
@@ -280,8 +285,15 @@ class Controller {
 
 		$events = [ Event::create( [ 'type' => $eventName ] + $info ) ];
 		if ( $title->getNamespace() === NS_USER_TALK ) {
-			$usertalkEvent = str_replace( 'flow-', 'flowusertalk-', $eventName );
-			$events[] = Event::create( [ 'type' => $usertalkEvent ] + $info );
+			// For masked (restricted) content, only notify the talk page
+			// owner when they are allowed to view it
+			$talkPageOwner = User::newFromName( $title->getRootText() );
+			if ( empty( $extraData['masked'] ) ||
+				( $talkPageOwner && UserLocator::filterMaskViewers( [ $talkPageOwner ] ) )
+			) {
+				$usertalkEvent = str_replace( 'flow-', 'flowusertalk-', $eventName );
+				$events[] = Event::create( [ 'type' => $usertalkEvent ] + $info );
+			}
 		}
 		return [
 			...$events,

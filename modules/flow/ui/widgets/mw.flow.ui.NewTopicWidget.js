@@ -55,6 +55,20 @@
 		this.title.$input
 			.attr( 'aria-label', mw.msg( 'flow-newtopic-start-placeholder' ) );
 
+		// Restricted (private) conversation checkbox, only for users with the
+		// flow-restrict right
+		this.privateCheckbox = null;
+		this.privateLayout = null;
+		if ( mw.config.get( 'wgFlowCanRestrict' ) ) {
+			this.privateCheckbox = new OO.ui.CheckboxInputWidget();
+			this.privateLayout = new OO.ui.FieldLayout( this.privateCheckbox, {
+				label: mw.msg( 'flow-newtopic-private' ),
+				align: 'inline',
+				classes: [ 'flow-ui-newTopicWidget-private' ]
+			} );
+			this.privateLayout.toggle( false );
+		}
+
 		this.editor = new mw.flow.ui.EditorWidget( Object.assign( {
 			placeholder: mw.msg( 'flow-newtopic-content-placeholder', this.page ),
 			saveMsgKey: mw.user.isAnon() ? 'flow-newtopic-save-anonymously' : 'flow-newtopic-save',
@@ -118,6 +132,11 @@
 				this.title.$element,
 				this.editor.$element
 			);
+		if ( this.privateLayout ) {
+			// Place the checkbox right above the terms-of-use notice
+			this.editor.editorControlsWidget.termsLabel.$element
+				.before( this.privateLayout.$element );
+		}
 	};
 
 	/* Initialization */
@@ -224,7 +243,8 @@
 		this.error.setLabel( '' );
 		this.error.toggle( false );
 
-		this.api.saveNewTopic( title, content, format, captchaResponse )
+		this.api.saveNewTopic( title, content, format, captchaResponse,
+			this.privateCheckbox && this.privateCheckbox.isSelected() )
 			.then( ( topicId ) => {
 				widget.captchaWidget.toggle( false );
 
@@ -286,12 +306,18 @@
 		this.editor.toggle( this.expanded );
 		this.anonWarning.toggle( this.expanded );
 		this.canNotEdit.toggle( this.expanded );
+		if ( this.privateLayout ) {
+			this.privateLayout.toggle( this.expanded );
+		}
 		// Hide errors
 		this.error.toggle( false );
 
 		if ( !this.expanded ) {
 			// Reset the title
 			this.title.setValue( '' );
+			if ( this.privateCheckbox ) {
+				this.privateCheckbox.setSelected( false );
+			}
 		}
 	};
 }() );
