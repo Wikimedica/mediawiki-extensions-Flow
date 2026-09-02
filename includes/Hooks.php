@@ -2255,6 +2255,13 @@ class Hooks implements
 		$parserOutput->addModules( [ 'ext.flow.embed' ] );
 		// Board content changes on every post; disable the parser cache for this page.
 		$parserOutput->updateCacheExpiry( 0 );
+		// Normally exported by View::renderApiResponse on direct board views;
+		// embedded boards need it too for the masked-conversation checkboxes.
+		// Safe to make user-dependent here since caching is disabled above.
+		$parserOutput->setJsConfigVar( 'wgFlowCanRestrict',
+			MediaWikiServices::getInstance()->getPermissionManager()
+				->userHasRight( RequestContext::getMain()->getUser(), 'flow-restrict' )
+		);
 
 		// Return a unique comment marker.  RemexHtml/Tidy preserves HTML comments
 		// verbatim, so this placeholder survives the tidy() pass intact and can be
