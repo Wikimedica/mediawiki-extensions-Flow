@@ -805,7 +805,7 @@ return [
 		'links' => [ 'topic', 'topic-history', 'topic-revision', 'watch-topic', 'unwatch-topic' ],
 		'actions' => [
 			'reply', 'thank', 'edit-title', 'hide-topic', 'delete-topic', 'suppress-topic',
-			'restrict-topic', 'edit-topic-summary', 'lock-topic', 'restore-topic'
+			'restrict-topic', 'edit-topic-summary', 'lock-topic', 'restore-topic', 'move-topic'
 		],
 		'history' => [
 			'i18n-message' => 'flow-rev-message-restored-topic',
