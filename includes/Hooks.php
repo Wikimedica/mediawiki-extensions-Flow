@@ -2253,6 +2253,12 @@ class Hooks implements
 		// JS initializer that re-runs Flow setup with the correct pageTitle and
 		// skips the global flow-initialize.js (which would use wgPageName instead).
 		$parserOutput->addModules( [ 'ext.flow.embed' ] );
+		// Thanks only adds its Flow handler on pages whose content model is
+		// flow-board; without it, thank links on embedded boards fall back to
+		// Special:Thanks and its confirmation form.
+		if ( ExtensionRegistry::getInstance()->isLoaded( 'Thanks' ) ) {
+			$parserOutput->addModules( [ 'ext.thanks.flowthank' ] );
+		}
 		// Board content changes on every post; disable the parser cache for this page.
 		$parserOutput->updateCacheExpiry( 0 );
 		// Normally exported by View::renderApiResponse on direct board views;
